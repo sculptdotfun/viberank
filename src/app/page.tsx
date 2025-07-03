@@ -1,102 +1,209 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Upload, Code2, Github, BarChart3 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import FileUpload from "@/components/FileUpload";
+import Leaderboard from "@/components/Leaderboard";
+import { formatNumber } from "@/lib/utils";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const stats = useQuery(api.stats.getGlobalStats);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+
+      {/* Modern Header with Stats */}
+      <header className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center justify-between h-20">
+            {/* Logo and Title */}
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-accent/10">
+                <BarChart3 className="w-6 h-6 text-accent" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight">viberank</h1>
+                <p className="text-xs text-muted hidden sm:block">Claude Code leaderboard</p>
+              </div>
+            </div>
+            
+            {/* Stats Bar */}
+            <div className="flex items-center gap-8">
+              <div className="hidden lg:flex items-center gap-6">
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="text-center px-3"
+                >
+                  <p className="text-2xl font-bold tabular-nums">
+                    {stats?.totalUsers || "—"}
+                  </p>
+                  <p className="text-xs text-muted font-medium">users</p>
+                </motion.div>
+                
+                <div className="h-8 w-px bg-border" />
+                
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                  className="text-center px-3"
+                >
+                  <p className="text-2xl font-bold tabular-nums">
+                    ${stats ? stats.totalCost.toFixed(0) : "—"}
+                  </p>
+                  <p className="text-xs text-muted font-medium">total spent</p>
+                </motion.div>
+                
+                <div className="h-8 w-px bg-border" />
+                
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.3 }}
+                  className="text-center px-3"
+                >
+                  <p className="text-2xl font-bold tabular-nums">
+                    {stats ? formatNumber(stats.totalTokens) : "—"}
+                  </p>
+                  <p className="text-xs text-muted font-medium">tokens</p>
+                </motion.div>
+                
+                <div className="h-8 w-px bg-border" />
+                
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                  className="text-center px-3"
+                >
+                  <p className="text-2xl font-bold text-accent tabular-nums">
+                    ${stats ? stats.topCost.toFixed(0) : "—"}
+                  </p>
+                  <p className="text-xs text-muted font-medium">top spend</p>
+                </motion.div>
+              </div>
+              
+              {/* Mobile Stats */}
+              <div className="flex lg:hidden items-center gap-4 text-sm">
+                <div className="text-center">
+                  <p className="font-bold text-lg tabular-nums">{stats?.totalUsers || 0}</p>
+                  <p className="text-xs text-muted">users</p>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="text-center">
+                  <p className="font-bold text-lg tabular-nums">${stats?.totalCost.toFixed(0) || 0}</p>
+                  <p className="text-xs text-muted">total</p>
+                </div>
+              </div>
+              
+              {/* GitHub Link */}
+              <motion.a
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
+                href="https://github.com/nikshepsvn/viberank"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors"
+              >
+                <Github className="w-5 h-5" />
+              </motion.a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 w-full">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          {/* Header with Submit Button */}
+          <div className="flex items-center justify-between mb-8">
+            <p className="text-lg text-muted">Track your Claude Code usage and compete globally</p>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowUploadModal(true)}
+              className="group relative px-5 py-2.5 bg-gradient-to-r from-accent to-accent/80 text-white rounded-xl font-medium shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30 transition-all duration-200 flex items-center gap-2.5"
+            >
+              <Upload className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+              Submit Usage
+            </motion.button>
+          </div>
+
+          {/* Leaderboard Content */}
+          <Leaderboard />
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+            onClick={() => setShowUploadModal(false)}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          
+          {/* Modal Content */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="relative bg-background border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+          >
+            {/* Modal Header */}
+            <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Submit Usage Data</h3>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="p-2 hover:bg-accent/10 rounded-lg transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
+              <FileUpload onSuccess={() => setShowUploadModal(false)} />
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="border-t border-border">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted">
+              Built with Claude Code
+            </p>
+            <a
+              href="https://github.com/nikshepsvn/viberank"
+              className="text-sm text-muted hover:text-foreground transition-colors"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );
