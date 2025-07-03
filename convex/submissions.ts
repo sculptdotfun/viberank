@@ -28,13 +28,12 @@ export const submit = mutation({
           totalCost: v.number(),
           modelsUsed: v.array(v.string()),
           modelBreakdowns: v.optional(v.array(v.object({
-            model: v.string(),
+            modelName: v.string(),
             inputTokens: v.number(),
             outputTokens: v.number(),
             cacheCreationTokens: v.number(),
             cacheReadTokens: v.number(),
-            totalTokens: v.number(),
-            totalCost: v.number(),
+            cost: v.number(),
           }))),
         })
       ),
