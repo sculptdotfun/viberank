@@ -14,8 +14,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VibeRank - Claude Code Leaderboard",
-  description: "Track and compare your Claude Code usage. Upload your cc.json file and see how you rank among developers worldwide.",
+  title: "viberank - claude code leaderboard",
+  description: "track and compare your claude code usage. upload your cc.json file and see how you rank among developers worldwide.",
+  keywords: ["claude", "claude code", "leaderboard", "ai", "usage", "ranking", "developers"],
+  authors: [{ name: "viberank" }],
+  creator: "viberank",
+  publisher: "viberank",
+  openGraph: {
+    title: "viberank - claude code leaderboard",
+    description: "track and compare your claude code usage",
+    url: "https://viberank.com",
+    siteName: "viberank",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "viberank - claude code leaderboard",
+    description: "track and compare your claude code usage",
+    creator: "@viberank",
+  },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  metadataBase: new URL("https://viberank.com"),
 };
 
 export default function RootLayout({
