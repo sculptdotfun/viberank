@@ -23,11 +23,20 @@ export default function Home() {
             {/* Logo and Title */}
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-accent/10">
-                <BarChart3 className="w-6 h-6 text-accent" />
+                <svg viewBox="0 0 24 24" className="w-6 h-6 text-accent" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 12L3 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M9 8L9 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M15 4L15 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M21 14L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="3" cy="9" r="2" fill="currentColor"/>
+                  <circle cx="9" cy="5" r="2" fill="currentColor"/>
+                  <circle cx="15" cy="2" r="2" fill="currentColor"/>
+                  <circle cx="21" cy="11" r="2" fill="currentColor"/>
+                </svg>
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight">viberank</h1>
-                <p className="text-xs text-muted hidden sm:block">Claude Code leaderboard</p>
+                <p className="text-xs text-muted hidden sm:block">claude code leaderboard</p>
               </div>
             </div>
             
@@ -107,7 +116,7 @@ export default function Home() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3, delay: 0.5 }}
-                href="https://github.com/nikshepsvn/viberank"
+                href="https://github.com/sculptdotfun/viberank"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors"
@@ -197,7 +206,7 @@ export default function Home() {
               Built with Claude Code
             </p>
             <a
-              href="https://github.com/nikshepsvn/viberank"
+              href="https://github.com/sculptdotfun/viberank"
               className="text-sm text-muted hover:text-foreground transition-colors"
             >
               GitHub
