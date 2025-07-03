@@ -91,12 +91,29 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
       const githubUsername = session.user.username;
       const githubName = session.user.name;
       
+      // Transform the data to match our schema
+      const transformedData = {
+        ...parsedData,
+        daily: parsedData.daily.map((day: any) => ({
+          ...day,
+          modelBreakdowns: day.modelBreakdowns?.map((mb: any) => ({
+            model: mb.modelName || mb.model,
+            inputTokens: mb.inputTokens,
+            outputTokens: mb.outputTokens,
+            cacheCreationTokens: mb.cacheCreationTokens,
+            cacheReadTokens: mb.cacheReadTokens,
+            totalTokens: mb.totalTokens,
+            totalCost: mb.cost || mb.totalCost,
+          }))
+        }))
+      };
+
       await submitMutation({
         username: githubUsername || session.user.email || "Anonymous",
         githubUsername: githubUsername || undefined,
         githubName: githubName || undefined,
         githubAvatar: session.user.image || undefined,
-        ccData: parsedData,
+        ccData: transformedData,
       });
       setUploadState("success");
       setParsedData(null);
