@@ -80,33 +80,86 @@ export const submit = mutation({
       day.totalCost > max.totalCost ? day : max
     , ccData.daily[0]);
     
-    // Create submission with all data
-    const submissionId = await ctx.db.insert("submissions", {
-      username,
-      githubUsername,
-      githubName,
-      githubAvatar,
-      totalTokens: ccData.totals.totalTokens,
-      totalCost: ccData.totals.totalCost,
-      inputTokens: ccData.totals.inputTokens,
-      outputTokens: ccData.totals.outputTokens,
-      cacheCreationTokens: ccData.totals.cacheCreationTokens,
-      cacheReadTokens: ccData.totals.cacheReadTokens,
-      dateRange,
-      modelsUsed,
-      dailyBreakdown: ccData.daily.map((day) => ({
-        date: day.date,
-        inputTokens: day.inputTokens,
-        outputTokens: day.outputTokens,
-        cacheCreationTokens: day.cacheCreationTokens,
-        cacheReadTokens: day.cacheReadTokens,
-        totalTokens: day.totalTokens,
-        totalCost: day.totalCost,
-        modelsUsed: day.modelsUsed,
-      })),
-      submittedAt: Date.now(),
-      verified: false,
-    });
+    // Check for existing submission with overlapping date range
+    const existingSubmissions = await ctx.db
+      .query("submissions")
+      .withIndex("by_username", (q) => q.eq("username", username))
+      .collect();
+    
+    let existingSubmission = null;
+    for (const submission of existingSubmissions) {
+      // Check if date ranges overlap
+      const existingStart = submission.dateRange.start;
+      const existingEnd = submission.dateRange.end;
+      const newStart = dateRange.start;
+      const newEnd = dateRange.end;
+      
+      // Date ranges overlap if one starts before the other ends
+      if (existingStart <= newEnd && newStart <= existingEnd) {
+        existingSubmission = submission;
+        break;
+      }
+    }
+    
+    let submissionId: any;
+    
+    if (existingSubmission) {
+      // Update existing submission
+      await ctx.db.patch(existingSubmission._id, {
+        githubUsername,
+        githubName,
+        githubAvatar,
+        totalTokens: ccData.totals.totalTokens,
+        totalCost: ccData.totals.totalCost,
+        inputTokens: ccData.totals.inputTokens,
+        outputTokens: ccData.totals.outputTokens,
+        cacheCreationTokens: ccData.totals.cacheCreationTokens,
+        cacheReadTokens: ccData.totals.cacheReadTokens,
+        dateRange,
+        modelsUsed,
+        dailyBreakdown: ccData.daily.map((day) => ({
+          date: day.date,
+          inputTokens: day.inputTokens,
+          outputTokens: day.outputTokens,
+          cacheCreationTokens: day.cacheCreationTokens,
+          cacheReadTokens: day.cacheReadTokens,
+          totalTokens: day.totalTokens,
+          totalCost: day.totalCost,
+          modelsUsed: day.modelsUsed,
+        })),
+        submittedAt: Date.now(),
+        verified: false,
+      });
+      submissionId = existingSubmission._id;
+    } else {
+      // Create new submission
+      submissionId = await ctx.db.insert("submissions", {
+        username,
+        githubUsername,
+        githubName,
+        githubAvatar,
+        totalTokens: ccData.totals.totalTokens,
+        totalCost: ccData.totals.totalCost,
+        inputTokens: ccData.totals.inputTokens,
+        outputTokens: ccData.totals.outputTokens,
+        cacheCreationTokens: ccData.totals.cacheCreationTokens,
+        cacheReadTokens: ccData.totals.cacheReadTokens,
+        dateRange,
+        modelsUsed,
+        dailyBreakdown: ccData.daily.map((day) => ({
+          date: day.date,
+          inputTokens: day.inputTokens,
+          outputTokens: day.outputTokens,
+          cacheCreationTokens: day.cacheCreationTokens,
+          cacheReadTokens: day.cacheReadTokens,
+          totalTokens: day.totalTokens,
+          totalCost: day.totalCost,
+          modelsUsed: day.modelsUsed,
+        })),
+        submittedAt: Date.now(),
+        verified: false,
+      });
+    }
     
     // Update or create profile
     const existingProfile = await ctx.db
@@ -115,13 +168,19 @@ export const submit = mutation({
       .first();
     
     if (existingProfile) {
-      await ctx.db.patch(existingProfile._id, {
-        totalSubmissions: existingProfile.totalSubmissions + 1,
-        bestSubmission: 
-          !existingProfile.bestSubmission || ccData.totals.totalCost > 0
-            ? submissionId
-            : existingProfile.bestSubmission,
-      });
+      // Only increment totalSubmissions if this is a new submission
+      const updates: any = {
+        bestSubmission: submissionId,
+        githubUsername,
+        githubName,
+        avatar: githubAvatar,
+      };
+      
+      if (!existingSubmission) {
+        updates.totalSubmissions = existingProfile.totalSubmissions + 1;
+      }
+      
+      await ctx.db.patch(existingProfile._id, updates);
     } else {
       await ctx.db.insert("profiles", {
         username,

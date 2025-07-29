@@ -132,8 +132,11 @@ export default function Home() {
       <main className="flex-1 w-full">
         <div className="max-w-7xl mx-auto px-6 py-12">
           {/* Header with Submit Button */}
-          <div className="flex items-center justify-between mb-8">
-            <p className="text-lg text-muted">Track your Claude Code usage and compete globally</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground mb-1">Global Usage Leaderboard</h2>
+              <p className="text-base text-muted">See who's pushing the limits of AI-powered development</p>
+            </div>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

@@ -16,7 +16,7 @@ export default function Leaderboard() {
   const [showShareCard, setShowShareCard] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const { data: session } = useSession();
   const submissions = useQuery(api.submissions.getLeaderboard, { 
     sortBy, 
@@ -26,10 +26,22 @@ export default function Leaderboard() {
   });
 
   const getRankBadge = (rank: number) => {
-    if (rank === 1) return <div className="w-6 h-6 rounded-full bg-[#FFD700] flex items-center justify-center text-xs font-bold text-black">1</div>;
-    if (rank === 2) return <div className="w-6 h-6 rounded-full bg-[#C0C0C0] flex items-center justify-center text-xs font-bold text-black">2</div>;
-    if (rank === 3) return <div className="w-6 h-6 rounded-full bg-[#CD7F32] flex items-center justify-center text-xs font-bold text-black">3</div>;
-    return <span className="text-muted text-sm">{rank}</span>;
+    if (rank === 1) return (
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFC107] flex items-center justify-center text-xs font-bold text-black shadow-lg shadow-[#FFD700]/20">
+        1
+      </div>
+    );
+    if (rank === 2) return (
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E0E0E0] to-[#B0B0B0] flex items-center justify-center text-xs font-bold text-black shadow-lg shadow-[#C0C0C0]/20">
+        2
+      </div>
+    );
+    if (rank === 3) return (
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#CD7F32] to-[#A0522D] flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-[#CD7F32]/20">
+        3
+      </div>
+    );
+    return <span className="text-muted text-sm font-medium">{rank}</span>;
   };
 
 
@@ -82,7 +94,9 @@ export default function Leaderboard() {
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="mb-4 sm:mb-6"
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="mb-4 sm:mb-6 overflow-hidden"
         >
           <div className="flex flex-wrap gap-2">
             {/* Preset time ranges */}
@@ -97,8 +111,8 @@ export default function Leaderboard() {
               className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
                 dateFrom && dateTo && 
                 new Date(dateTo).getTime() - new Date(dateFrom).getTime() === 7 * 24 * 60 * 60 * 1000
-                  ? "bg-accent text-white"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground"
+                  ? "bg-accent text-white shadow-md shadow-accent/20"
+                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
               }`}
             >
               <Clock className="w-3 h-3" />
@@ -116,8 +130,8 @@ export default function Leaderboard() {
                 dateFrom && dateTo && 
                 Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) >= 29 &&
                 Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) <= 31
-                  ? "bg-accent text-white"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground"
+                  ? "bg-accent text-white shadow-md shadow-accent/20"
+                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
               }`}
             >
               <Calendar className="w-3 h-3" />
@@ -130,7 +144,7 @@ export default function Leaderboard() {
                 setDateFrom(thisMonth.toISOString().split('T')[0]);
                 setDateTo(today.toISOString().split('T')[0]);
               }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all bg-card hover:bg-card-hover text-muted hover:text-foreground`}
+              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50`}
             >
               This month
             </button>
@@ -142,7 +156,7 @@ export default function Leaderboard() {
                 setDateFrom(lastMonth.toISOString().split('T')[0]);
                 setDateTo(lastDayOfLastMonth.toISOString().split('T')[0]);
               }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all bg-card hover:bg-card-hover text-muted hover:text-foreground`}
+              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50`}
             >
               Last month
             </button>
@@ -153,8 +167,8 @@ export default function Leaderboard() {
               }}
               className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all ${
                 !dateFrom && !dateTo
-                  ? "bg-accent text-white"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground"
+                  ? "bg-accent text-white shadow-md shadow-accent/20"
+                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
               }`}
             >
               All time
@@ -171,18 +185,18 @@ export default function Leaderboard() {
       )}
 
       {/* Leaderboard List */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         {submissions ? (
           submissions.map((submission, index) => (
             <motion.div
               key={submission._id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.02, duration: 0.3 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
               className="group"
             >
               {/* Mobile Card Layout */}
-              <div className="sm:hidden bg-card rounded-lg p-4 relative">
+              <div className="sm:hidden bg-card rounded-lg p-4 relative border border-border/30 shadow-sm">
                 {/* Rank Badge - Top Right */}
                 <div className="absolute top-3 right-3">
                   {getRankBadge(index + 1)}
@@ -257,7 +271,7 @@ export default function Leaderboard() {
               </div>
               
               {/* Desktop Row Layout */}
-              <div className="hidden sm:block p-4 rounded-lg hover:bg-card transition-all">
+              <div className="hidden sm:block p-4 rounded-lg bg-card/50 hover:bg-card border border-border/30 hover:border-border/50 transition-all hover:shadow-lg hover:shadow-accent/5">
                 <div className="flex items-center gap-4">
                   {/* Rank */}
                   <div className="w-10 flex justify-center">
@@ -305,13 +319,13 @@ export default function Leaderboard() {
                   {/* Stats */}
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className="font-mono text-lg font-medium">
+                      <p className="font-mono text-lg font-semibold text-accent">
                         ${submission.totalCost.toFixed(2)}
                       </p>
                       <p className="text-xs text-muted">total cost</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-lg">
+                      <p className="font-mono text-lg font-medium">
                         {formatNumber(submission.totalTokens)}
                       </p>
                       <p className="text-xs text-muted">tokens</p>
@@ -352,8 +366,11 @@ export default function Leaderboard() {
             </motion.div>
           ))
         ) : (
-          <div className="text-center py-12 text-muted">
-            Loading leaderboard...
+          <div className="text-center py-12">
+            <div className="inline-flex items-center gap-2 text-muted">
+              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              Loading leaderboard...
+            </div>
           </div>
         )}
       </div>
