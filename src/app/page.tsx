@@ -17,28 +17,44 @@ export default function Home() {
     <div className="min-h-screen bg-background flex flex-col">
 
       {/* Modern Header with Stats */}
-      <header className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-20">
+      <header className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16 sm:h-20">
             {/* Logo and Title */}
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-accent/10">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 text-accent" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 12L3 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <path d="M9 8L9 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <path d="M15 4L15 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <path d="M21 14L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <circle cx="3" cy="9" r="2" fill="currentColor"/>
-                  <circle cx="9" cy="5" r="2" fill="currentColor"/>
-                  <circle cx="15" cy="2" r="2" fill="currentColor"/>
-                  <circle cx="21" cy="11" r="2" fill="currentColor"/>
-                </svg>
-              </div>
+            <motion.div 
+              className="flex items-center gap-4"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <motion.div 
+                className="relative group"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-accent/10 rounded-xl blur-lg group-hover:blur-xl transition-all duration-300" />
+                <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-accent/15 to-accent/5 border border-accent/20 group-hover:border-accent/30 transition-all duration-300">
+                  <svg viewBox="0 0 24 24" className="w-7 h-7 sm:w-8 sm:h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 12L3 21" stroke="#dc8850" strokeWidth="2.5" strokeLinecap="round"/>
+                    <path d="M9 8L9 21" stroke="#e07b39" strokeWidth="2.5" strokeLinecap="round"/>
+                    <path d="M15 4L15 21" stroke="#f39c52" strokeWidth="2.5" strokeLinecap="round"/>
+                    <path d="M21 14L21 21" stroke="#dc8850" strokeWidth="2.5" strokeLinecap="round"/>
+                    <circle cx="3" cy="9" r="2.5" fill="#dc8850"/>
+                    <circle cx="9" cy="5" r="2.5" fill="#e07b39"/>
+                    <circle cx="15" cy="2" r="2.5" fill="#f39c52"/>
+                    <circle cx="21" cy="11" r="2.5" fill="#dc8850"/>
+                  </svg>
+                </div>
+              </motion.div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">viberank</h1>
-                <p className="text-xs text-muted hidden sm:block">claude code leaderboard</p>
+                <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                  viberank
+                </h1>
+                <p className="text-sm text-muted hidden sm:block font-medium">
+                  Claude Code Usage Leaderboard
+                </p>
               </div>
-            </div>
+            </motion.div>
             
             {/* Stats Bar */}
             <div className="flex items-center gap-8">

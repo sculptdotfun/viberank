@@ -310,9 +310,20 @@ export default function Leaderboard() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0 pr-8">
-                    <p className="font-medium text-foreground truncate">
-                      {submission.githubUsername || submission.username}
-                    </p>
+                    {submission.githubUsername ? (
+                      <a 
+                        href={`https://github.com/${submission.githubUsername}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-foreground hover:text-accent transition-colors truncate block"
+                      >
+                        {submission.githubUsername}
+                      </a>
+                    ) : (
+                      <p className="font-medium text-foreground truncate">
+                        {submission.username}
+                      </p>
+                    )}
                     {submission.githubName && submission.githubName !== submission.githubUsername && (
                       <p className="text-xs text-muted truncate">
                         {submission.githubName}
@@ -387,9 +398,20 @@ export default function Leaderboard() {
                     )}
                     <div className="min-w-0">
                       <div className="flex items-baseline gap-2">
-                        <p className="font-medium text-foreground">
-                          {submission.githubUsername || submission.username}
-                        </p>
+                        {submission.githubUsername ? (
+                          <a 
+                            href={`https://github.com/${submission.githubUsername}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-foreground hover:text-accent transition-colors"
+                          >
+                            {submission.githubUsername}
+                          </a>
+                        ) : (
+                          <p className="font-medium text-foreground">
+                            {submission.username}
+                          </p>
+                        )}
                         {submission.githubName && submission.githubName !== submission.githubUsername && (
                           <p className="text-sm text-muted">
                             {submission.githubName}
