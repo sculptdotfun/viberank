@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from "recharts";
 import { Calendar, TrendingUp, Zap } from "lucide-react";
 import type { TooltipProps } from "@/types/chart";
+import { formatCurrency } from "@/lib/utils";
 
 interface ChartData {
   date: string;
@@ -27,7 +28,7 @@ export default function TokenChart({ data, type = "area" }: TokenChartProps) {
           </p>
           <p className="text-sm flex items-center gap-2">
             <span className="text-foreground/60">Cost:</span>
-            <span className="font-mono font-medium">${payload[0].value.toFixed(2)}</span>
+            <span className="font-mono font-medium">${formatCurrency(payload[0].value)}</span>
           </p>
           <p className="text-sm flex items-center gap-2">
             <span className="text-foreground/60">Tokens:</span>

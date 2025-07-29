@@ -12,6 +12,17 @@ export function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
+export function formatCurrency(num: number): string {
+  return num.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+export function formatLargeNumber(num: number): string {
+  return num.toLocaleString('en-US');
+}
+
 export function formatDateRange(start: string, end: string): string {
   const startDate = new Date(start);
   const endDate = new Date(end);

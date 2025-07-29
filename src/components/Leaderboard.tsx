@@ -7,7 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
 import ShareCard from "./ShareCard";
-import { formatNumber, getGitHubAvatarUrl } from "@/lib/utils";
+import { formatNumber, formatCurrency, getGitHubAvatarUrl } from "@/lib/utils";
 
 type SortBy = "cost" | "tokens";
 
@@ -329,7 +329,7 @@ export default function Leaderboard() {
                   <div className="bg-background rounded-md p-2.5">
                     <p className="text-xs text-muted mb-0.5">Total Cost</p>
                     <p className="font-mono font-medium text-accent">
-                      ${submission.totalCost.toFixed(2)}
+                      ${formatCurrency(submission.totalCost)}
                     </p>
                   </div>
                   <div className="bg-background rounded-md p-2.5">
@@ -408,7 +408,7 @@ export default function Leaderboard() {
                   <div className="flex items-center gap-6">
                     <div className="text-right">
                       <p className="font-mono text-lg font-semibold text-accent">
-                        ${submission.totalCost.toFixed(2)}
+                        ${formatCurrency(submission.totalCost)}
                       </p>
                       <p className="text-xs text-muted">total cost</p>
                     </div>

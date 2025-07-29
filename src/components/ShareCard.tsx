@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Share2, Download, Twitter, Copy, X } from "lucide-react";
 import { useState } from "react";
+import { formatNumber, formatCurrency } from "@/lib/utils";
 
 interface ShareCardProps {
   rank: number;
@@ -17,7 +18,7 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
   const [copied, setCopied] = useState(false);
   
   const shareUrl = `viberank.app`;
-  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n💰 $${totalCost.toFixed(0)} spent\n📊 ${(totalTokens / 1e6).toFixed(1)}M tokens used\n\nJoin the Claude Code leaderboard:`;
+  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens used\n\nJoin the Claude Code leaderboard:`;
   
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -59,11 +60,11 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted">Total Spent</p>
-              <p className="text-lg font-mono font-medium text-accent">${totalCost.toFixed(0)}</p>
+              <p className="text-lg font-mono font-medium text-accent">${formatCurrency(totalCost)}</p>
             </div>
             <div>
               <p className="text-muted">Tokens Used</p>
-              <p className="text-lg font-mono">{(totalTokens / 1e6).toFixed(1)}M</p>
+              <p className="text-lg font-mono">{formatNumber(totalTokens)}</p>
             </div>
           </div>
           <p className="text-xs text-muted mt-3">

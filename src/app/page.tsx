@@ -7,7 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatLargeNumber } from "@/lib/utils";
 
 export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -50,7 +50,7 @@ export default function Home() {
                   className="text-center px-3"
                 >
                   <p className="text-2xl font-bold tabular-nums">
-                    {stats?.totalUsers || "—"}
+                    {stats ? formatLargeNumber(stats.totalUsers) : "—"}
                   </p>
                   <p className="text-xs text-muted font-medium">users</p>
                 </motion.div>
@@ -64,7 +64,7 @@ export default function Home() {
                   className="text-center px-3"
                 >
                   <p className="text-2xl font-bold tabular-nums">
-                    ${stats ? stats.totalCost.toFixed(0) : "—"}
+                    ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "—"}
                   </p>
                   <p className="text-xs text-muted font-medium">total spent</p>
                 </motion.div>
@@ -92,7 +92,7 @@ export default function Home() {
                   className="text-center px-3"
                 >
                   <p className="text-2xl font-bold text-accent tabular-nums">
-                    ${stats ? stats.topCost.toFixed(0) : "—"}
+                    ${stats ? formatLargeNumber(Math.round(stats.topCost)) : "—"}
                   </p>
                   <p className="text-xs text-muted font-medium">top spend</p>
                 </motion.div>
@@ -101,12 +101,12 @@ export default function Home() {
               {/* Mobile Stats */}
               <div className="flex lg:hidden items-center gap-4 text-sm">
                 <div className="text-center">
-                  <p className="font-bold text-lg tabular-nums">{stats?.totalUsers || 0}</p>
+                  <p className="font-bold text-lg tabular-nums">{stats ? formatLargeNumber(stats.totalUsers) : 0}</p>
                   <p className="text-xs text-muted">users</p>
                 </div>
                 <div className="h-8 w-px bg-border" />
                 <div className="text-center">
-                  <p className="font-bold text-lg tabular-nums">${stats?.totalCost.toFixed(0) || 0}</p>
+                  <p className="font-bold text-lg tabular-nums">${stats ? formatLargeNumber(Math.round(stats.totalCost)) : 0}</p>
                   <p className="text-xs text-muted">total</p>
                 </div>
               </div>

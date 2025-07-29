@@ -7,6 +7,7 @@ import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Github, LogOut } f
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { formatNumber, formatCurrency } from "@/lib/utils";
 
 interface CCData {
   daily: Array<{
@@ -210,11 +211,11 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted">Total Cost</span>
-                <span className="font-mono">${parsedData.totals.totalCost.toFixed(2)}</span>
+                <span className="font-mono">${formatCurrency(parsedData.totals.totalCost)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Total Tokens</span>
-                <span className="font-mono">{(parsedData.totals.totalTokens / 1e6).toFixed(1)}M</span>
+                <span className="font-mono">{formatNumber(parsedData.totals.totalTokens)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Days Tracked</span>
