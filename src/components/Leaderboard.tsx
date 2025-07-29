@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Cpu, Calendar, TrendingUp, User, Share2, Filter, Clock } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Cpu, Calendar, TrendingUp, User, Share2, Filter, Clock, X, CalendarDays } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
@@ -98,8 +98,9 @@ export default function Leaderboard() {
           transition={{ duration: 0.3, ease: "easeInOut" }}
           className="mb-4 sm:mb-6 overflow-hidden"
         >
-          <div className="flex flex-wrap gap-2">
-            {/* Preset time ranges */}
+          <div className="space-y-3">
+            {/* Quick filters */}
+            <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
                 const today = new Date();
@@ -117,6 +118,24 @@ export default function Leaderboard() {
             >
               <Clock className="w-3 h-3" />
               Last 7 days
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const last14Days = new Date(today);
+                last14Days.setDate(today.getDate() - 14);
+                setDateFrom(last14Days.toISOString().split('T')[0]);
+                setDateTo(today.toISOString().split('T')[0]);
+              }}
+              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
+                dateFrom && dateTo && 
+                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) === 14
+                  ? "bg-accent text-white shadow-md shadow-accent/20"
+                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              Last 14 days
             </button>
             <button
               onClick={() => {
@@ -144,21 +163,39 @@ export default function Leaderboard() {
                 setDateFrom(thisMonth.toISOString().split('T')[0]);
                 setDateTo(today.toISOString().split('T')[0]);
               }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50`}
+              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${(() => {
+                if (!dateFrom || !dateTo) return false;
+                const today = new Date();
+                const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                
+                return dateFrom === thisMonthStart.toISOString().split('T')[0] &&
+                       dateTo === today.toISOString().split('T')[0];
+              })()
+                  ? "bg-accent text-white shadow-md shadow-accent/20"
+                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
+              }`}
             >
+              <Calendar className="w-3 h-3" />
               This month
             </button>
             <button
               onClick={() => {
                 const today = new Date();
-                const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-                setDateFrom(lastMonth.toISOString().split('T')[0]);
-                setDateTo(lastDayOfLastMonth.toISOString().split('T')[0]);
+                const last90Days = new Date(today);
+                last90Days.setDate(today.getDate() - 90);
+                setDateFrom(last90Days.toISOString().split('T')[0]);
+                setDateTo(today.toISOString().split('T')[0]);
               }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50`}
+              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
+                dateFrom && dateTo && 
+                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) >= 89 &&
+                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) <= 91
+                  ? "bg-accent text-white shadow-md shadow-accent/20"
+                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
+              }`}
             >
-              Last month
+              <TrendingUp className="w-3 h-3" />
+              Last 90 days
             </button>
             <button
               onClick={() => {
@@ -173,13 +210,64 @@ export default function Leaderboard() {
             >
               All time
             </button>
+            </div>
+            
+            {/* Custom date range */}
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-muted" />
+                <span className="text-sm text-muted">Custom range:</span>
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="px-3 py-1.5 text-sm bg-card border border-border/50 rounded-md focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  placeholder="From"
+                />
+                <span className="text-muted text-sm">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="px-3 py-1.5 text-sm bg-card border border-border/50 rounded-md focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  placeholder="To"
+                />
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={() => {
+                      setDateFrom("");
+                      setDateTo("");
+                    }}
+                    className="p-1.5 hover:bg-card rounded-md transition-colors"
+                    title="Clear dates"
+                  >
+                    <X className="w-4 h-4 text-muted hover:text-foreground" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
           {(dateFrom || dateTo) && (
-            <p className="text-xs text-muted mt-2">
-              Showing: {dateFrom && new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              {dateFrom && dateTo && " - "}
-              {dateTo && new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </p>
+            <div className="mt-3 p-3 bg-accent/10 rounded-lg border border-accent/20">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-accent">
+                  Filtering results from {dateFrom && new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {dateFrom && dateTo && " to "}
+                  {dateTo && new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+                <button
+                  onClick={() => {
+                    setDateFrom("");
+                    setDateTo("");
+                  }}
+                  className="text-xs text-accent hover:text-accent/80 font-medium"
+                >
+                  Clear filter
+                </button>
+              </div>
+            </div>
           )}
         </motion.div>
       )}
