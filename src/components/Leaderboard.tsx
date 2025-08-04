@@ -6,6 +6,7 @@ import { Trophy, Medal, Award, DollarSign, Cpu, Calendar, TrendingUp, User, Shar
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import ShareCard from "./ShareCard";
 import { formatNumber, formatCurrency, getGitHubAvatarUrl } from "@/lib/utils";
 
@@ -311,18 +312,19 @@ export default function Leaderboard() {
                   )}
                   <div className="flex-1 min-w-0 pr-8">
                     {submission.githubUsername ? (
-                      <a 
-                        href={`https://github.com/${submission.githubUsername}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link 
+                        href={`/profile/${submission.githubUsername}`}
                         className="font-medium text-foreground hover:text-accent transition-colors truncate block"
                       >
                         {submission.githubUsername}
-                      </a>
+                      </Link>
                     ) : (
-                      <p className="font-medium text-foreground truncate">
+                      <Link 
+                        href={`/profile/${submission.username}`}
+                        className="font-medium text-foreground hover:text-accent transition-colors truncate block"
+                      >
                         {submission.username}
-                      </p>
+                      </Link>
                     )}
                     {submission.githubName && submission.githubName !== submission.githubUsername && (
                       <p className="text-xs text-muted truncate">
@@ -399,18 +401,19 @@ export default function Leaderboard() {
                     <div className="min-w-0">
                       <div className="flex items-baseline gap-2">
                         {submission.githubUsername ? (
-                          <a 
-                            href={`https://github.com/${submission.githubUsername}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <Link 
+                            href={`/profile/${submission.githubUsername}`}
                             className="font-medium text-foreground hover:text-accent transition-colors"
                           >
                             {submission.githubUsername}
-                          </a>
+                          </Link>
                         ) : (
-                          <p className="font-medium text-foreground">
+                          <Link 
+                            href={`/profile/${submission.username}`}
+                            className="font-medium text-foreground hover:text-accent transition-colors"
+                          >
                             {submission.username}
-                          </p>
+                          </Link>
                         )}
                         {submission.githubName && submission.githubName !== submission.githubUsername && (
                           <p className="text-sm text-muted">
