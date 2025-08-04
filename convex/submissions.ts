@@ -104,20 +104,16 @@ export const submit = mutation({
     let submissionId: any;
     
     if (existingSubmission) {
-      // Update existing submission
-      await ctx.db.patch(existingSubmission._id, {
-        githubUsername,
-        githubName,
-        githubAvatar,
-        totalTokens: ccData.totals.totalTokens,
-        totalCost: ccData.totals.totalCost,
-        inputTokens: ccData.totals.inputTokens,
-        outputTokens: ccData.totals.outputTokens,
-        cacheCreationTokens: ccData.totals.cacheCreationTokens,
-        cacheReadTokens: ccData.totals.cacheReadTokens,
-        dateRange,
-        modelsUsed,
-        dailyBreakdown: ccData.daily.map((day) => ({
+      // Merge with existing submission
+      
+      // Create a map of existing daily data
+      const existingDailyMap = new Map(
+        existingSubmission.dailyBreakdown.map(day => [day.date, day])
+      );
+      
+      // Update with new daily data (overwrites for same dates, adds new dates)
+      ccData.daily.forEach(day => {
+        existingDailyMap.set(day.date, {
           date: day.date,
           inputTokens: day.inputTokens,
           outputTokens: day.outputTokens,
@@ -126,7 +122,56 @@ export const submit = mutation({
           totalTokens: day.totalTokens,
           totalCost: day.totalCost,
           modelsUsed: day.modelsUsed,
-        })),
+        });
+      });
+      
+      // Convert back to array and sort by date
+      const mergedDailyBreakdown = Array.from(existingDailyMap.values())
+        .sort((a, b) => a.date.localeCompare(b.date));
+      
+      // Recalculate totals from merged data
+      const mergedTotals = mergedDailyBreakdown.reduce((acc, day) => ({
+        inputTokens: acc.inputTokens + day.inputTokens,
+        outputTokens: acc.outputTokens + day.outputTokens,
+        cacheCreationTokens: acc.cacheCreationTokens + day.cacheCreationTokens,
+        cacheReadTokens: acc.cacheReadTokens + day.cacheReadTokens,
+        totalTokens: acc.totalTokens + day.totalTokens,
+        totalCost: acc.totalCost + day.totalCost,
+      }), {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+        totalTokens: 0,
+        totalCost: 0,
+      });
+      
+      // Update date range to encompass all dates
+      const allDates = mergedDailyBreakdown.map(d => d.date);
+      const mergedDateRange = {
+        start: allDates[0] || dateRange.start,
+        end: allDates[allDates.length - 1] || dateRange.end,
+      };
+      
+      // Collect all unique models used
+      const allModelsUsed = Array.from(new Set([
+        ...existingSubmission.modelsUsed,
+        ...modelsUsed
+      ]));
+      
+      await ctx.db.patch(existingSubmission._id, {
+        githubUsername,
+        githubName,
+        githubAvatar,
+        totalTokens: mergedTotals.totalTokens,
+        totalCost: mergedTotals.totalCost,
+        inputTokens: mergedTotals.inputTokens,
+        outputTokens: mergedTotals.outputTokens,
+        cacheCreationTokens: mergedTotals.cacheCreationTokens,
+        cacheReadTokens: mergedTotals.cacheReadTokens,
+        dateRange: mergedDateRange,
+        modelsUsed: allModelsUsed,
+        dailyBreakdown: mergedDailyBreakdown,
         submittedAt: Date.now(),
         verified: false,
       });
