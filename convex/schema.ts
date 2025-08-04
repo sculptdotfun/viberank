@@ -32,6 +32,8 @@ export default defineSchema({
     ),
     submittedAt: v.number(),
     verified: v.boolean(),
+    flaggedForReview: v.optional(v.boolean()),
+    flagReasons: v.optional(v.array(v.string())),
   })
     .index("by_total_cost", ["totalCost"])
     .index("by_total_tokens", ["totalTokens"])

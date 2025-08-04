@@ -53,32 +53,100 @@ export const submit = mutation({
       throw new Error("Token totals don't match. Please use official ccusage tool.");
     }
     
-    // 2. Validate date format
+    // 2. Validate realistic ranges
+    const MAX_DAILY_COST = 5000; // $5k/day is extremely high usage
+    const MAX_DAILY_TOKENS = 50_000_000; // 50M tokens/day
+    const MIN_COST_PER_TOKEN = 0.000001; // Sanity check for cost/token ratio
+    const MAX_COST_PER_TOKEN = 0.1; // Sanity check for cost/token ratio
+    
+    // Check totals
+    if (ccData.totals.totalCost < 0 || ccData.totals.totalTokens < 0) {
+      throw new Error("Negative values are not allowed.");
+    }
+    
+    if (ccData.totals.totalCost > MAX_DAILY_COST * 365) {
+      throw new Error("Total cost exceeds realistic limits. Please check your data.");
+    }
+    
+    if (ccData.totals.totalTokens > MAX_DAILY_TOKENS * 365) {
+      throw new Error("Total tokens exceed realistic limits. Please check your data.");
+    }
+    
+    // Check cost per token ratio
+    if (ccData.totals.totalTokens > 0) {
+      const costPerToken = ccData.totals.totalCost / ccData.totals.totalTokens;
+      if (costPerToken < MIN_COST_PER_TOKEN || costPerToken > MAX_COST_PER_TOKEN) {
+        throw new Error("Cost per token ratio is unrealistic. Please check your data.");
+      }
+    }
+    
+    // 3. Validate date format and daily data
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    let flaggedForReview = false;
+    const suspiciousReasons: string[] = [];
+    
     for (const day of ccData.daily) {
       if (!dateRegex.test(day.date)) {
         throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
       }
+      
+      // Check for negative values
+      if (day.totalCost < 0 || day.totalTokens < 0 || 
+          day.inputTokens < 0 || day.outputTokens < 0 ||
+          day.cacheCreationTokens < 0 || day.cacheReadTokens < 0) {
+        throw new Error("Negative values are not allowed in daily data.");
+      }
+      
+      // Check for unrealistic daily values
+      if (day.totalCost > MAX_DAILY_COST) {
+        flaggedForReview = true;
+        suspiciousReasons.push(`Daily cost of $${day.totalCost.toFixed(2)} on ${day.date} exceeds typical limits`);
+      }
+      
+      if (day.totalTokens > MAX_DAILY_TOKENS) {
+        flaggedForReview = true;
+        suspiciousReasons.push(`Daily tokens of ${day.totalTokens.toLocaleString()} on ${day.date} exceeds typical limits`);
+      }
+      
+      // Validate daily token sum
+      const dayTokenSum = day.inputTokens + day.outputTokens + 
+                         day.cacheCreationTokens + day.cacheReadTokens;
+      if (Math.abs(dayTokenSum - day.totalTokens) > 1) {
+        throw new Error(`Token components don't sum correctly for ${day.date}.`);
+      }
     }
     
-    // 3. Extract unique models
+    // 4. Extract unique models
     const modelsUsed = Array.from(
       new Set(ccData.daily.flatMap((day) => day.modelsUsed))
     );
     
-    // 4. Sort dates to ensure consistent range
+    // 5. Sort dates to ensure consistent range
     const dates = ccData.daily.map((d) => d.date).sort();
     const dateRange = {
       start: dates[0] || "",
       end: dates[dates.length - 1] || "",
     };
     
-    // 5. Calculate interesting metrics
+    // 6. Calculate interesting metrics
     const daysActive = dates.length;
     const avgDailyCost = ccData.totals.totalCost / daysActive;
     const biggestDay = ccData.daily.reduce((max, day) => 
       day.totalCost > max.totalCost ? day : max
     , ccData.daily[0]);
+    
+    // Additional validation for suspicious patterns
+    if (avgDailyCost > MAX_DAILY_COST * 0.5) {
+      flaggedForReview = true;
+      suspiciousReasons.push(`Average daily cost of $${avgDailyCost.toFixed(2)} is unusually high`);
+    }
+    
+    // Check for future dates
+    const today = new Date();
+    const futureDate = dates.find(date => new Date(date) > today);
+    if (futureDate) {
+      throw new Error(`Future date detected: ${futureDate}. Please check your data.`);
+    }
     
     // Check for existing submission with overlapping date range
     const existingSubmissions = await ctx.db
@@ -174,6 +242,8 @@ export const submit = mutation({
         dailyBreakdown: mergedDailyBreakdown,
         submittedAt: Date.now(),
         verified: false,
+        flaggedForReview: flaggedForReview || existingSubmission.flaggedForReview,
+        flagReasons: flaggedForReview ? suspiciousReasons : existingSubmission.flagReasons,
       });
       submissionId = existingSubmission._id;
     } else {
@@ -203,6 +273,8 @@ export const submit = mutation({
         })),
         submittedAt: Date.now(),
         verified: false,
+        flaggedForReview: flaggedForReview,
+        flagReasons: flaggedForReview ? suspiciousReasons : undefined,
       });
     }
     
@@ -248,12 +320,14 @@ export const getLeaderboard = query({
     limit: v.optional(v.number()),
     dateFrom: v.optional(v.string()),
     dateTo: v.optional(v.string()),
+    includeFlagged: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
     const limit = args.limit || 100;
     const dateFrom = args.dateFrom;
     const dateTo = args.dateTo;
+    const includeFlagged = args.includeFlagged || false;
     
     // Use indexes for efficient sorting when no date filter
     if (!dateFrom && !dateTo) {
@@ -261,13 +335,25 @@ export const getLeaderboard = query({
         ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
         : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
       
-      return await query.take(limit);
+      let results = await query.take(limit * 2); // Take more to account for filtering
+      
+      // Filter out flagged submissions unless explicitly included
+      if (!includeFlagged) {
+        results = results.filter(sub => !sub.flaggedForReview);
+      }
+      
+      return results.slice(0, limit);
     }
     
     // For date filtering, we still need to fetch all and filter
-    const allSubmissions = await ctx.db
+    let allSubmissions = await ctx.db
       .query("submissions")
       .collect();
+    
+    // Filter out flagged submissions unless explicitly included
+    if (!includeFlagged) {
+      allSubmissions = allSubmissions.filter(sub => !sub.flaggedForReview);
+    }
     
     // Calculate filtered totals for each submission
     const filteredSubmissions = allSubmissions.map(submission => {
