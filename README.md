@@ -73,25 +73,45 @@ pnpm dev
 
 Open [http://localhost:3001](http://localhost:3001) to see the app.
 
-### Generating Usage Data
+### Submitting Usage Data
 
-To submit your usage data to viberank:
+#### Option 1: Using the viberank CLI (Recommended)
 
-1. Install ccusage:
+The easiest way to submit your usage data:
+
 ```bash
-# Using pip
-pip install ccusage
-
-# Using brew (macOS)
-brew install ryoppippi/tap/ccusage
+npx viberank
 ```
 
-2. Generate your usage file:
+This will automatically generate your usage data and submit it to the leaderboard.
+
+#### Option 2: Using curl
+
+If you prefer to use curl directly:
+
 ```bash
-ccusage --json > cc.json
+# Generate usage data
+npx ccusage@latest --json > cc.json
+
+# Get your GitHub username
+GITHUB_USER=$(git config user.name)
+
+# Submit to viberank
+curl -X POST https://viberank.app/api/submit \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-User: $GITHUB_USER" \
+  -d @cc.json
 ```
 
-3. Upload the `cc.json` file on viberank
+#### Option 3: Manual Upload
+
+1. Generate your usage file:
+```bash
+npx ccusage@latest --json > cc.json
+```
+
+2. Visit [viberank.app](https://viberank.app) and sign in with GitHub
+3. Upload the `cc.json` file using the web interface
 
 ## Tech Stack
 

@@ -1,0 +1,36 @@
+{
+  "name": "viberank",
+  "version": "1.0.0",
+  "description": "CLI tool to submit Claude usage stats to Viberank leaderboard",
+  "type": "module",
+  "main": "cli.js",
+  "bin": {
+    "viberank": "./cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "viberank",
+    "claude",
+    "ccusage",
+    "leaderboard",
+    "cli"
+  ],
+  "author": "SCULPT",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "prompts": "^2.4.2",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sculptdotfun/viberank"
+  },
+  "homepage": "https://viberank.app"
+}
