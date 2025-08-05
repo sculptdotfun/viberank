@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Cpu, Calendar, TrendingUp, User, Share2, Filter, Clock, X, CalendarDays } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
@@ -17,8 +17,9 @@ export default function Leaderboard() {
   const [showShareCard, setShowShareCard] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const { data: session } = useSession();
+
   const submissions = useQuery(api.submissions.getLeaderboard, { 
     sortBy, 
     limit: 50,
@@ -26,464 +27,378 @@ export default function Leaderboard() {
     dateTo: dateTo || undefined,
   });
 
-  const getRankBadge = (rank: number) => {
-    if (rank === 1) return (
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFC107] flex items-center justify-center text-xs font-bold text-black shadow-lg shadow-[#FFD700]/20">
-        1
-      </div>
-    );
-    if (rank === 2) return (
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E0E0E0] to-[#B0B0B0] flex items-center justify-center text-xs font-bold text-black shadow-lg shadow-[#C0C0C0]/20">
-        2
-      </div>
-    );
-    if (rank === 3) return (
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#CD7F32] to-[#A0522D] flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-[#CD7F32]/20">
-        3
-      </div>
-    );
-    return <span className="text-muted text-sm font-medium">{rank}</span>;
+  const getRankDisplay = (rank: number) => {
+    if (rank === 1) return <Trophy className="w-5 h-5 text-yellow-500" />;
+    if (rank === 2) return <Medal className="w-5 h-5 text-gray-400" />;
+    if (rank === 3) return <Award className="w-5 h-5 text-orange-600" />;
+    return <span className="text-lg font-semibold text-muted">{rank}</span>;
   };
 
+  // Quick filter functions
+  const setQuickFilter = (days: number | null) => {
+    if (days === null) {
+      setDateFrom("");
+      setDateTo("");
+    } else {
+      const today = new Date();
+      const from = new Date(today);
+      from.setDate(today.getDate() - days);
+      setDateFrom(from.toISOString().split('T')[0]);
+      setDateTo(today.toISOString().split('T')[0]);
+    }
+  };
 
   return (
-    <div>
-      {/* Sort Controls */}
-      <div className="flex flex-col gap-4 mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="text-xl sm:text-2xl font-light">Leaderboard</h2>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <div className="flex gap-1 flex-1 sm:flex-initial">
-              <button
-                onClick={() => setSortBy("cost")}
-                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all flex-1 sm:flex-initial ${
-                  sortBy === "cost"
-                    ? "text-foreground border-b-2 border-accent"
-                    : "text-muted hover:text-foreground"
-                }`}
-              >
-                By Cost
-              </button>
-              <button
-                onClick={() => setSortBy("tokens")}
-                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all flex-1 sm:flex-initial ${
-                  sortBy === "tokens"
-                    ? "text-foreground border-b-2 border-accent"
-                    : "text-muted hover:text-foreground"
-                }`}
-              >
-                By Tokens
-              </button>
-            </div>
+    <div className="space-y-4">
+      {/* Filter Bar */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Quick Filters */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setQuickFilter(null)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                !dateFrom && !dateTo
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card"
+              }`}
+            >
+              All Time
+            </button>
+            <button
+              onClick={() => setQuickFilter(7)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                dateFrom && dateTo && 
+                new Date(dateTo).getTime() - new Date(dateFrom).getTime() === 7 * 24 * 60 * 60 * 1000
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card"
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              onClick={() => setQuickFilter(30)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                dateFrom && dateTo && 
+                Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000)) === 30
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card"
+              }`}
+            >
+              30 Days
+            </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all ${
-                showFilters || dateFrom || dateTo
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                showFilters || (dateFrom && dateTo)
                   ? "text-accent"
                   : "text-muted hover:text-foreground"
               }`}
             >
-              <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Filters</span>
+              <Calendar className="w-4 h-4" />
+              Custom
+              <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+
+          {/* Sort Options */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSortBy("cost")}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+                sortBy === "cost"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card"
+              }`}
+            >
+              <DollarSign className="w-4 h-4" />
+              Cost
+            </button>
+            <button
+              onClick={() => setSortBy("tokens")}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+                sortBy === "tokens"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card"
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              Tokens
             </button>
           </div>
         </div>
+
+        {/* Custom Date Range */}
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-wrap items-center gap-3 px-3 py-2 bg-card/30 rounded-lg"
+          >
+            <span className="text-sm text-muted">Date range:</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-3 py-1 text-sm bg-background border border-border/50 rounded-md focus:outline-none focus:ring-1 focus:ring-accent/50"
+            />
+            <span className="text-sm text-muted">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-3 py-1 text-sm bg-background border border-border/50 rounded-md focus:outline-none focus:ring-1 focus:ring-accent/50"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                className="p-1 hover:bg-card rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-muted hover:text-foreground" />
+              </button>
+            )}
+          </motion.div>
+        )}
       </div>
 
-      {/* Date Filters */}
-      {showFilters && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="mb-4 sm:mb-6 overflow-hidden"
-        >
-          <div className="space-y-3">
-            {/* Quick filters */}
-            <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                const today = new Date();
-                const last7Days = new Date(today);
-                last7Days.setDate(today.getDate() - 7);
-                setDateFrom(last7Days.toISOString().split('T')[0]);
-                setDateTo(today.toISOString().split('T')[0]);
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
-                dateFrom && dateTo && 
-                new Date(dateTo).getTime() - new Date(dateFrom).getTime() === 7 * 24 * 60 * 60 * 1000
-                  ? "bg-accent text-white shadow-md shadow-accent/20"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              Last 7 days
-            </button>
-            <button
-              onClick={() => {
-                const today = new Date();
-                const last14Days = new Date(today);
-                last14Days.setDate(today.getDate() - 14);
-                setDateFrom(last14Days.toISOString().split('T')[0]);
-                setDateTo(today.toISOString().split('T')[0]);
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
-                dateFrom && dateTo && 
-                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) === 14
-                  ? "bg-accent text-white shadow-md shadow-accent/20"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              Last 14 days
-            </button>
-            <button
-              onClick={() => {
-                const today = new Date();
-                const last30Days = new Date(today);
-                last30Days.setDate(today.getDate() - 30);
-                setDateFrom(last30Days.toISOString().split('T')[0]);
-                setDateTo(today.toISOString().split('T')[0]);
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
-                dateFrom && dateTo && 
-                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) >= 29 &&
-                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) <= 31
-                  ? "bg-accent text-white shadow-md shadow-accent/20"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
-              }`}
-            >
-              <Calendar className="w-3 h-3" />
-              Last 30 days
-            </button>
-            <button
-              onClick={() => {
-                const today = new Date();
-                const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-                setDateFrom(thisMonth.toISOString().split('T')[0]);
-                setDateTo(today.toISOString().split('T')[0]);
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${(() => {
-                if (!dateFrom || !dateTo) return false;
-                const today = new Date();
-                const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                
-                return dateFrom === thisMonthStart.toISOString().split('T')[0] &&
-                       dateTo === today.toISOString().split('T')[0];
-              })()
-                  ? "bg-accent text-white shadow-md shadow-accent/20"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
-              }`}
-            >
-              <Calendar className="w-3 h-3" />
-              This month
-            </button>
-            <button
-              onClick={() => {
-                const today = new Date();
-                const last90Days = new Date(today);
-                last90Days.setDate(today.getDate() - 90);
-                setDateFrom(last90Days.toISOString().split('T')[0]);
-                setDateTo(today.toISOString().split('T')[0]);
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all flex items-center gap-1.5 ${
-                dateFrom && dateTo && 
-                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) >= 89 &&
-                Math.abs(new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000) <= 91
-                  ? "bg-accent text-white shadow-md shadow-accent/20"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
-              }`}
-            >
-              <TrendingUp className="w-3 h-3" />
-              Last 90 days
-            </button>
-            <button
-              onClick={() => {
-                setDateFrom("");
-                setDateTo("");
-              }}
-              className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all ${
-                !dateFrom && !dateTo
-                  ? "bg-accent text-white shadow-md shadow-accent/20"
-                  : "bg-card hover:bg-card-hover text-muted hover:text-foreground border border-border/50"
-              }`}
-            >
-              All time
-            </button>
-            </div>
-            
-            {/* Custom date range */}
-            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-muted" />
-                <span className="text-sm text-muted">Custom range:</span>
-              </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="px-3 py-1.5 text-sm bg-card border border-border/50 rounded-md focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-                  placeholder="From"
-                />
-                <span className="text-muted text-sm">to</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="px-3 py-1.5 text-sm bg-card border border-border/50 rounded-md focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-                  placeholder="To"
-                />
-                {(dateFrom || dateTo) && (
-                  <button
-                    onClick={() => {
-                      setDateFrom("");
-                      setDateTo("");
-                    }}
-                    className="p-1.5 hover:bg-card rounded-md transition-colors"
-                    title="Clear dates"
-                  >
-                    <X className="w-4 h-4 text-muted hover:text-foreground" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          {(dateFrom || dateTo) && (
-            <div className="mt-3 p-3 bg-accent/10 rounded-lg border border-accent/20">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-accent">
-                  Filtering results from {dateFrom && new Date(dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  {dateFrom && dateTo && " to "}
-                  {dateTo && new Date(dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </p>
-                <button
-                  onClick={() => {
-                    setDateFrom("");
-                    setDateTo("");
-                  }}
-                  className="text-xs text-accent hover:text-accent/80 font-medium"
-                >
-                  Clear filter
-                </button>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {/* Leaderboard List */}
+      {/* Leaderboard Table */}
       <div className="space-y-2">
         {submissions ? (
-          submissions.map((submission, index) => (
-            <motion.div
-              key={submission._id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
-              className="group"
-            >
-              {/* Mobile Card Layout */}
-              <div className="sm:hidden bg-card rounded-lg p-4 relative border border-border/30 shadow-sm">
-                {/* Rank Badge - Top Right */}
-                <div className="absolute top-3 right-3">
-                  {getRankBadge(index + 1)}
-                </div>
-                
-                {/* User Info */}
-                <div className="flex items-start gap-3 mb-3">
-                  {submission.githubAvatar ? (
-                    <img 
-                      src={submission.githubAvatar} 
-                      alt={submission.githubUsername || submission.username}
-                      className="w-12 h-12 rounded-full bg-background"
-                    />
-                  ) : submission.githubUsername ? (
-                    <img 
-                      src={getGitHubAvatarUrl(submission.githubUsername, 48)} 
-                      alt={submission.githubUsername}
-                      className="w-12 h-12 rounded-full bg-background"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-background flex items-center justify-center">
-                      <User className="w-6 h-6 text-muted" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0 pr-8">
-                    {submission.githubUsername ? (
-                      <Link 
-                        href={`/profile/${submission.githubUsername}`}
-                        className="font-medium text-foreground hover:text-accent transition-colors truncate block"
+          <>
+            {/* Desktop View */}
+            <div className="hidden sm:block overflow-hidden rounded-xl border border-border/50">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border/50 bg-card/30">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted">Rank</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted">User</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-muted">Total Cost</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-muted">Tokens</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted">Model</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-muted"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submissions.map((submission, index) => {
+                    const isCurrentUser = session?.user?.username === submission.githubUsername || 
+                                         session?.user?.email === submission.username;
+                    
+                    return (
+                      <motion.tr
+                        key={submission._id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.02 }}
+                        className={`border-b border-border/30 hover:bg-card/50 transition-colors ${
+                          isCurrentUser ? "bg-accent/5" : ""
+                        }`}
                       >
-                        {submission.githubUsername}
-                      </Link>
-                    ) : (
-                      <Link 
-                        href={`/profile/${submission.username}`}
-                        className="font-medium text-foreground hover:text-accent transition-colors truncate block"
-                      >
-                        {submission.username}
-                      </Link>
-                    )}
-                    {submission.githubName && submission.githubName !== submission.githubUsername && (
-                      <p className="text-xs text-muted truncate">
-                        {submission.githubName}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted mt-1">
-                      {submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(", ")}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-background rounded-md p-2.5">
-                    <p className="text-xs text-muted mb-0.5">Total Cost</p>
-                    <p className="font-mono font-medium text-accent">
-                      ${formatCurrency(submission.totalCost)}
-                    </p>
-                  </div>
-                  <div className="bg-background rounded-md p-2.5">
-                    <p className="text-xs text-muted mb-0.5">Tokens</p>
-                    <p className="font-mono font-medium">
-                      {formatNumber(submission.totalTokens)}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Date Range & Share */}
-                <div className="flex items-center justify-between mt-3">
-                  <p className="text-xs text-muted">
-                    {submission.dateRange.start} → {submission.dateRange.end}
-                  </p>
-                  {(session?.user?.username === submission.githubUsername || 
-                    session?.user?.email === submission.username) && (
-                    <button
-                      onClick={() => setShowShareCard(submission._id)}
-                      className="p-1.5 rounded-md hover:bg-background transition-colors"
-                      title="Share your rank"
-                    >
-                      <Share2 className="w-4 h-4 text-muted hover:text-accent" />
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              {/* Desktop Row Layout */}
-              <div className="hidden sm:block p-4 rounded-lg bg-card/50 hover:bg-card border border-border/30 hover:border-border/50 transition-all hover:shadow-lg hover:shadow-accent/5">
-                <div className="flex items-center gap-4">
-                  {/* Rank */}
-                  <div className="w-10 flex justify-center">
-                    {getRankBadge(index + 1)}
-                  </div>
-                  
-                  {/* User Info */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {submission.githubAvatar ? (
-                      <img 
-                        src={submission.githubAvatar} 
-                        alt={submission.githubUsername || submission.username}
-                        className="w-10 h-10 rounded-full bg-card"
-                      />
-                    ) : submission.githubUsername ? (
-                      <img 
-                        src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
-                        alt={submission.githubUsername}
-                        className="w-10 h-10 rounded-full bg-card"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
-                        <User className="w-5 h-5 text-muted" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        {submission.githubUsername ? (
-                          <Link 
-                            href={`/profile/${submission.githubUsername}`}
-                            className="font-medium text-foreground hover:text-accent transition-colors"
-                          >
-                            {submission.githubUsername}
-                          </Link>
-                        ) : (
-                          <Link 
-                            href={`/profile/${submission.username}`}
-                            className="font-medium text-foreground hover:text-accent transition-colors"
-                          >
-                            {submission.username}
-                          </Link>
-                        )}
-                        {submission.githubName && submission.githubName !== submission.githubUsername && (
-                          <p className="text-sm text-muted">
-                            {submission.githubName}
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-center w-8">
+                            {getRankDisplay(index + 1)}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            {submission.githubAvatar ? (
+                              <img 
+                                src={submission.githubAvatar} 
+                                alt={submission.githubUsername || submission.username}
+                                className="w-10 h-10 rounded-full"
+                              />
+                            ) : submission.githubUsername ? (
+                              <img 
+                                src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
+                                alt={submission.githubUsername}
+                                className="w-10 h-10 rounded-full"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
+                                <User className="w-5 h-5 text-muted" />
+                              </div>
+                            )}
+                            <div>
+                              <Link 
+                                href={`/profile/${submission.githubUsername || submission.username}`}
+                                className="font-medium hover:text-accent transition-colors"
+                              >
+                                {submission.githubUsername || submission.username}
+                              </Link>
+                              {submission.githubName && submission.githubName !== submission.githubUsername && (
+                                <p className="text-sm text-muted">
+                                  {submission.githubName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <p className="font-mono font-semibold text-lg">
+                            ${formatCurrency(submission.totalCost)}
                           </p>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <p className="font-mono text-muted">
+                            {formatNumber(submission.totalTokens)}
+                          </p>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="text-xs font-medium text-muted">
+                            {submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(" + ")}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          {isCurrentUser && (
+                            <button
+                              onClick={() => setShowShareCard(submission._id)}
+                              className="p-2 rounded-lg hover:bg-card transition-colors"
+                              title="Share your rank"
+                            >
+                              <Share2 className="w-4 h-4 text-muted hover:text-accent" />
+                            </button>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="sm:hidden space-y-3">
+              {submissions.map((submission, index) => {
+                const isCurrentUser = session?.user?.username === submission.githubUsername || 
+                                     session?.user?.email === submission.username;
+                
+                return (
+                  <motion.div
+                    key={submission._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.02 }}
+                    className={`p-4 rounded-xl border ${
+                      isCurrentUser 
+                        ? "border-accent/30 bg-accent/5" 
+                        : "border-border/50 bg-card/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8">
+                          {getRankDisplay(index + 1)}
+                        </div>
+                        {submission.githubAvatar ? (
+                          <img 
+                            src={submission.githubAvatar} 
+                            alt={submission.githubUsername || submission.username}
+                            className="w-12 h-12 rounded-full"
+                          />
+                        ) : submission.githubUsername ? (
+                          <img 
+                            src={getGitHubAvatarUrl(submission.githubUsername, 48)} 
+                            alt={submission.githubUsername}
+                            className="w-12 h-12 rounded-full"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center">
+                            <User className="w-6 h-6 text-muted" />
+                          </div>
                         )}
+                        <div>
+                          <Link 
+                            href={`/profile/${submission.githubUsername || submission.username}`}
+                            className="font-medium hover:text-accent transition-colors"
+                          >
+                            {submission.githubUsername || submission.username}
+                          </Link>
+                          {submission.githubName && submission.githubName !== submission.githubUsername && (
+                            <p className="text-sm text-muted">
+                              {submission.githubName}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted">
-                        <span>{submission.dateRange.start} → {submission.dateRange.end}</span>
-                        <span>•</span>
-                        <span>{submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(", ")}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Stats */}
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="font-mono text-lg font-semibold text-accent">
-                        ${formatCurrency(submission.totalCost)}
-                      </p>
-                      <p className="text-xs text-muted">total cost</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-lg font-medium">
-                        {formatNumber(submission.totalTokens)}
-                      </p>
-                      <p className="text-xs text-muted">tokens</p>
+                      {isCurrentUser && (
+                        <button
+                          onClick={() => setShowShareCard(submission._id)}
+                          className="p-2"
+                        >
+                          <Share2 className="w-4 h-4 text-muted" />
+                        </button>
+                      )}
                     </div>
                     
-                    {/* Share button */}
-                    {(session?.user?.username === submission.githubUsername || 
-                      session?.user?.email === submission.username) && (
-                      <button
-                        onClick={() => setShowShareCard(submission._id)}
-                        className="p-2 rounded-md hover:bg-card-hover transition-colors"
-                        title="Share your rank"
-                      >
-                        <Share2 className="w-4 h-4 text-muted hover:text-accent" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Share Card Modal */}
-              {showShareCard === submission._id && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="mt-2"
-                >
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-muted mb-1">Total Cost</p>
+                          <p className="font-mono font-semibold">
+                            ${formatCurrency(submission.totalCost)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted mb-1">Tokens</p>
+                          <p className="font-mono">
+                            {formatNumber(submission.totalTokens)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted">
+                          {submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(" + ")} user
+                        </span>
+                        {isCurrentUser && (
+                          <span className="text-xs text-accent font-medium">
+                            You
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Share Card Modal */}
+            {showShareCard && submissions.find(s => s._id === showShareCard) && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                onClick={() => setShowShareCard(null)}
+              >
+                <div onClick={(e) => e.stopPropagation()}>
                   <ShareCard
-                    rank={index + 1}
-                    username={submission.username}
-                    totalCost={submission.totalCost}
-                    totalTokens={submission.totalTokens}
-                    dateRange={submission.dateRange}
+                    rank={submissions.findIndex(s => s._id === showShareCard) + 1}
+                    username={submissions.find(s => s._id === showShareCard)!.username}
+                    totalCost={submissions.find(s => s._id === showShareCard)!.totalCost}
+                    totalTokens={submissions.find(s => s._id === showShareCard)!.totalTokens}
+                    dateRange={submissions.find(s => s._id === showShareCard)!.dateRange}
                     onClose={() => setShowShareCard(null)}
                   />
-                </motion.div>
-              )}
-            </motion.div>
-          ))
+                </div>
+              </motion.div>
+            )}
+          </>
         ) : (
-          <div className="text-center py-12">
+          <div className="text-center py-20">
             <div className="inline-flex items-center gap-2 text-muted">
-              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
               Loading leaderboard...
             </div>
+          </div>
+        )}
+        
+        {submissions && submissions.length === 0 && (
+          <div className="text-center py-20">
+            <Trophy className="w-12 h-12 text-muted mx-auto mb-4" />
+            <p className="text-lg text-muted">No submissions yet</p>
+            <p className="text-sm text-muted mt-2">Be the first to submit your stats!</p>
           </div>
         )}
       </div>

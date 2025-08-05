@@ -84,9 +84,9 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-background sticky top-0 z-50">
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14">
             <Link 
               href="/" 
               className="inline-flex items-center gap-2 text-muted hover:text-foreground transition-colors"
@@ -145,39 +145,27 @@ export default function ProfilePage() {
 
             {/* Key Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-2 text-muted mb-1">
-                  <DollarSign className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Total Spent</span>
-                </div>
-                <p className="text-2xl font-mono font-medium">${formatCurrency(totalCost)}</p>
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
+                <p className="text-sm text-muted mb-1">Total Spent</p>
+                <p className="text-2xl font-bold">${formatCurrency(totalCost)}</p>
                 <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
               </div>
               
-              <div className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-2 text-muted mb-1">
-                  <Zap className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Total Tokens</span>
-                </div>
-                <p className="text-2xl font-mono font-medium">{formatNumber(totalTokens)}</p>
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
+                <p className="text-sm text-muted mb-1">Total Tokens</p>
+                <p className="text-2xl font-bold">{formatNumber(totalTokens)}</p>
                 <p className="text-xs text-muted mt-1">{formatNumber(Math.round(totalTokens / daysActive))}/day</p>
               </div>
 
-              <div className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-2 text-muted mb-1">
-                  <Activity className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Days Active</span>
-                </div>
-                <p className="text-2xl font-mono font-medium">{daysActive}</p>
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
+                <p className="text-sm text-muted mb-1">Days Active</p>
+                <p className="text-2xl font-bold">{daysActive}</p>
                 <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submissions</p>
               </div>
 
-              <div className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-2 text-muted mb-1">
-                  <Hash className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Rank</span>
-                </div>
-                <p className="text-2xl font-mono font-medium">-</p>
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
+                <p className="text-sm text-muted mb-1">Global Rank</p>
+                <p className="text-2xl font-bold">-</p>
                 <p className="text-xs text-muted mt-1">Coming soon</p>
               </div>
             </div>

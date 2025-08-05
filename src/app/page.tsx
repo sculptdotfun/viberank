@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, Code2, Github, BarChart3, Sparkles } from "lucide-react";
+import { Trophy, Upload, Github, Sparkles, TrendingUp } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
@@ -16,208 +16,187 @@ export default function Home() {
   const stats = useQuery(api.stats.getGlobalStats);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-
-      {/* Modern Header with Stats */}
-      <header className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
+    <div className="min-h-screen bg-background">
+      {/* Sleek Header */}
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            {/* Logo and Title */}
+          <div className="flex items-center justify-between h-14">
+            {/* Logo */}
             <motion.div 
-              className="flex items-center gap-4"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
             >
-              <motion.div 
-                className="relative group"
-                whileHover={{ scale: 1.05 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-accent/10 rounded-xl blur-lg group-hover:blur-xl transition-all duration-300" />
-                <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-accent/15 to-accent/5 border border-accent/20 group-hover:border-accent/30 transition-all duration-300">
-                  <svg viewBox="0 0 24 24" className="w-7 h-7 sm:w-8 sm:h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 12L3 21" stroke="#dc8850" strokeWidth="2.5" strokeLinecap="round"/>
-                    <path d="M9 8L9 21" stroke="#e07b39" strokeWidth="2.5" strokeLinecap="round"/>
-                    <path d="M15 4L15 21" stroke="#f39c52" strokeWidth="2.5" strokeLinecap="round"/>
-                    <path d="M21 14L21 21" stroke="#dc8850" strokeWidth="2.5" strokeLinecap="round"/>
-                    <circle cx="3" cy="9" r="2.5" fill="#dc8850"/>
-                    <circle cx="9" cy="5" r="2.5" fill="#e07b39"/>
-                    <circle cx="15" cy="2" r="2.5" fill="#f39c52"/>
-                    <circle cx="21" cy="11" r="2.5" fill="#dc8850"/>
-                  </svg>
+              <div className="relative">
+                <div className="absolute inset-0 bg-accent/20 rounded-lg blur-xl" />
+                <div className="relative p-2 rounded-lg bg-gradient-to-br from-accent/10 to-transparent">
+                  <Trophy className="w-5 h-5 text-accent" />
                 </div>
-              </motion.div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                  viberank
-                </h1>
-                <p className="text-sm text-muted hidden sm:block font-medium">
-                  Claude Code Usage Leaderboard
-                </p>
               </div>
+              <h1 className="text-xl font-semibold">viberank</h1>
             </motion.div>
             
-            {/* Stats Bar */}
-            <div className="flex items-center gap-8">
-              <div className="hidden lg:flex items-center gap-6">
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                  className="text-center px-3"
-                >
-                  <p className="text-2xl font-bold tabular-nums">
-                    {stats ? formatLargeNumber(stats.totalUsers) : "—"}
-                  </p>
-                  <p className="text-xs text-muted font-medium">users</p>
-                </motion.div>
-                
-                <div className="h-8 w-px bg-border" />
-                
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                  className="text-center px-3"
-                >
-                  <p className="text-2xl font-bold tabular-nums">
-                    ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "—"}
-                  </p>
-                  <p className="text-xs text-muted font-medium">total spent</p>
-                </motion.div>
-                
-                <div className="h-8 w-px bg-border" />
-                
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.3 }}
-                  className="text-center px-3"
-                >
-                  <p className="text-2xl font-bold tabular-nums">
-                    {stats ? formatNumber(stats.totalTokens) : "—"}
-                  </p>
-                  <p className="text-xs text-muted font-medium">tokens</p>
-                </motion.div>
-                
-                <div className="h-8 w-px bg-border" />
-                
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.4 }}
-                  className="text-center px-3"
-                >
-                  <p className="text-2xl font-bold text-accent tabular-nums">
-                    ${stats ? formatLargeNumber(Math.round(stats.topCost)) : "—"}
-                  </p>
-                  <p className="text-xs text-muted font-medium">top spend</p>
-                </motion.div>
-              </div>
+            {/* Right side actions */}
+            <div className="flex items-center gap-2">
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                onClick={() => setShowUpdatesModal(true)}
+                className="p-2 rounded-lg hover:bg-accent/10 transition-colors relative"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent rounded-full" />
+              </motion.button>
               
-              {/* Mobile Stats */}
-              <div className="flex lg:hidden items-center gap-4 text-sm">
-                <div className="text-center">
-                  <p className="font-bold text-lg tabular-nums">{stats ? formatLargeNumber(stats.totalUsers) : 0}</p>
-                  <p className="text-xs text-muted">users</p>
-                </div>
-                <div className="h-8 w-px bg-border" />
-                <div className="text-center">
-                  <p className="font-bold text-lg tabular-nums">${stats ? formatLargeNumber(Math.round(stats.totalCost)) : 0}</p>
-                  <p className="text-xs text-muted">total</p>
-                </div>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                {/* Updates Button */}
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 0.4 }}
-                  onClick={() => setShowUpdatesModal(true)}
-                  className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors relative group"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-pulse" />
-                </motion.button>
-                
-                {/* GitHub Link */}
-                <motion.a
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 0.5 }}
-                  href="https://github.com/sculptdotfun/viberank"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors"
-                >
-                  <Github className="w-5 h-5" />
-                </motion.a>
-              </div>
+              <motion.a
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                href="https://github.com/sculptdotfun/viberank"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg hover:bg-accent/10 transition-colors"
+              >
+                <Github className="w-4 h-4" />
+              </motion.a>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          {/* Header with Submit Button */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-            <div>
-              <h2 className="text-2xl font-semibold text-foreground mb-1">Global Usage Leaderboard</h2>
-              <p className="text-base text-muted">See who's pushing the limits of AI-powered development</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* How it works link */}
+      <main className="flex-1">
+        {/* Hero Section with Stats */}
+        <div className="bg-gradient-to-b from-accent/5 via-accent/5 to-transparent">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-4xl sm:text-5xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                Claude Code Leaderboard
+              </h2>
+              <p className="text-lg text-muted max-w-2xl mx-auto">
+                Track and compare AI-powered development usage across the community
+              </p>
+            </motion.div>
+
+            {/* Stats Grid */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+            >
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 text-center">
+                <p className="text-3xl font-bold text-foreground mb-1">
+                  {stats ? formatLargeNumber(stats.totalUsers) : "—"}
+                </p>
+                <p className="text-sm text-muted">Active Users</p>
+              </div>
+              
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 text-center">
+                <p className="text-3xl font-bold text-foreground mb-1">
+                  ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "—"}
+                </p>
+                <p className="text-sm text-muted">Total Spent</p>
+              </div>
+              
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 text-center">
+                <p className="text-3xl font-bold text-foreground mb-1">
+                  {stats ? formatNumber(stats.totalTokens) : "—"}
+                </p>
+                <p className="text-sm text-muted">Tokens Used</p>
+              </div>
+              
+              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <TrendingUp className="w-5 h-5 text-accent" />
+                  <p className="text-3xl font-bold text-accent">
+                    ${stats ? formatLargeNumber(Math.round(stats.topCost)) : "—"}
+                  </p>
+                </div>
+                <p className="text-sm text-muted">Top Spender</p>
+              </div>
+            </motion.div>
+
+            {/* Submit CTA */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="text-center"
+            >
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => window.open('https://github.com/sculptdotfun/viberank#getting-started', '_blank')}
-                className="px-4 py-2.5 text-sm font-medium text-muted hover:text-foreground border border-border rounded-xl hover:border-accent/30 transition-all duration-200 flex items-center gap-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowUploadModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl font-medium shadow-lg shadow-accent/25 hover:shadow-xl hover:shadow-accent/30 transition-all"
               >
-                <Code2 className="w-4 h-4" />
-                How it works
+                <Upload className="w-5 h-5" />
+                Submit Your Stats
               </motion.button>
               
-              {/* Submit button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowUploadModal(true)}
-                className="group relative px-5 py-2.5 bg-gradient-to-r from-accent to-accent/80 text-white rounded-xl font-medium shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30 transition-all duration-200 flex items-center gap-2.5"
-              >
-                <Upload className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                Submit Usage
-              </motion.button>
-            </div>
+              <p className="mt-3 text-sm text-muted">
+                or run{" "}
+                <code className="px-2 py-0.5 bg-card rounded text-xs font-mono">npx viberank</code>
+                {" "}in your terminal
+              </p>
+            </motion.div>
           </div>
+        </div>
 
-          {/* Leaderboard Content */}
+        {/* Leaderboard Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12">
           <Leaderboard />
         </div>
       </main>
 
+      {/* Minimal Footer */}
+      <footer className="border-t border-border/50 bg-background/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between text-sm text-muted">
+            <div className="flex items-center gap-4">
+              <span>Built with Claude Code</span>
+              <a href="https://github.com/sculptdotfun/viberank" className="hover:text-foreground transition-colors">
+                GitHub
+              </a>
+              <button
+                onClick={() => setShowUpdatesModal(true)}
+                className="hover:text-foreground transition-colors"
+              >
+                Updates
+              </button>
+            </div>
+            <a 
+              href="https://github.com/sculptdotfun/viberank#getting-started"
+              className="hover:text-foreground transition-colors"
+            >
+              How it works
+            </a>
+          </div>
+        </div>
+      </footer>
+
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-background/80 backdrop-blur-sm"
             onClick={() => setShowUploadModal(false)}
           />
           
-          {/* Modal Content */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="relative bg-background border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+            className="relative bg-background border border-border rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
           >
-            {/* Modal Header */}
             <div className="border-b border-border px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Submit Usage Data</h3>
               <button
@@ -240,7 +219,6 @@ export default function Home() {
               </button>
             </div>
             
-            {/* Modal Body */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
               <FileUpload onSuccess={() => setShowUploadModal(false)} />
             </div>
@@ -250,40 +228,6 @@ export default function Home() {
 
       {/* Updates Modal */}
       <UpdatesModal isOpen={showUpdatesModal} onClose={() => setShowUpdatesModal(false)} />
-
-      {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-6 text-sm text-muted">
-              <p>Built with Claude Code</p>
-              <span className="hidden sm:block">•</span>
-              <a
-                href="https://github.com/sculptdotfun/viberank"
-                className="hover:text-foreground transition-colors"
-              >
-                GitHub
-              </a>
-              <span className="hidden sm:block">•</span>
-              <a
-                href="https://github.com/sculptdotfun/viberank/issues"
-                className="hover:text-foreground transition-colors"
-              >
-                Report Issue
-              </a>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <button
-                onClick={() => setShowUpdatesModal(true)}
-                className="hover:text-foreground transition-colors flex items-center gap-1"
-              >
-                <Sparkles className="w-3 h-3" />
-                Recent Updates
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
