@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -38,9 +38,33 @@ export default function Leaderboard() {
   const totalPages = submissions ? Math.ceil(submissions.length / ITEMS_PER_PAGE) : 0;
 
   const getRankDisplay = (rank: number) => {
-    if (rank === 1) return <Trophy className="w-5 h-5 text-yellow-500" />;
-    if (rank === 2) return <Medal className="w-5 h-5 text-gray-400" />;
-    if (rank === 3) return <Award className="w-5 h-5 text-orange-600" />;
+    if (rank === 1) return (
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+      >
+        <Trophy className="w-5 h-5 text-yellow-500" />
+      </motion.div>
+    );
+    if (rank === 2) return (
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+      >
+        <Medal className="w-5 h-5 text-gray-400" />
+      </motion.div>
+    );
+    if (rank === 3) return (
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+      >
+        <Award className="w-5 h-5 text-orange-600" />
+      </motion.div>
+    );
     return <span className="text-lg font-semibold text-muted">{rank}</span>;
   };
 
@@ -66,39 +90,47 @@ export default function Leaderboard() {
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           {/* Quick Filters */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setQuickFilter(null)}
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 !dateFrom && !dateTo
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-white shadow-sm"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
               All Time
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setQuickFilter(7)}
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 dateFrom && dateTo && 
                 new Date(dateTo).getTime() - new Date(dateFrom).getTime() === 7 * 24 * 60 * 60 * 1000
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-white shadow-sm"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
               7 Days
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setQuickFilter(30)}
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 dateFrom && dateTo && 
                 Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000)) === 30
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-white shadow-sm"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
               30 Days
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setShowFilters(!showFilters)}
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                 showFilters || (dateFrom && dateTo)
@@ -108,45 +140,56 @@ export default function Leaderboard() {
             >
               <Calendar className="w-3 sm:w-4 h-3 sm:h-4" />
               Custom
-              <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? "rotate-180" : ""}`} />
-            </button>
+              <motion.div
+                animate={{ rotate: showFilters ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronDown className="w-3 h-3" />
+              </motion.div>
+            </motion.button>
           </div>
 
           {/* Sort Options */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setSortBy("cost")}
               className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 ${
                 sortBy === "cost"
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-white shadow-sm"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
               <DollarSign className="w-3 sm:w-4 h-3 sm:h-4" />
               Cost
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setSortBy("tokens")}
               className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 ${
                 sortBy === "tokens"
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-white shadow-sm"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
               <Zap className="w-3 sm:w-4 h-3 sm:h-4" />
               Tokens
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {/* Custom Date Range */}
-        {showFilters && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex flex-wrap items-center gap-3 px-3 py-2 bg-card/30 rounded-lg"
-          >
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-wrap items-center gap-3 px-3 py-2 bg-card/30 rounded-lg overflow-hidden"
+            >
             <span className="text-sm text-muted">Date range:</span>
             <input
               type="date"
@@ -172,8 +215,9 @@ export default function Leaderboard() {
                 <X className="w-4 h-4 text-muted hover:text-foreground" />
               </button>
             )}
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Leaderboard Table */}
@@ -201,10 +245,11 @@ export default function Leaderboard() {
                     return (
                       <motion.tr
                         key={submission._id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: index * 0.02 }}
-                        className={`border-b border-border/30 hover:bg-card/50 transition-colors ${
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        whileHover={{ backgroundColor: "rgba(var(--card), 0.5)" }}
+                        className={`border-b border-border/30 transition-colors ${
                           isCurrentUser ? "bg-accent/5" : ""
                         }`}
                       >
@@ -260,13 +305,15 @@ export default function Leaderboard() {
                         </td>
                         <td className="py-4 px-4 text-center">
                           {isCurrentUser && (
-                            <button
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
                               onClick={() => setShowShareCard(submission._id)}
                               className="p-2 rounded-lg hover:bg-card transition-colors"
                               title="Share your rank"
                             >
                               <Share2 className="w-4 h-4 text-muted hover:text-accent" />
-                            </button>
+                            </motion.button>
                           )}
                         </td>
                       </motion.tr>
@@ -286,13 +333,14 @@ export default function Leaderboard() {
                 return (
                   <motion.div
                     key={submission._id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.02 }}
-                    className={`p-3 sm:p-4 rounded-xl border ${
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    whileHover={{ scale: 1.02 }}
+                    className={`p-3 sm:p-4 rounded-xl border transition-all ${
                       isCurrentUser 
-                        ? "border-accent/30 bg-accent/5" 
-                        : "border-border/50 bg-card/30"
+                        ? "border-accent/30 bg-accent/5 shadow-sm shadow-accent/10" 
+                        : "border-border/50 bg-card/30 hover:shadow-sm"
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2.5">
@@ -333,12 +381,14 @@ export default function Leaderboard() {
                         </div>
                       </div>
                       {isCurrentUser && (
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
                           onClick={() => setShowShareCard(submission._id)}
                           className="p-1.5 -mr-1 flex-shrink-0"
                         >
                           <Share2 className="w-4 h-4 text-muted" />
-                        </button>
+                        </motion.button>
                       )}
                     </div>
                     
@@ -429,19 +479,36 @@ export default function Leaderboard() {
               </button>
               
               <div className="flex items-center gap-0.5 sm:gap-1">
+                {/* Always show first page */}
+                <button
+                  onClick={() => setPage(0)}
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
+                    page === 0
+                      ? "bg-accent text-white"
+                      : "text-muted hover:text-foreground hover:bg-card"
+                  }`}
+                >
+                  1
+                </button>
+                
+                {/* Show ellipsis if needed */}
+                {page > 2 && <span className="text-muted px-1 hidden sm:inline">...</span>}
+                
+                {/* Show current page and adjacent pages on desktop, only current on mobile */}
                 {Array.from({ length: totalPages }, (_, i) => {
-                  // On mobile, show fewer page numbers
-                  const isMobile = window.innerWidth < 640;
-                  const showPage = isMobile 
-                    ? (i === 0 || i === totalPages - 1 || i === page)
-                    : (i === 0 || i === totalPages - 1 || (i >= page - 1 && i <= page + 1));
+                  if (i === 0 || i === totalPages - 1) return null; // Already shown
                   
-                  if (showPage) {
+                  const showOnDesktop = i >= page - 1 && i <= page + 1;
+                  const showOnMobile = i === page;
+                  
+                  if (showOnDesktop) {
                     return (
                       <button
                         key={i}
                         onClick={() => setPage(i)}
                         className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
+                          showOnMobile ? '' : 'hidden sm:inline-block'
+                        } ${
                           i === page
                             ? "bg-accent text-white"
                             : "text-muted hover:text-foreground hover:bg-card"
@@ -450,14 +517,26 @@ export default function Leaderboard() {
                         {i + 1}
                       </button>
                     );
-                  } else if (
-                    (isMobile && (i === 1 || i === totalPages - 2) && Math.abs(i - page) > 1) ||
-                    (!isMobile && (i === page - 2 || i === page + 2))
-                  ) {
-                    return <span key={i} className="text-muted px-1">...</span>;
                   }
                   return null;
                 })}
+                
+                {/* Show ellipsis if needed */}
+                {page < totalPages - 3 && <span className="text-muted px-1 hidden sm:inline">...</span>}
+                
+                {/* Always show last page if more than 1 page */}
+                {totalPages > 1 && (
+                  <button
+                    onClick={() => setPage(totalPages - 1)}
+                    className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
+                      page === totalPages - 1
+                        ? "bg-accent text-white"
+                        : "text-muted hover:text-foreground hover:bg-card"
+                    }`}
+                  >
+                    {totalPages}
+                  </button>
+                )}
               </div>
               
               <button

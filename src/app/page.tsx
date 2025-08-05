@@ -43,17 +43,25 @@ export default function Home() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setShowUpdatesModal(true)}
                 className="p-2 rounded-lg hover:bg-accent/10 transition-colors relative"
               >
                 <Sparkles className="w-4 h-4" />
-                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent rounded-full" />
+                <motion.span 
+                  className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent rounded-full"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
               </motion.button>
               
               <motion.a
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3, delay: 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 href="https://github.com/sculptdotfun/viberank"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -92,28 +100,40 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8"
             >
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
+              <motion.div 
+                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              >
                 <p className="text-2xl sm:text-3xl font-bold text-foreground mb-0.5 sm:mb-1">
                   {stats ? formatLargeNumber(stats.totalUsers) : "—"}
                 </p>
                 <p className="text-xs sm:text-sm text-muted">Active Users</p>
-              </div>
+              </motion.div>
               
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
+              <motion.div 
+                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              >
                 <p className="text-2xl sm:text-3xl font-bold text-foreground mb-0.5 sm:mb-1">
                   ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "—"}
                 </p>
                 <p className="text-xs sm:text-sm text-muted">Total Spent</p>
-              </div>
+              </motion.div>
               
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
+              <motion.div 
+                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              >
                 <p className="text-2xl sm:text-3xl font-bold text-foreground mb-0.5 sm:mb-1">
                   {stats ? formatNumber(stats.totalTokens) : "—"}
                 </p>
                 <p className="text-xs sm:text-sm text-muted">Tokens Used</p>
-              </div>
+              </motion.div>
               
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
+              <motion.div 
+                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              >
                 <div className="flex items-center justify-center gap-1">
                   <TrendingUp className="w-4 sm:w-5 h-4 sm:h-5 text-accent" />
                   <p className="text-2xl sm:text-3xl font-bold text-accent">
@@ -121,7 +141,7 @@ export default function Home() {
                   </p>
                 </div>
                 <p className="text-xs sm:text-sm text-muted">Top Spender</p>
-              </div>
+              </motion.div>
             </motion.div>
 
             {/* Submit CTA */}
