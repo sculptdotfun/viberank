@@ -178,7 +178,6 @@ export default function Leaderboard() {
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted">User</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-muted">Total Cost</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-muted">Tokens</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted">Model</th>
                     <th className="text-center py-3 px-4 text-sm font-medium text-muted"></th>
                   </tr>
                 </thead>
@@ -245,11 +244,6 @@ export default function Leaderboard() {
                           <p className="font-mono text-muted">
                             {formatNumber(submission.totalTokens)}
                           </p>
-                        </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="text-xs font-medium text-muted">
-                            {submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(" + ")}
-                          </span>
                         </td>
                         <td className="py-4 px-4 text-center">
                           {isCurrentUser && (
@@ -348,16 +342,13 @@ export default function Leaderboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted">
-                          {submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(" + ")} user
-                        </span>
-                        {isCurrentUser && (
+                      {isCurrentUser && (
+                        <div className="text-center">
                           <span className="text-xs text-accent font-medium">
-                            You
+                            This is you!
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );
