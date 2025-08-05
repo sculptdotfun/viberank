@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
@@ -223,9 +223,10 @@ export default function Leaderboard() {
                             <div>
                               <Link 
                                 href={`/profile/${submission.githubUsername || submission.username}`}
-                                className="font-medium hover:text-accent transition-colors"
+                                className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors"
                               >
                                 {submission.githubUsername || submission.username}
+                                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </Link>
                               {submission.githubName && submission.githubName !== submission.githubUsername && (
                                 <p className="text-sm text-muted">
@@ -306,9 +307,10 @@ export default function Leaderboard() {
                         <div>
                           <Link 
                             href={`/profile/${submission.githubUsername || submission.username}`}
-                            className="font-medium hover:text-accent transition-colors"
+                            className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors"
                           >
                             {submission.githubUsername || submission.username}
+                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </Link>
                           {submission.githubName && submission.githubName !== submission.githubUsername && (
                             <p className="text-sm text-muted">
@@ -390,6 +392,15 @@ export default function Leaderboard() {
             <Trophy className="w-12 h-12 text-muted mx-auto mb-4" />
             <p className="text-lg text-muted">No submissions yet</p>
             <p className="text-sm text-muted mt-2">Be the first to submit your stats!</p>
+          </div>
+        )}
+        
+        {/* Tip */}
+        {submissions && submissions.length > 0 && (
+          <div className="text-center">
+            <p className="text-xs text-muted">
+              💡 Click on any username to view their detailed profile and usage charts
+            </p>
           </div>
         )}
       </div>
