@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
   Github, Calendar, DollarSign, Zap, ArrowLeft, ExternalLink,
-  TrendingUp, Code2, BarChart3, Activity, Clock, Hash
+  TrendingUp, Code2, BarChart3, Activity, Hash
 } from "lucide-react";
 import Link from "next/link";
 import { formatNumber, formatCurrency } from "@/lib/utils";
@@ -260,63 +260,98 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Submissions History */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-light mb-6 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-accent" />
-              Submission History
-            </h2>
-            <div className="space-y-3">
-              {profileData.submissions.map((submission, index) => (
-                <motion.div
-                  key={submission._id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="border border-border rounded-md p-4 hover:bg-card-hover transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="text-sm text-muted mb-1">
-                        {new Date(submission.submittedAt).toLocaleDateString('en', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {submission.dateRange.start} → {submission.dateRange.end}
-                      </p>
-                    </div>
-                    {submission.verified && (
-                      <span className="text-xs text-success">Verified</span>
-                    )}
+          {/* Additional Stats */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Token Breakdown */}
+            <div className="bg-card border border-border rounded-lg p-6">
+              <h2 className="text-lg font-light mb-6 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-accent" />
+                Token Breakdown
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-muted">Input Tokens</span>
+                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.inputTokens || 0)}</span>
                   </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted text-xs mb-1">Cost</p>
-                      <p className="font-mono">${formatCurrency(submission.totalCost)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted text-xs mb-1">Tokens</p>
-                      <p className="font-mono">{formatNumber(submission.totalTokens)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted text-xs mb-1">Input/Output</p>
-                      <p className="font-mono text-xs">
-                        {formatNumber(submission.inputTokens)}/{formatNumber(submission.outputTokens)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted text-xs mb-1">Models</p>
-                      <p className="text-xs">
-                        {submission.modelsUsed.map(m => m.includes("opus") ? "Opus" : "Sonnet").join(", ")}
-                      </p>
-                    </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div 
+                      className="bg-accent h-2 rounded-full transition-all"
+                      style={{ width: `${(profileData.submissions[0]?.inputTokens || 0) / totalTokens * 100}%` }}
+                    />
                   </div>
-                </motion.div>
-              ))}
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-muted">Output Tokens</span>
+                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.outputTokens || 0)}</span>
+                  </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all"
+                      style={{ width: `${(profileData.submissions[0]?.outputTokens || 0) / totalTokens * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-muted">Cache Read</span>
+                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.cacheReadTokens || 0)}</span>
+                  </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all"
+                      style={{ width: `${(profileData.submissions[0]?.cacheReadTokens || 0) / totalTokens * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-muted">Cache Creation</span>
+                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.cacheCreationTokens || 0)}</span>
+                  </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div 
+                      className="bg-purple-500 h-2 rounded-full transition-all"
+                      style={{ width: `${(profileData.submissions[0]?.cacheCreationTokens || 0) / totalTokens * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Usage Insights */}
+            <div className="bg-card border border-border rounded-lg p-6">
+              <h2 className="text-lg font-light mb-6 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-accent" />
+                Usage Insights
+              </h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-sm text-muted">Most Expensive Day</span>
+                  <span className="font-mono text-sm">
+                    ${formatCurrency(Math.max(...profileData.submissions[0]?.dailyBreakdown.map(d => d.totalCost) || [0]))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-sm text-muted">Average Daily Cost</span>
+                  <span className="font-mono text-sm">${formatCurrency(avgDailyCost)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-sm text-muted">Total Days Tracked</span>
+                  <span className="font-mono text-sm">{daysActive} days</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted">Last Updated</span>
+                  <span className="text-sm">
+                    {new Date(profileData.submissions[0]?.submittedAt || 0).toLocaleDateString('en', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>

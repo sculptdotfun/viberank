@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, Code2, Github, BarChart3 } from "lucide-react";
+import { Upload, Code2, Github, BarChart3, Sparkles } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
+import UpdatesModal from "@/components/UpdatesModal";
 import { formatNumber, formatLargeNumber } from "@/lib/utils";
 
 export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showUpdatesModal, setShowUpdatesModal] = useState(false);
   const stats = useQuery(api.stats.getGlobalStats);
 
   return (
@@ -127,18 +129,33 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* GitHub Link */}
-              <motion.a
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay: 0.5 }}
-                href="https://github.com/sculptdotfun/viberank"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors"
-              >
-                <Github className="w-5 h-5" />
-              </motion.a>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Updates Button */}
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                  onClick={() => setShowUpdatesModal(true)}
+                  className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors relative group"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-pulse" />
+                </motion.button>
+                
+                {/* GitHub Link */}
+                <motion.a
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.5 }}
+                  href="https://github.com/sculptdotfun/viberank"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl hover:bg-accent/10 transition-colors"
+                >
+                  <Github className="w-5 h-5" />
+                </motion.a>
+              </div>
             </div>
           </div>
         </div>
@@ -153,15 +170,29 @@ export default function Home() {
               <h2 className="text-2xl font-semibold text-foreground mb-1">Global Usage Leaderboard</h2>
               <p className="text-base text-muted">See who's pushing the limits of AI-powered development</p>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowUploadModal(true)}
-              className="group relative px-5 py-2.5 bg-gradient-to-r from-accent to-accent/80 text-white rounded-xl font-medium shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30 transition-all duration-200 flex items-center gap-2.5"
-            >
-              <Upload className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-              Submit Usage
-            </motion.button>
+            <div className="flex items-center gap-3">
+              {/* How it works link */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => window.open('https://github.com/sculptdotfun/viberank#getting-started', '_blank')}
+                className="px-4 py-2.5 text-sm font-medium text-muted hover:text-foreground border border-border rounded-xl hover:border-accent/30 transition-all duration-200 flex items-center gap-2"
+              >
+                <Code2 className="w-4 h-4" />
+                How it works
+              </motion.button>
+              
+              {/* Submit button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowUploadModal(true)}
+                className="group relative px-5 py-2.5 bg-gradient-to-r from-accent to-accent/80 text-white rounded-xl font-medium shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30 transition-all duration-200 flex items-center gap-2.5"
+              >
+                <Upload className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                Submit Usage
+              </motion.button>
+            </div>
           </div>
 
           {/* Leaderboard Content */}
@@ -217,19 +248,39 @@ export default function Home() {
         </div>
       )}
 
+      {/* Updates Modal */}
+      <UpdatesModal isOpen={showUpdatesModal} onClose={() => setShowUpdatesModal(false)} />
+
       {/* Footer */}
       <footer className="border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted">
-              Built with Claude Code
-            </p>
-            <a
-              href="https://github.com/sculptdotfun/viberank"
-              className="text-sm text-muted hover:text-foreground transition-colors"
-            >
-              GitHub
-            </a>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-6 text-sm text-muted">
+              <p>Built with Claude Code</p>
+              <span className="hidden sm:block">•</span>
+              <a
+                href="https://github.com/sculptdotfun/viberank"
+                className="hover:text-foreground transition-colors"
+              >
+                GitHub
+              </a>
+              <span className="hidden sm:block">•</span>
+              <a
+                href="https://github.com/sculptdotfun/viberank/issues"
+                className="hover:text-foreground transition-colors"
+              >
+                Report Issue
+              </a>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <button
+                onClick={() => setShowUpdatesModal(true)}
+                className="hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <Sparkles className="w-3 h-3" />
+                Recent Updates
+              </button>
+            </div>
           </div>
         </div>
       </footer>
