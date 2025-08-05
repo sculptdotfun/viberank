@@ -49,6 +49,14 @@ curl -X POST https://viberank.app/api/submit \
   -d @cc.json
 ```
 
+## Data Validation
+
+Your submissions are automatically validated to ensure data integrity:
+- Token calculations must be correct
+- No negative values allowed
+- Dates must be valid and not in the future
+- Extremely high usage may be flagged for review
+
 ## About
 
 Viberank is a community leaderboard for Claude Code usage. Join us to see how you stack up against other developers!

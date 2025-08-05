@@ -9,31 +9,111 @@ A community-driven leaderboard for Claude Code (formerly Claude Engineer) usage.
 
 ## Overview
 
-viberank is an open-source leaderboard where developers can upload their Claude Code usage statistics and see how they rank globally. Built with Next.js, TypeScript, and Convex, it provides a minimal, sophisticated interface inspired by modern design principles.
+viberank is an open-source leaderboard where developers can upload their Claude Code usage statistics and see how they rank globally. Built with Next.js, TypeScript, and Convex, it provides a minimal, sophisticated interface inspired by Claude's design principles.
 
 ### Features
 
 - 🏆 **Global Leaderboard** - See how you rank among Claude Code users worldwide
-- 📊 **Usage Analytics** - Track your token usage and costs over time
-- 🔍 **Time Filters** - View rankings for different time periods
+- 📊 **Profile Pages** - Beautiful profiles at `viberank.app/profile/{username}` with usage charts
+- 🚀 **Multiple Submission Methods** - CLI tool, curl command, or web upload
+- 📈 **Usage Analytics** - Track your token usage and costs over time with interactive charts
+- 🔍 **Advanced Filtering** - View rankings by custom date ranges (7d, 30d, all time)
 - 🔐 **GitHub Authentication** - Secure sign-in with GitHub OAuth
+- 🛡️ **Data Validation** - Automatic validation to ensure fair competition
+- 🔄 **Smart Merging** - Submit multiple times without data loss
 - 📱 **Responsive Design** - Beautiful on desktop and mobile
 - 🎯 **Share Cards** - Share your achievements on social media
 
 ## Getting Started
+
+### Submitting Your Usage Data
+
+#### Option 1: Using the viberank CLI (Recommended)
+
+The easiest way to submit your usage data:
+
+```bash
+npx viberank
+```
+
+This will:
+- Automatically detect your GitHub username from git config
+- Generate your usage data using ccusage
+- Submit it to the leaderboard
+- Give you a direct link to your profile
+
+#### Option 2: Using curl
+
+If you prefer to use curl directly:
+
+```bash
+# Generate usage data
+npx ccusage@latest --json > cc.json
+
+# Get your GitHub username
+GITHUB_USER=$(git config user.name)
+
+# Submit to viberank
+curl -X POST https://viberank.app/api/submit \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-User: $GITHUB_USER" \
+  -d @cc.json
+```
+
+#### Option 3: Web Upload
+
+1. Visit [viberank.app](https://viberank.app)
+2. Sign in with GitHub
+3. Click "Submit Your Stats"
+4. Upload your `cc.json` file
+
+### Profile Pages
+
+Every user gets a beautiful profile page at `viberank.app/profile/{github-username}` featuring:
+
+- 📊 **Usage Chart** - Interactive area chart showing daily costs over time
+- 📈 **Statistics** - Total cost, tokens, days active, and averages
+- 📝 **Submission History** - Detailed breakdown of all submissions
+- 🏷️ **Model Usage** - See which Claude models you use most
+- 🔗 **GitHub Integration** - Links to your GitHub profile
+
+### Data Validation & Fair Play
+
+To maintain leaderboard integrity, viberank validates all submissions:
+
+#### Automatic Validation
+- ✅ **Token math verification** - Ensures input + output + cache tokens = total
+- ✅ **Negative value check** - Rejects any negative values
+- ✅ **Date validation** - No future dates allowed
+- ✅ **Realistic limits** - Flags unusually high usage for review
+
+#### Validation Limits
+- Maximum daily cost: $5,000
+- Maximum daily tokens: 50 million
+- Cost per token ratio: 0.000001 to 0.1
+
+Submissions exceeding these limits are flagged for review and hidden from the main leaderboard to ensure fair competition.
+
+### Multiple Submissions
+
+viberank intelligently handles multiple submissions:
+- **Overlapping dates**: Merges data at the daily level, preserving all your usage history
+- **Non-overlapping dates**: Adds to your profile without affecting existing data
+- **Updates**: Submit new data anytime - it will merge with existing data without loss
+
+## Development
 
 ### Prerequisites
 
 - Node.js 18+ and pnpm
 - A [Convex](https://convex.dev) account
 - GitHub OAuth App credentials
-- [ccusage](https://github.com/ryoppippi/ccusage) CLI tool for generating usage data
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/viberank.git
+git clone https://github.com/sculptdotfun/viberank.git
 cd viberank
 ```
 
@@ -73,68 +153,38 @@ pnpm dev
 
 Open [http://localhost:3001](http://localhost:3001) to see the app.
 
-### Submitting Usage Data
-
-#### Option 1: Using the viberank CLI (Recommended)
-
-The easiest way to submit your usage data:
-
-```bash
-npx viberank
-```
-
-This will automatically generate your usage data and submit it to the leaderboard.
-
-#### Option 2: Using curl
-
-If you prefer to use curl directly:
-
-```bash
-# Generate usage data
-npx ccusage@latest --json > cc.json
-
-# Get your GitHub username
-GITHUB_USER=$(git config user.name)
-
-# Submit to viberank
-curl -X POST https://viberank.app/api/submit \
-  -H "Content-Type: application/json" \
-  -H "X-GitHub-User: $GITHUB_USER" \
-  -d @cc.json
-```
-
-#### Option 3: Manual Upload
-
-1. Generate your usage file:
-```bash
-npx ccusage@latest --json > cc.json
-```
-
-2. Visit [viberank.app](https://viberank.app) and sign in with GitHub
-3. Upload the `cc.json` file using the web interface
-
 ## Tech Stack
 
 - **Frontend**: Next.js 15, TypeScript, Tailwind CSS
 - **Database**: Convex (real-time, serverless)
 - **Authentication**: NextAuth.js with GitHub OAuth
+- **Charts**: Recharts for data visualization
 - **Animations**: Framer Motion
 - **Styling**: Tailwind CSS with custom Claude-inspired theme
-- **Charts**: Recharts
+- **CLI Tool**: Node.js with prompts and chalk
 - **Development**: Turbopack, ESLint, Prettier
 
-## Project Structure
+## API Documentation
 
+### POST /api/submit
+
+Submit usage data programmatically:
+
+```bash
+curl -X POST https://viberank.app/api/submit \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-User: YOUR_GITHUB_USERNAME" \
+  -d @cc.json
 ```
-viberank/
-├── src/
-│   ├── app/              # Next.js app directory
-│   ├── components/       # React components
-│   ├── lib/             # Utilities and helpers
-│   └── types/           # TypeScript type definitions
-├── convex/              # Convex backend functions
-├── public/              # Static assets
-└── ...config files
+
+Response:
+```json
+{
+  "success": true,
+  "submissionId": "...",
+  "message": "Successfully submitted data for username",
+  "profileUrl": "https://viberank.app/profile/username"
+}
 ```
 
 ## Contributing
@@ -159,13 +209,9 @@ We love contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md)
 
 ### Deploy on Vercel
 
-The easiest way to deploy viberank is using Vercel:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/viberank)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sculptdotfun/viberank)
 
 ### Environment Variables for Production
-
-Make sure to set all environment variables in your deployment platform:
 
 - `NEXT_PUBLIC_CONVEX_URL`
 - `NEXTAUTH_URL` (your production URL)
@@ -178,6 +224,7 @@ Make sure to set all environment variables in your deployment platform:
 - All authentication is handled through GitHub OAuth
 - Usage data is validated to ensure it comes from the official ccusage tool
 - No sensitive data is stored - only aggregated usage statistics
+- Suspicious submissions are automatically flagged for review
 
 ## License
 
@@ -192,8 +239,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Links
 
 - [Website](https://viberank.app)
-- [GitHub](https://github.com/yourusername/viberank)
-- [Report Issues](https://github.com/yourusername/viberank/issues)
+- [GitHub](https://github.com/sculptdotfun/viberank)
+- [Report Issues](https://github.com/sculptdotfun/viberank/issues)
+- [NPM Package](https://www.npmjs.com/package/viberank)
 
 ---
 
