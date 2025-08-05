@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
@@ -18,14 +18,24 @@ export default function Leaderboard() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(0);
   const { data: session } = useSession();
+
+  const ITEMS_PER_PAGE = 25;
 
   const submissions = useQuery(api.submissions.getLeaderboard, { 
     sortBy, 
-    limit: 50,
+    limit: 200, // Fetch more to paginate client-side
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
+
+  // Paginate the results
+  const paginatedSubmissions = submissions?.slice(
+    page * ITEMS_PER_PAGE,
+    (page + 1) * ITEMS_PER_PAGE
+  );
+  const totalPages = submissions ? Math.ceil(submissions.length / ITEMS_PER_PAGE) : 0;
 
   const getRankDisplay = (rank: number) => {
     if (rank === 1) return <Trophy className="w-5 h-5 text-yellow-500" />;
@@ -46,6 +56,7 @@ export default function Leaderboard() {
       setDateFrom(from.toISOString().split('T')[0]);
       setDateTo(today.toISOString().split('T')[0]);
     }
+    setPage(0); // Reset to first page when filtering
   };
 
   return (
@@ -167,7 +178,7 @@ export default function Leaderboard() {
 
       {/* Leaderboard Table */}
       <div className="space-y-2">
-        {submissions ? (
+        {paginatedSubmissions ? (
           <>
             {/* Desktop View */}
             <div className="hidden sm:block overflow-hidden rounded-xl border border-border/50">
@@ -182,7 +193,8 @@ export default function Leaderboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {submissions.map((submission, index) => {
+                  {paginatedSubmissions.map((submission, index) => {
+                    const actualRank = page * ITEMS_PER_PAGE + index + 1;
                     const isCurrentUser = session?.user?.username === submission.githubUsername || 
                                          session?.user?.email === submission.username;
                     
@@ -198,7 +210,7 @@ export default function Leaderboard() {
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center justify-center w-8">
-                            {getRankDisplay(index + 1)}
+                            {getRankDisplay(actualRank)}
                           </div>
                         </td>
                         <td className="py-4 px-4">
@@ -266,7 +278,8 @@ export default function Leaderboard() {
 
             {/* Mobile View */}
             <div className="sm:hidden space-y-3">
-              {submissions.map((submission, index) => {
+              {paginatedSubmissions.map((submission, index) => {
+                const actualRank = page * ITEMS_PER_PAGE + index + 1;
                 const isCurrentUser = session?.user?.username === submission.githubUsername || 
                                      session?.user?.email === submission.username;
                 
@@ -285,7 +298,7 @@ export default function Leaderboard() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8">
-                          {getRankDisplay(index + 1)}
+                          {getRankDisplay(actualRank)}
                         </div>
                         {submission.githubAvatar ? (
                           <img 
@@ -358,7 +371,7 @@ export default function Leaderboard() {
             </div>
 
             {/* Share Card Modal */}
-            {showShareCard && submissions.find(s => s._id === showShareCard) && (
+            {showShareCard && submissions && submissions.find(s => s._id === showShareCard) && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -392,6 +405,69 @@ export default function Leaderboard() {
             <Trophy className="w-12 h-12 text-muted mx-auto mb-4" />
             <p className="text-lg text-muted">No submissions yet</p>
             <p className="text-sm text-muted mt-2">Be the first to submit your stats!</p>
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted">
+              Showing {page * ITEMS_PER_PAGE + 1}-{Math.min((page + 1) * ITEMS_PER_PAGE, submissions?.length || 0)} of {submissions?.length || 0}
+            </p>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className={`p-2 rounded-lg transition-colors ${
+                  page === 0 
+                    ? "text-muted/50 cursor-not-allowed" 
+                    : "text-muted hover:text-foreground hover:bg-card"
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => {
+                  // Show first, last, current, and adjacent pages
+                  if (
+                    i === 0 || 
+                    i === totalPages - 1 || 
+                    (i >= page - 1 && i <= page + 1)
+                  ) {
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setPage(i)}
+                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                          i === page
+                            ? "bg-accent text-white"
+                            : "text-muted hover:text-foreground hover:bg-card"
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    );
+                  } else if (i === page - 2 || i === page + 2) {
+                    return <span key={i} className="text-muted">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+              
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page === totalPages - 1}
+                className={`p-2 rounded-lg transition-colors ${
+                  page === totalPages - 1
+                    ? "text-muted/50 cursor-not-allowed" 
+                    : "text-muted hover:text-foreground hover:bg-card"
+                }`}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
         
