@@ -63,12 +63,12 @@ export default function Leaderboard() {
     <div className="space-y-4">
       {/* Filter Bar */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           {/* Quick Filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setQuickFilter(null)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+              className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 !dateFrom && !dateTo
                   ? "bg-accent text-white"
                   : "text-muted hover:text-foreground hover:bg-card"
@@ -78,7 +78,7 @@ export default function Leaderboard() {
             </button>
             <button
               onClick={() => setQuickFilter(7)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+              className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 dateFrom && dateTo && 
                 new Date(dateTo).getTime() - new Date(dateFrom).getTime() === 7 * 24 * 60 * 60 * 1000
                   ? "bg-accent text-white"
@@ -89,7 +89,7 @@ export default function Leaderboard() {
             </button>
             <button
               onClick={() => setQuickFilter(30)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+              className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 dateFrom && dateTo && 
                 Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000)) === 30
                   ? "bg-accent text-white"
@@ -100,40 +100,40 @@ export default function Leaderboard() {
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+              className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                 showFilters || (dateFrom && dateTo)
                   ? "text-accent"
                   : "text-muted hover:text-foreground"
               }`}
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="w-3 sm:w-4 h-3 sm:h-4" />
               Custom
               <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? "rotate-180" : ""}`} />
             </button>
           </div>
 
           {/* Sort Options */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setSortBy("cost")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 ${
                 sortBy === "cost"
                   ? "bg-accent text-white"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
-              <DollarSign className="w-4 h-4" />
+              <DollarSign className="w-3 sm:w-4 h-3 sm:h-4" />
               Cost
             </button>
             <button
               onClick={() => setSortBy("tokens")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 ${
                 sortBy === "tokens"
                   ? "bg-accent text-white"
                   : "text-muted hover:text-foreground hover:bg-card"
               }`}
             >
-              <Zap className="w-4 h-4" />
+              <Zap className="w-3 sm:w-4 h-3 sm:h-4" />
               Tokens
             </button>
           </div>
@@ -289,44 +289,44 @@ export default function Leaderboard() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.02 }}
-                    className={`p-4 rounded-xl border ${
+                    className={`p-3 sm:p-4 rounded-xl border ${
                       isCurrentUser 
                         ? "border-accent/30 bg-accent/5" 
                         : "border-border/50 bg-card/30"
                     }`}
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8">
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center justify-center w-7 h-7 flex-shrink-0">
                           {getRankDisplay(actualRank)}
                         </div>
                         {submission.githubAvatar ? (
                           <img 
                             src={submission.githubAvatar} 
                             alt={submission.githubUsername || submission.username}
-                            className="w-12 h-12 rounded-full"
+                            className="w-10 h-10 rounded-full flex-shrink-0"
                           />
                         ) : submission.githubUsername ? (
                           <img 
-                            src={getGitHubAvatarUrl(submission.githubUsername, 48)} 
+                            src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
                             alt={submission.githubUsername}
-                            className="w-12 h-12 rounded-full"
+                            className="w-10 h-10 rounded-full flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center">
-                            <User className="w-6 h-6 text-muted" />
+                          <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center flex-shrink-0">
+                            <User className="w-5 h-5 text-muted" />
                           </div>
                         )}
-                        <div>
+                        <div className="min-w-0">
                           <Link 
                             href={`/profile/${submission.githubUsername || submission.username}`}
-                            className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors"
+                            className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors text-sm truncate"
                           >
-                            {submission.githubUsername || submission.username}
-                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="truncate">{submission.githubUsername || submission.username}</span>
+                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                           </Link>
                           {submission.githubName && submission.githubName !== submission.githubUsername && (
-                            <p className="text-sm text-muted">
+                            <p className="text-xs text-muted truncate">
                               {submission.githubName}
                             </p>
                           )}
@@ -335,7 +335,7 @@ export default function Leaderboard() {
                       {isCurrentUser && (
                         <button
                           onClick={() => setShowShareCard(submission._id)}
-                          className="p-2"
+                          className="p-1.5 -mr-1 flex-shrink-0"
                         >
                           <Share2 className="w-4 h-4 text-muted" />
                         </button>
@@ -345,20 +345,20 @@ export default function Leaderboard() {
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <p className="text-xs text-muted mb-1">Total Cost</p>
-                          <p className="font-mono font-semibold">
+                          <p className="text-xs text-muted mb-0.5">Total Cost</p>
+                          <p className="font-mono font-semibold text-sm">
                             ${formatCurrency(submission.totalCost)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted mb-1">Tokens</p>
-                          <p className="font-mono">
+                          <p className="text-xs text-muted mb-0.5">Tokens</p>
+                          <p className="font-mono text-sm">
                             {formatNumber(submission.totalTokens)}
                           </p>
                         </div>
                       </div>
                       {isCurrentUser && (
-                        <div className="text-center">
+                        <div className="text-center pt-1">
                           <span className="text-xs text-accent font-medium">
                             This is you!
                           </span>
@@ -410,16 +410,16 @@ export default function Leaderboard() {
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs sm:text-sm text-muted text-center sm:text-left">
               Showing {page * ITEMS_PER_PAGE + 1}-{Math.min((page + 1) * ITEMS_PER_PAGE, submissions?.length || 0)} of {submissions?.length || 0}
             </p>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                   page === 0 
                     ? "text-muted/50 cursor-not-allowed" 
                     : "text-muted hover:text-foreground hover:bg-card"
@@ -428,19 +428,20 @@ export default function Leaderboard() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 {Array.from({ length: totalPages }, (_, i) => {
-                  // Show first, last, current, and adjacent pages
-                  if (
-                    i === 0 || 
-                    i === totalPages - 1 || 
-                    (i >= page - 1 && i <= page + 1)
-                  ) {
+                  // On mobile, show fewer page numbers
+                  const isMobile = window.innerWidth < 640;
+                  const showPage = isMobile 
+                    ? (i === 0 || i === totalPages - 1 || i === page)
+                    : (i === 0 || i === totalPages - 1 || (i >= page - 1 && i <= page + 1));
+                  
+                  if (showPage) {
                     return (
                       <button
                         key={i}
                         onClick={() => setPage(i)}
-                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                        className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
                           i === page
                             ? "bg-accent text-white"
                             : "text-muted hover:text-foreground hover:bg-card"
@@ -449,8 +450,11 @@ export default function Leaderboard() {
                         {i + 1}
                       </button>
                     );
-                  } else if (i === page - 2 || i === page + 2) {
-                    return <span key={i} className="text-muted">...</span>;
+                  } else if (
+                    (isMobile && (i === 1 || i === totalPages - 2) && Math.abs(i - page) > 1) ||
+                    (!isMobile && (i === page - 2 || i === page + 2))
+                  ) {
+                    return <span key={i} className="text-muted px-1">...</span>;
                   }
                   return null;
                 })}
@@ -459,7 +463,7 @@ export default function Leaderboard() {
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                   page === totalPages - 1
                     ? "text-muted/50 cursor-not-allowed" 
                     : "text-muted hover:text-foreground hover:bg-card"
