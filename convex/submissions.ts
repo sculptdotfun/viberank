@@ -8,6 +8,8 @@ export const submit = mutation({
     githubUsername: v.optional(v.string()),
     githubName: v.optional(v.string()),
     githubAvatar: v.optional(v.string()),
+    source: v.union(v.literal("cli"), v.literal("oauth")),
+    verified: v.boolean(),
     ccData: v.object({
       totals: v.object({
         inputTokens: v.number(),
@@ -40,7 +42,7 @@ export const submit = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const { username, githubUsername, githubName, githubAvatar, ccData } = args;
+    const { username, githubUsername, githubName, githubAvatar, source, verified, ccData } = args;
     
     // Data validation and normalization
     // 1. Verify total tokens match sum of components
@@ -148,7 +150,7 @@ export const submit = mutation({
       throw new Error(`Future date detected: ${futureDate}. Please check your data.`);
     }
     
-    // Check for existing submission with overlapping date range
+    // Check for existing submission with overlapping date range and same source
     const existingSubmissions = await ctx.db
       .query("submissions")
       .withIndex("by_username", (q) => q.eq("username", username))
@@ -156,6 +158,13 @@ export const submit = mutation({
     
     let existingSubmission = null;
     for (const submission of existingSubmissions) {
+      // Only consider submissions from the same source
+      // If existing submission has no source (old data), treat it as oauth
+      const existingSource = submission.source || "oauth";
+      if (existingSource !== source) {
+        continue;
+      }
+      
       // Check if date ranges overlap
       const existingStart = submission.dateRange.start;
       const existingEnd = submission.dateRange.end;
@@ -241,7 +250,8 @@ export const submit = mutation({
         modelsUsed: allModelsUsed,
         dailyBreakdown: mergedDailyBreakdown,
         submittedAt: Date.now(),
-        verified: false,
+        verified: verified,
+        source: source,
         flaggedForReview: flaggedForReview || existingSubmission.flaggedForReview,
         flagReasons: flaggedForReview ? suspiciousReasons : existingSubmission.flagReasons,
       });
@@ -272,7 +282,8 @@ export const submit = mutation({
           modelsUsed: day.modelsUsed,
         })),
         submittedAt: Date.now(),
-        verified: false,
+        verified: verified,
+        source: source,
         flaggedForReview: flaggedForReview,
         flagReasons: flaggedForReview ? suspiciousReasons : undefined,
       });
@@ -448,5 +459,50 @@ export const getProfile = query({
       ...profile,
       submissions,
     };
+  },
+});
+
+
+export const claimSubmission = mutation({
+  args: {
+    submissionId: v.id("submissions"),
+    claimingUsername: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { submissionId, claimingUsername } = args;
+    
+    // Get the submission
+    const submission = await ctx.db.get(submissionId);
+    if (!submission) {
+      throw new Error("Submission not found");
+    }
+    
+    // Check if already verified
+    if (submission.verified) {
+      throw new Error("This submission is already verified");
+    }
+    
+    // Check if usernames match
+    if (submission.username !== claimingUsername && submission.githubUsername !== claimingUsername) {
+      throw new Error("You can only claim submissions for your own username");
+    }
+    
+    // Get the claiming user's profile
+    const claimingProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_username", (q) => q.eq("username", claimingUsername))
+      .first();
+    
+    if (!claimingProfile) {
+      throw new Error("Profile not found");
+    }
+    
+    // Update the submission
+    await ctx.db.patch(submissionId, {
+      verified: true,
+      claimedBy: claimingProfile._id,
+    });
+    
+    return { success: true };
   },
 });

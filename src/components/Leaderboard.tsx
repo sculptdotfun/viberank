@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
@@ -278,13 +278,23 @@ export default function Leaderboard() {
                               </div>
                             )}
                             <div>
-                              <Link 
-                                href={`/profile/${submission.githubUsername || submission.username}`}
-                                className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors"
-                              >
-                                {submission.githubUsername || submission.username}
-                                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </Link>
+                              <div className="flex items-center gap-2">
+                                <Link 
+                                  href={`/profile/${submission.githubUsername || submission.username}`}
+                                  className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors"
+                                >
+                                  {submission.githubUsername || submission.username}
+                                  <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </Link>
+                                {submission.verified && (
+                                  <div className="group relative">
+                                    <CheckCircle2 className="w-4 h-4 text-accent" />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                      Verified via GitHub authentication
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                               {submission.githubName && submission.githubName !== submission.githubUsername && (
                                 <p className="text-sm text-muted">
                                   {submission.githubName}
@@ -366,13 +376,23 @@ export default function Leaderboard() {
                           </div>
                         )}
                         <div className="min-w-0">
-                          <Link 
-                            href={`/profile/${submission.githubUsername || submission.username}`}
-                            className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors text-sm truncate"
-                          >
-                            <span className="truncate">{submission.githubUsername || submission.username}</span>
-                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                          </Link>
+                          <div className="flex items-center gap-1.5">
+                            <Link 
+                              href={`/profile/${submission.githubUsername || submission.username}`}
+                              className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors text-sm truncate"
+                            >
+                              <span className="truncate">{submission.githubUsername || submission.username}</span>
+                              <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                            </Link>
+                            {submission.verified && (
+                              <div className="group relative flex-shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                  Verified via GitHub authentication
+                                </div>
+                              </div>
+                            )}
+                          </div>
                           {submission.githubName && submission.githubName !== submission.githubUsername && (
                             <p className="text-xs text-muted truncate">
                               {submission.githubName}

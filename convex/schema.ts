@@ -32,6 +32,8 @@ export default defineSchema({
     ),
     submittedAt: v.number(),
     verified: v.boolean(),
+    source: v.optional(v.union(v.literal("cli"), v.literal("oauth"))),
+    claimedBy: v.optional(v.id("profiles")),
     flaggedForReview: v.optional(v.boolean()),
     flagReasons: v.optional(v.array(v.string())),
   })

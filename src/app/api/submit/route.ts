@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
+import { getServerSession } from "next-auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -9,14 +10,23 @@ export async function POST(request: NextRequest) {
     // Parse the request body
     const ccData = await request.json();
     
-    // Get GitHub username from header or try to extract from data
-    let githubUsername = request.headers.get("X-GitHub-User");
+    // Check for authentication
+    const session = await getServerSession();
     
-    // If no username in header, try to extract from git remote URL pattern
-    if (!githubUsername) {
-      // Try to parse username from common patterns in the data
-      // This is a fallback - header is preferred
-      githubUsername = "anonymous";
+    let githubUsername: string;
+    let source: "oauth" | "cli";
+    let verified: boolean;
+    
+    if (session?.user?.username) {
+      // Authenticated via OAuth
+      githubUsername = session.user.username;
+      source = "oauth";
+      verified = true;
+    } else {
+      // CLI submission
+      githubUsername = request.headers.get("X-GitHub-User") || "anonymous";
+      source = "cli";
+      verified = false;
     }
     
     // Validate the cc.json structure
@@ -31,6 +41,8 @@ export async function POST(request: NextRequest) {
     const submissionId = await convex.mutation(api.submissions.submit, {
       username: githubUsername,
       githubUsername: githubUsername,
+      source: source,
+      verified: verified,
       ccData: ccData,
     });
     
