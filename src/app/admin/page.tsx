@@ -8,6 +8,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { AlertTriangle, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import NavBar from "@/components/NavBar";
 
 // Add your admin GitHub usernames here
 const ADMIN_USERS = ["nikshepsvn"];
@@ -55,7 +56,11 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <NavBar 
+        onUploadClick={() => {}}
+        onUpdatesClick={() => {}}
+      />
+      <div className="max-w-7xl mx-auto px-4 py-8 pt-24 md:pt-32">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
           <p className="text-muted">Review and manage flagged submissions</p>

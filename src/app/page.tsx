@@ -8,6 +8,7 @@ import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
 import UpdatesModal from "@/components/UpdatesModal";
+import NavBar from "@/components/NavBar";
 import { formatNumber, formatLargeNumber } from "@/lib/utils";
 
 export default function Home() {
@@ -17,68 +18,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sleek Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14">
-            {/* Logo */}
-            <motion.div 
-              className="flex items-center gap-3"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="relative">
-                <div className="absolute inset-0 bg-accent/20 rounded-lg blur-xl" />
-                <div className="relative p-2 rounded-lg bg-gradient-to-br from-accent/10 to-transparent">
-                  <Trophy className="w-5 h-5 text-accent" />
-                </div>
-              </div>
-              <h1 className="text-xl font-semibold">viberank</h1>
-            </motion.div>
-            
-            {/* Right side actions */}
-            <div className="flex items-center gap-2">
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowUpdatesModal(true)}
-                className="p-2 rounded-lg hover:bg-accent/10 transition-colors relative"
-              >
-                <Sparkles className="w-4 h-4" />
-                <motion.span 
-                  className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent rounded-full"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                />
-              </motion.button>
-              
-              <motion.a
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                href="https://github.com/sculptdotfun/viberank"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg hover:bg-accent/10 transition-colors"
-              >
-                <Github className="w-4 h-4" />
-              </motion.a>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Navigation */}
+      <NavBar 
+        onUploadClick={() => setShowUploadModal(true)}
+        onUpdatesClick={() => setShowUpdatesModal(true)}
+      />
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 pt-20 md:pt-0">
         {/* Hero Section with Stats */}
         <div className="bg-gradient-to-b from-accent/5 via-accent/5 to-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-6 sm:pb-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 md:pt-24 pb-6 sm:pb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
