@@ -34,7 +34,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="flex-1 pt-20 md:pt-0">
         {/* Hero Section */}
-        <div className="bg-gradient-to-b from-accent/5 via-transparent to-transparent">
+        <div className="relative bg-gradient-to-b from-accent/5 via-transparent to-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 md:pt-32 pb-6 sm:pb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
