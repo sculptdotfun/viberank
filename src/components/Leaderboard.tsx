@@ -571,15 +571,6 @@ export default function Leaderboard() {
             </div>
           </div>
         )}
-        
-        {/* Tip */}
-        {submissions && submissions.length > 0 && (
-          <div className="text-center">
-            <p className="text-xs text-muted">
-              💡 Click on any username to view their detailed profile and usage charts
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
