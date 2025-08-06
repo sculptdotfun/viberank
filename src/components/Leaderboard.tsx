@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, BadgeCheck } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
@@ -286,7 +286,7 @@ export default function Leaderboard() {
                                   {submission.githubUsername || submission.username}
                                   {submission.verified && (
                                     <div className="group/badge relative inline-flex">
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-accent fill-accent" />
+                                      <BadgeCheck className="w-4 h-4 text-blue-500" />
                                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover/badge:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
                                         Verified via GitHub authentication
                                       </div>
@@ -383,7 +383,7 @@ export default function Leaderboard() {
                             <span className="truncate">{submission.githubUsername || submission.username}</span>
                             {submission.verified && (
                               <div className="group/badge relative inline-flex flex-shrink-0">
-                                <CheckCircle2 className="w-3 h-3 text-accent fill-accent" />
+                                <BadgeCheck className="w-3.5 h-3.5 text-blue-500" />
                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover/badge:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
                                   Verified via GitHub authentication
                                 </div>
