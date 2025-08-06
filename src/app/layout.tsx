@@ -27,21 +27,12 @@ export const metadata: Metadata = {
     siteName: "Viberank",
     locale: "en_US",
     type: "website",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Viberank - Claude Code Usage Leaderboard",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Viberank - Claude Code Usage Leaderboard",
     description: "Track and compare your Claude Code usage with developers worldwide. Join the AI development leaderboard today!",
     creator: "@viberank",
-    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -55,13 +46,8 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
-    apple: [
-      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    icon: "/icon.svg",
+    apple: "/apple-icon",
   },
   metadataBase: new URL("https://viberank.com"),
   alternates: {
