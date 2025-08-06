@@ -505,46 +505,165 @@ export const updateFlagStatus = mutation({
   },
 });
 
-export const claimSubmission = mutation({
+// Unified claim and merge function - handles both claiming unverified submissions
+// and merging multiple submissions into one
+export const claimAndMergeSubmissions = mutation({
   args: {
-    submissionId: v.id("submissions"),
-    claimingUsername: v.string(),
+    githubUsername: v.string(),
   },
   handler: async (ctx, args) => {
-    const { submissionId, claimingUsername } = args;
+    const { githubUsername } = args;
     
-    // Get the submission
-    const submission = await ctx.db.get(submissionId);
-    if (!submission) {
-      throw new Error("Submission not found");
+    // Find all submissions for this GitHub username
+    const submissions = await ctx.db
+      .query("submissions")
+      .withIndex("by_github_username", (q) => q.eq("githubUsername", githubUsername))
+      .collect();
+    
+    if (submissions.length === 0) {
+      throw new Error("No submissions found");
     }
     
-    // Check if already verified
-    if (submission.verified) {
-      throw new Error("This submission is already verified");
+    // If only one submission and it's already verified, nothing to do
+    if (submissions.length === 1 && submissions[0].verified) {
+      return { success: true, action: "already_verified" };
     }
     
-    // Check if usernames match
-    if (submission.username !== claimingUsername && submission.githubUsername !== claimingUsername) {
-      throw new Error("You can only claim submissions for your own username");
+    // Separate CLI and OAuth submissions
+    const cliSubmissions = submissions.filter(s => s.source === "cli");
+    const oauthSubmissions = submissions.filter(s => s.source === "oauth");
+    
+    // If only one CLI submission and no OAuth, just verify it
+    if (oauthSubmissions.length === 0 && cliSubmissions.length === 1) {
+      await ctx.db.patch(cliSubmissions[0]._id, {
+        verified: true,
+      });
+      return { success: true, action: "claimed", submissionId: cliSubmissions[0]._id };
     }
     
-    // Get the claiming user's profile
-    const claimingProfile = await ctx.db
-      .query("profiles")
-      .withIndex("by_username", (q) => q.eq("username", claimingUsername))
-      .first();
-    
-    if (!claimingProfile) {
-      throw new Error("Profile not found");
+    // If multiple OAuth submissions only, this is unusual but merge them
+    if (cliSubmissions.length === 0 && oauthSubmissions.length > 1) {
+      // This shouldn't normally happen, but handle it gracefully
+      console.warn(`User ${githubUsername} has multiple OAuth submissions`);
     }
     
-    // Update the submission
-    await ctx.db.patch(submissionId, {
+    // If we have multiple submissions, merge them
+    // Use the OAuth submission as the base (it's verified), or the most recent if no OAuth
+    const baseSubmission = oauthSubmissions[0] || submissions.sort((a, b) => b.submittedAt - a.submittedAt)[0];
+    
+    // Merge all daily breakdowns
+    const allDailyData = new Map<string, any>();
+    
+    // Add all data, with OAuth taking priority for overlapping dates
+    for (const submission of submissions) {
+      for (const day of submission.dailyBreakdown) {
+        // OAuth data takes priority
+        if (submission.source === "oauth" || !allDailyData.has(day.date)) {
+          allDailyData.set(day.date, day);
+        }
+      }
+    }
+    
+    // Convert back to array and sort by date
+    const mergedDailyBreakdown = Array.from(allDailyData.values())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Check if we have any data
+    if (mergedDailyBreakdown.length === 0) {
+      throw new Error("No data to merge");
+    }
+    
+    // Calculate new totals
+    const totalTokens = mergedDailyBreakdown.reduce((sum, day) => sum + day.totalTokens, 0);
+    const totalCost = mergedDailyBreakdown.reduce((sum, day) => sum + day.totalCost, 0);
+    const inputTokens = mergedDailyBreakdown.reduce((sum, day) => sum + day.inputTokens, 0);
+    const outputTokens = mergedDailyBreakdown.reduce((sum, day) => sum + day.outputTokens, 0);
+    const cacheCreationTokens = mergedDailyBreakdown.reduce((sum, day) => sum + day.cacheCreationTokens, 0);
+    const cacheReadTokens = mergedDailyBreakdown.reduce((sum, day) => sum + day.cacheReadTokens, 0);
+    
+    // Update date range
+    const dateRange = {
+      start: mergedDailyBreakdown[0]?.date || "",
+      end: mergedDailyBreakdown[mergedDailyBreakdown.length - 1]?.date || "",
+    };
+    
+    // Collect all unique models
+    const allModelsUsed = Array.from(new Set(
+      mergedDailyBreakdown.flatMap(day => day.modelsUsed || [])
+    ));
+    
+    // Update the base submission with merged data
+    await ctx.db.patch(baseSubmission._id, {
+      totalTokens,
+      totalCost,
+      inputTokens,
+      outputTokens,
+      cacheCreationTokens,
+      cacheReadTokens,
+      dateRange,
+      modelsUsed: allModelsUsed,
+      dailyBreakdown: mergedDailyBreakdown,
+      submittedAt: Date.now(),
       verified: true,
-      claimedBy: claimingProfile._id,
+      source: oauthSubmissions.length > 0 ? "oauth" : baseSubmission.source,
     });
     
-    return { success: true };
+    // Delete other submissions
+    for (const submission of submissions) {
+      if (submission._id !== baseSubmission._id) {
+        await ctx.db.delete(submission._id);
+      }
+    }
+    
+    return { 
+      success: true, 
+      action: submissions.length > 1 ? "merged" : "claimed",
+      submissionId: baseSubmission._id,
+      mergedCount: submissions.length
+    };
   },
 });
+
+export const checkClaimableSubmissions = query({
+  args: {
+    githubUsername: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { githubUsername } = args;
+    
+    const submissions = await ctx.db
+      .query("submissions")
+      .withIndex("by_github_username", (q) => q.eq("githubUsername", githubUsername))
+      .collect();
+    
+    const cliSubmissions = submissions.filter(s => s.source === "cli");
+    const oauthSubmissions = submissions.filter(s => s.source === "oauth");
+    const unverifiedCount = submissions.filter(s => !s.verified).length;
+    
+    // Determine what action is available
+    let actionNeeded = null;
+    let actionText = "";
+    
+    if (submissions.length === 0) {
+      actionNeeded = null;
+    } else if (submissions.length === 1 && submissions[0].verified) {
+      actionNeeded = null; // Already verified
+    } else if (unverifiedCount > 0 && submissions.length === 1) {
+      actionNeeded = "claim";
+      actionText = "Verify your submission";
+    } else if (submissions.length > 1) {
+      actionNeeded = "merge";
+      actionText = `Merge ${submissions.length} submissions into one`;
+    }
+    
+    return {
+      actionNeeded,
+      actionText,
+      cliCount: cliSubmissions.length,
+      oauthCount: oauthSubmissions.length,
+      totalSubmissions: submissions.length,
+      unverifiedCount,
+    };
+  },
+});
+

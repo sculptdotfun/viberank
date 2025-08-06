@@ -164,7 +164,7 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
       </motion.header>
 
       {/* Mobile Navigation */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background backdrop-blur-xl border-b border-border/50">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#1a1918] backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/" className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-accent" />
@@ -201,7 +201,7 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="border-t border-border/50 bg-background backdrop-blur-xl"
+              className="border-t border-border/50 bg-[#1a1918] backdrop-blur-xl"
             >
               <div className="px-4 py-4 space-y-2">
                 {/* Admin link if applicable */}

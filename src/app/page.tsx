@@ -1,26 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Trophy, Upload, Github, Sparkles, TrendingUp } from "lucide-react";
-import { useQuery } from "convex/react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, Upload, Github, Sparkles, TrendingUp, Merge, X } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
 import UpdatesModal from "@/components/UpdatesModal";
 import NavBar from "@/components/NavBar";
 import { formatNumber, formatLargeNumber } from "@/lib/utils";
+import { useSession } from "next-auth/react";
 
 export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUpdatesModal, setShowUpdatesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [showMergeBanner, setShowMergeBanner] = useState(true);
+  const [merging, setMerging] = useState(false);
+  
+  const { data: session } = useSession();
   const stats = useQuery(api.stats.getGlobalStats);
+  const claimStatus = useQuery(
+    api.submissions.checkClaimableSubmissions, 
+    session?.user?.username ? { githubUsername: session.user.username } : "skip"
+  );
+  const claimAndMergeMutation = useMutation(api.submissions.claimAndMergeSubmissions);
 
   const copyCommand = () => {
     navigator.clipboard.writeText("npx viberank");
     setCopiedToClipboard(true);
     setTimeout(() => setCopiedToClipboard(false), 2000);
+  };
+  
+  const handleClaimAndMerge = async () => {
+    if (!session?.user?.username) return;
+    
+    setMerging(true);
+    try {
+      const result = await claimAndMergeMutation({ githubUsername: session.user.username });
+      setShowMergeBanner(false);
+      // Refresh the page to show updated data
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to process:", error);
+      alert("Failed to process submissions. Please try again.");
+    } finally {
+      setMerging(false);
+    }
   };
 
   return (
@@ -31,11 +58,57 @@ export default function Home() {
         onUpdatesClick={() => setShowUpdatesModal(true)}
       />
 
+      {/* Claim/Merge Banner */}
+      <AnimatePresence>
+        {showMergeBanner && claimStatus?.actionNeeded && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-14 md:top-20 left-0 right-0 z-40"
+          >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              <div className="bg-accent/10 border border-accent/20 rounded-lg p-3 sm:p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Merge className="w-5 h-5 text-accent flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {claimStatus.actionText}
+                    </p>
+                    <p className="text-xs text-muted mt-0.5">
+                      {claimStatus.actionNeeded === "claim" 
+                        ? "Add verification badge to your submission"
+                        : `Combine your ${claimStatus.totalSubmissions} submissions into one verified entry`
+                      }
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleClaimAndMerge}
+                    disabled={merging}
+                    className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+                  >
+                    {merging ? "Processing..." : claimStatus.actionNeeded === "claim" ? "Verify" : "Merge"}
+                  </button>
+                  <button
+                    onClick={() => setShowMergeBanner(false)}
+                    className="p-1.5 hover:bg-accent/10 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
-      <main className="flex-1 pt-20 md:pt-0">
+      <main className={`flex-1 ${showMergeBanner && claimStatus?.actionNeeded ? 'pt-28 md:pt-32' : 'pt-14 md:pt-0'} transition-all`}>
         {/* Hero Section */}
         <div className="relative bg-gradient-to-b from-accent/5 via-transparent to-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 md:pt-32 pb-6 sm:pb-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-20 md:pt-32 pb-6 sm:pb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

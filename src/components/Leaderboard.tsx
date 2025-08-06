@@ -89,15 +89,15 @@ export default function Leaderboard() {
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           {/* Quick Filters */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setQuickFilter(null)}
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 !dateFrom && !dateTo
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-muted hover:text-foreground hover:bg-card"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card/50"
               }`}
             >
               All Time
@@ -109,8 +109,8 @@ export default function Leaderboard() {
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 dateFrom && dateTo && 
                 new Date(dateTo).getTime() - new Date(dateFrom).getTime() === 7 * 24 * 60 * 60 * 1000
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-muted hover:text-foreground hover:bg-card"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card/50"
               }`}
             >
               7 Days
@@ -122,8 +122,8 @@ export default function Leaderboard() {
               className={`whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                 dateFrom && dateTo && 
                 Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000)) === 30
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-muted hover:text-foreground hover:bg-card"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card/50"
               }`}
             >
               30 Days
@@ -138,7 +138,7 @@ export default function Leaderboard() {
                   : "text-muted hover:text-foreground"
               }`}
             >
-              <Calendar className="w-3 sm:w-4 h-3 sm:h-4" />
+              <Calendar className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Custom
               <motion.div
                 animate={{ rotate: showFilters ? 180 : 0 }}
@@ -150,31 +150,31 @@ export default function Leaderboard() {
           </div>
 
           {/* Sort Options */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setSortBy("cost")}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 ${
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                 sortBy === "cost"
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-muted hover:text-foreground hover:bg-card"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card/50"
               }`}
             >
-              <DollarSign className="w-3 sm:w-4 h-3 sm:h-4" />
+              <DollarSign className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Cost
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setSortBy("tokens")}
-              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 ${
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                 sortBy === "tokens"
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-muted hover:text-foreground hover:bg-card"
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-card/50"
               }`}
             >
-              <Zap className="w-3 sm:w-4 h-3 sm:h-4" />
+              <Zap className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Tokens
             </motion.button>
           </div>
@@ -221,21 +221,22 @@ export default function Leaderboard() {
       </div>
 
       {/* Leaderboard Table */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {paginatedSubmissions ? (
           <>
             {/* Desktop View */}
-            <div className="hidden sm:block overflow-hidden rounded-xl border border-border/50">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border/50 bg-card/30">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted">Rank</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted">User</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted">Total Cost</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted">Tokens</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted"></th>
-                  </tr>
-                </thead>
+            <div className="hidden sm:block">
+              <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/50 overflow-hidden shadow-sm">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-background/30 border-b border-border/50">
+                      <th className="text-left py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Rank</th>
+                      <th className="text-left py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Developer</th>
+                      <th className="text-right py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Spent</th>
+                      <th className="text-right py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Tokens</th>
+                      <th className="w-16"></th>
+                    </tr>
+                  </thead>
                 <tbody>
                   {paginatedSubmissions.map((submission, index) => {
                     const actualRank = page * ITEMS_PER_PAGE + index + 1;
@@ -245,86 +246,109 @@ export default function Leaderboard() {
                     return (
                       <motion.tr
                         key={submission._id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        whileHover={{ backgroundColor: "rgba(var(--card), 0.5)" }}
-                        className={`border-b border-border/30 transition-colors ${
-                          isCurrentUser ? "bg-accent/5" : ""
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.3) }}
+                        className={`group relative border-b border-border/50 transition-all hover:bg-card/50 ${
+                          isCurrentUser ? "bg-accent/5 hover:bg-accent/10" : ""
                         }`}
                       >
-                        <td className="py-4 px-4">
-                          <div className="flex items-center justify-center w-8">
-                            {getRankDisplay(actualRank)}
+                        <td className="py-5 px-6">
+                          <div className="flex items-center">
+                            <span className="text-lg font-semibold text-muted">{actualRank}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-5 px-6">
                           <div className="flex items-center gap-3">
-                            {submission.githubAvatar ? (
-                              <img 
-                                src={submission.githubAvatar} 
-                                alt={submission.githubUsername || submission.username}
-                                className="w-10 h-10 rounded-full"
-                              />
-                            ) : submission.githubUsername ? (
-                              <img 
-                                src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
-                                alt={submission.githubUsername}
-                                className="w-10 h-10 rounded-full"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
-                                <User className="w-5 h-5 text-muted" />
-                              </div>
-                            )}
+                            <div className="relative">
+                              {submission.githubAvatar ? (
+                                <img 
+                                  src={submission.githubAvatar} 
+                                  alt={submission.githubUsername || submission.username}
+                                  className="w-10 h-10 rounded-full ring-2 ring-border/20"
+                                />
+                              ) : submission.githubUsername ? (
+                                <img 
+                                  src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
+                                  alt={submission.githubUsername}
+                                  className="w-10 h-10 rounded-full ring-2 ring-border/20"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center ring-2 ring-border/20">
+                                  <User className="w-5 h-5 text-muted" />
+                                </div>
+                              )}
+                              {actualRank <= 3 && (
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-background rounded-full flex items-center justify-center">
+                                  {getRankDisplay(actualRank)}
+                                </div>
+                              )}
+                            </div>
                             <div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1.5">
                                 <Link 
                                   href={`/profile/${submission.githubUsername || submission.username}`}
-                                  className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors"
+                                  className="font-medium hover:text-accent transition-colors"
                                 >
                                   {submission.githubUsername || submission.username}
-                                  {submission.verified && (
-                                    <div className="group/badge relative inline-flex">
-                                      <BadgeCheck className="w-4 h-4 text-blue-500" />
-                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover/badge:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                        Verified via GitHub authentication
-                                      </div>
-                                    </div>
-                                  )}
-                                  <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </Link>
+                                {submission.verified && (
+                                  <div className="group/badge relative inline-flex">
+                                    <BadgeCheck className="w-4 h-4 text-blue-500" />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover/badge:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                      Verified via GitHub authentication
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                               {submission.githubName && submission.githubName !== submission.githubUsername && (
-                                <p className="text-sm text-muted">
+                                <p className="text-xs text-muted mt-0.5">
                                   {submission.githubName}
                                 </p>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-right">
-                          <p className="font-mono font-semibold text-lg">
-                            ${formatCurrency(submission.totalCost)}
-                          </p>
+                        <td className="py-5 px-6 text-right">
+                          <div>
+                            <p className="font-mono font-semibold text-foreground">
+                              ${formatCurrency(submission.totalCost)}
+                            </p>
+                            <p className="text-xs text-muted mt-0.5">
+                              ${(submission.totalCost / submission.dailyBreakdown.length).toFixed(0)}/day
+                            </p>
+                          </div>
                         </td>
-                        <td className="py-4 px-4 text-right">
-                          <p className="font-mono text-muted">
-                            {formatNumber(submission.totalTokens)}
-                          </p>
+                        <td className="py-5 px-6 text-right">
+                          <div>
+                            <p className="font-mono text-sm font-medium">
+                              {formatNumber(submission.totalTokens)}
+                            </p>
+                            <p className="text-xs text-muted mt-0.5">
+                              {submission.dailyBreakdown.length} days
+                            </p>
+                          </div>
                         </td>
-                        <td className="py-4 px-4 text-center">
-                          {isCurrentUser && (
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => setShowShareCard(submission._id)}
-                              className="p-2 rounded-lg hover:bg-card transition-colors"
-                              title="Share your rank"
+                        <td className="py-5 px-6">
+                          <div className="flex items-center justify-end gap-2">
+                            {isCurrentUser && (
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setShowShareCard(submission._id)}
+                                className="p-1.5 rounded-lg hover:bg-card/50 transition-all opacity-0 group-hover:opacity-100"
+                                title="Share your rank"
+                              >
+                                <Share2 className="w-3.5 h-3.5 text-muted hover:text-accent" />
+                              </motion.button>
+                            )}
+                            <Link
+                              href={`/profile/${submission.githubUsername || submission.username}`}
+                              className="p-1.5 rounded-lg hover:bg-card/50 transition-all opacity-0 group-hover:opacity-100"
                             >
-                              <Share2 className="w-4 h-4 text-muted hover:text-accent" />
-                            </motion.button>
-                          )}
+                              <ArrowUpRight className="w-3.5 h-3.5 text-muted hover:text-foreground" />
+                            </Link>
+                          </div>
                         </td>
                       </motion.tr>
                     );
@@ -332,6 +356,7 @@ export default function Leaderboard() {
                 </tbody>
               </table>
             </div>
+          </div>
 
             {/* Mobile View */}
             <div className="sm:hidden space-y-3">
@@ -346,17 +371,17 @@ export default function Leaderboard() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                    whileHover={{ scale: 1.02 }}
-                    className={`p-3 sm:p-4 rounded-xl border transition-all ${
+                    whileHover={{ scale: 1.01 }}
+                    className={`p-4 rounded-xl border transition-all shadow-sm ${
                       isCurrentUser 
-                        ? "border-accent/30 bg-accent/5 shadow-sm shadow-accent/10" 
-                        : "border-border/50 bg-card/30 hover:shadow-sm"
+                        ? "border-accent/30 bg-accent/5 shadow-accent/10" 
+                        : "border-border/50 bg-card/30 hover:bg-card/50 hover:shadow-md"
                     }`}
                   >
-                    <div className="flex items-start justify-between mb-2.5">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="flex items-center justify-center w-7 h-7 flex-shrink-0">
-                          {getRankDisplay(actualRank)}
+                          <span className="text-base font-bold text-muted">{actualRank}</span>
                         </div>
                         {submission.githubAvatar ? (
                           <img 
@@ -389,7 +414,6 @@ export default function Leaderboard() {
                                 </div>
                               </div>
                             )}
-                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                           </Link>
                           {submission.githubName && submission.githubName !== submission.githubUsername && (
                             <p className="text-xs text-muted truncate">
@@ -417,11 +441,17 @@ export default function Leaderboard() {
                           <p className="font-mono font-semibold text-sm">
                             ${formatCurrency(submission.totalCost)}
                           </p>
+                          <p className="text-[10px] text-muted/70">
+                            ${(submission.totalCost / submission.dailyBreakdown.length).toFixed(0)}/day
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted mb-0.5">Tokens</p>
                           <p className="font-mono text-sm">
                             {formatNumber(submission.totalTokens)}
+                          </p>
+                          <p className="text-[10px] text-muted/70">
+                            {submission.dailyBreakdown.length} days
                           </p>
                         </div>
                       </div>
@@ -483,11 +513,11 @@ export default function Leaderboard() {
               Showing {page * ITEMS_PER_PAGE + 1}-{Math.min((page + 1) * ITEMS_PER_PAGE, submissions?.length || 0)} of {submissions?.length || 0}
             </p>
             
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors ${
                   page === 0 
                     ? "text-muted/50 cursor-not-allowed" 
                     : "text-muted hover:text-foreground hover:bg-card"
@@ -496,11 +526,11 @@ export default function Leaderboard() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               
-              <div className="flex items-center gap-0.5 sm:gap-1">
+              <div className="flex items-center gap-0.5">
                 {/* Always show first page */}
                 <button
                   onClick={() => setPage(0)}
-                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
+                  className={`px-2.5 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
                     page === 0
                       ? "bg-accent text-white"
                       : "text-muted hover:text-foreground hover:bg-card"
@@ -524,7 +554,7 @@ export default function Leaderboard() {
                       <button
                         key={i}
                         onClick={() => setPage(i)}
-                        className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
+                        className={`px-2.5 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
                           showOnMobile ? '' : 'hidden sm:inline-block'
                         } ${
                           i === page
@@ -546,7 +576,7 @@ export default function Leaderboard() {
                 {totalPages > 1 && (
                   <button
                     onClick={() => setPage(totalPages - 1)}
-                    className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
+                    className={`px-2.5 py-1 text-xs sm:text-sm rounded-lg transition-colors ${
                       page === totalPages - 1
                         ? "bg-accent text-white"
                         : "text-muted hover:text-foreground hover:bg-card"
@@ -560,7 +590,7 @@ export default function Leaderboard() {
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1}
-                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors ${
                   page === totalPages - 1
                     ? "text-muted/50 cursor-not-allowed" 
                     : "text-muted hover:text-foreground hover:bg-card"

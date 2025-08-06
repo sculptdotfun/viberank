@@ -40,7 +40,8 @@ export default defineSchema({
     .index("by_total_cost", ["totalCost"])
     .index("by_total_tokens", ["totalTokens"])
     .index("by_submitted_at", ["submittedAt"])
-    .index("by_username", ["username"]),
+    .index("by_username", ["username"])
+    .index("by_github_username", ["githubUsername"]),
   
   profiles: defineTable({
     username: v.string(),
