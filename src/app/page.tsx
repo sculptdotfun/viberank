@@ -14,7 +14,14 @@ import { formatNumber, formatLargeNumber } from "@/lib/utils";
 export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUpdatesModal, setShowUpdatesModal] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const stats = useQuery(api.stats.getGlobalStats);
+
+  const copyCommand = () => {
+    navigator.clipboard.writeText("npx viberank");
+    setCopiedToClipboard(true);
+    setTimeout(() => setCopiedToClipboard(false), 2000);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,9 +33,9 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 pt-20 md:pt-0">
-        {/* Hero Section with Stats */}
-        <div className="bg-gradient-to-b from-accent/5 via-accent/5 to-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 md:pt-24 pb-6 sm:pb-8">
+        {/* Hero Section */}
+        <div className="bg-gradient-to-b from-accent/5 via-transparent to-transparent">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 md:pt-32 pb-6 sm:pb-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -43,80 +50,33 @@ export default function Home() {
               </p>
             </motion.div>
 
-            {/* Stats Grid */}
+            {/* Compact Stats */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8"
+              className="flex items-center justify-center gap-6 sm:gap-8 text-center flex-wrap mb-12"
             >
-              <motion.div 
-                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-              >
-                <p className="text-2xl sm:text-3xl font-bold text-foreground mb-0.5 sm:mb-1">
-                  {stats ? formatLargeNumber(stats.totalUsers) : "—"}
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold">{stats?.totalSubmissions || 0}</p>
+                <p className="text-xs sm:text-sm text-muted">Developers</p>
+              </div>
+              <div className="w-px h-12 bg-border/50 hidden sm:block" />
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold">
+                  {stats ? formatNumber(stats.totalTokens) : "0"}
                 </p>
-                <p className="text-xs sm:text-sm text-muted">Active Users</p>
-              </motion.div>
-              
-              <motion.div 
-                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-              >
-                <p className="text-2xl sm:text-3xl font-bold text-foreground mb-0.5 sm:mb-1">
-                  ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "—"}
+                <p className="text-xs sm:text-sm text-muted">Total Tokens</p>
+              </div>
+              <div className="w-px h-12 bg-border/50 hidden sm:block" />
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold text-accent">
+                  ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "0"}
                 </p>
                 <p className="text-xs sm:text-sm text-muted">Total Spent</p>
-              </motion.div>
-              
-              <motion.div 
-                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-              >
-                <p className="text-2xl sm:text-3xl font-bold text-foreground mb-0.5 sm:mb-1">
-                  {stats ? formatNumber(stats.totalTokens) : "—"}
-                </p>
-                <p className="text-xs sm:text-sm text-muted">Tokens Used</p>
-              </motion.div>
-              
-              <motion.div 
-                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center"
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  <TrendingUp className="w-4 sm:w-5 h-4 sm:h-5 text-accent" />
-                  <p className="text-2xl sm:text-3xl font-bold text-accent">
-                    ${stats ? formatLargeNumber(Math.round(stats.topCost)) : "—"}
-                  </p>
-                </div>
-                <p className="text-xs sm:text-sm text-muted">Top Spender</p>
-              </motion.div>
+              </div>
             </motion.div>
 
-            {/* Submit CTA */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="text-center px-4"
-            >
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowUploadModal(true)}
-                className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-accent text-white rounded-xl font-medium shadow-lg shadow-accent/25 hover:shadow-xl hover:shadow-accent/30 transition-all text-sm sm:text-base"
-              >
-                <Upload className="w-4 sm:w-5 h-4 sm:h-5" />
-                Submit Your Stats
-              </motion.button>
-              
-              <p className="mt-3 text-xs sm:text-sm text-muted">
-                or run{" "}
-                <code className="px-1.5 sm:px-2 py-0.5 bg-card rounded text-xs font-mono">npx viberank</code>
-                {" "}in your terminal
-              </p>
-            </motion.div>
           </div>
         </div>
 
@@ -125,32 +85,6 @@ export default function Home() {
           <Leaderboard />
         </div>
       </main>
-
-      {/* Minimal Footer */}
-      <footer className="border-t border-border/50 bg-background/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between text-sm text-muted">
-            <div className="flex items-center gap-4">
-              <span>Built with Claude Code</span>
-              <a href="https://github.com/sculptdotfun/viberank" className="hover:text-foreground transition-colors">
-                GitHub
-              </a>
-              <button
-                onClick={() => setShowUpdatesModal(true)}
-                className="hover:text-foreground transition-colors"
-              >
-                Updates
-              </button>
-            </div>
-            <a 
-              href="https://github.com/sculptdotfun/viberank#getting-started"
-              className="hover:text-foreground transition-colors"
-            >
-              How it works
-            </a>
-          </div>
-        </div>
-      </footer>
 
       {/* Upload Modal */}
       {showUploadModal && (
@@ -168,7 +102,7 @@ export default function Home() {
             className="relative bg-background border border-border rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
           >
             <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Submit Usage Data</h3>
+              <h3 className="text-lg font-semibold">Submit Your Stats</h3>
               <button
                 onClick={() => setShowUploadModal(false)}
                 className="p-2 hover:bg-accent/10 rounded-lg transition-colors"
@@ -190,7 +124,45 @@ export default function Home() {
             </div>
             
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
-              <FileUpload onSuccess={() => setShowUploadModal(false)} />
+              {/* CLI Option */}
+              <div className="mb-6 p-6 bg-card/50 rounded-xl border border-border/50">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Option 1: Terminal (Recommended)
+                </h4>
+                <p className="text-sm text-muted mb-4">Quick submit via command line</p>
+                <div className="flex items-center gap-3 bg-background rounded-lg p-3 border border-border/50">
+                  <code className="text-sm font-mono text-accent">npx viberank</code>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={copyCommand}
+                    className="ml-auto p-1.5 hover:bg-accent/10 rounded transition-colors"
+                    title="Copy to clipboard"
+                  >
+                    {copiedToClipboard ? (
+                      <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Manual Upload Option */}
+              <div>
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Option 2: Manual Upload
+                </h4>
+                <FileUpload onSuccess={() => setShowUploadModal(false)} />
+              </div>
             </div>
           </motion.div>
         </div>
