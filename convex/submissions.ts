@@ -463,6 +463,48 @@ export const getProfile = query({
 });
 
 
+export const getFlaggedSubmissions = query({
+  args: {},
+  handler: async (ctx) => {
+    const flaggedSubmissions = await ctx.db
+      .query("submissions")
+      .filter((q) => q.eq(q.field("flaggedForReview"), true))
+      .order("desc")
+      .collect();
+    
+    return flaggedSubmissions;
+  },
+});
+
+export const updateFlagStatus = mutation({
+  args: {
+    submissionId: v.id("submissions"),
+    flagged: v.boolean(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { submissionId, flagged, reason } = args;
+    
+    const submission = await ctx.db.get(submissionId);
+    if (!submission) {
+      throw new Error("Submission not found");
+    }
+    
+    const updates: any = {
+      flaggedForReview: flagged,
+    };
+    
+    if (flagged && reason) {
+      updates.flagReasons = [...(submission.flagReasons || []), reason];
+    } else if (!flagged) {
+      updates.flagReasons = undefined;
+    }
+    
+    await ctx.db.patch(submissionId, updates);
+    return { success: true };
+  },
+});
+
 export const claimSubmission = mutation({
   args: {
     submissionId: v.id("submissions"),
