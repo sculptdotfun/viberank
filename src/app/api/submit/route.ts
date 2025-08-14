@@ -56,15 +56,20 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Submission error:", error);
     
-    // Provide specific error messages
+    // Provide specific error messages for validation errors
     if (error instanceof Error) {
-      if (error.message.includes("Token totals don't match")) {
-        return NextResponse.json(
-          { error: error.message },
-          { status: 400 }
-        );
-      }
-      if (error.message.includes("Invalid date format")) {
+      // Handle validation errors with 400 status
+      const validationErrors = [
+        "Token totals don't match",
+        "Invalid date format",
+        "Future date detected",
+        "Negative values are not allowed",
+        "exceed realistic limits",
+        "Cost per token ratio is unrealistic",
+        "Token components don't sum correctly"
+      ];
+      
+      if (validationErrors.some(msg => error.message.includes(msg))) {
         return NextResponse.json(
           { error: error.message },
           { status: 400 }
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Support OPTIONS for CORS if needed
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
