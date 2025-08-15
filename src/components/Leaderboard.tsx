@@ -287,7 +287,7 @@ export default function Leaderboard() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <Link 
-                                  href={`/profile/${submission.githubUsername || submission.username}`}
+                                  href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                                   className="font-medium hover:text-accent transition-colors"
                                 >
                                   {submission.githubUsername || submission.username}
@@ -343,7 +343,7 @@ export default function Leaderboard() {
                               </motion.button>
                             )}
                             <Link
-                              href={`/profile/${submission.githubUsername || submission.username}`}
+                              href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                               className="p-1.5 rounded-lg hover:bg-card/50 transition-all opacity-0 group-hover:opacity-100"
                             >
                               <ArrowUpRight className="w-3.5 h-3.5 text-muted hover:text-foreground" />
@@ -402,7 +402,7 @@ export default function Leaderboard() {
                         )}
                         <div className="min-w-0">
                           <Link 
-                            href={`/profile/${submission.githubUsername || submission.username}`}
+                            href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                             className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors text-sm truncate"
                           >
                             <span className="truncate">{submission.githubUsername || submission.username}</span>
