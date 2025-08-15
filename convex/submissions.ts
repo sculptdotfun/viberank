@@ -56,7 +56,7 @@ export const submit = mutation({
     }
     
     // 2. Validate realistic ranges
-    const MAX_DAILY_COST = 25000; // $25k/day is extremely high usage (increased 5x from $5k)
+    const MAX_DAILY_COST = 5000; // $5k/day is extremely high usage
     const MAX_DAILY_TOKENS = 250_000_000; // 250M tokens/day (increased 5x from 50M)
     const MIN_COST_PER_TOKEN = 0.000001; // Sanity check for cost/token ratio
     const MAX_COST_PER_TOKEN = 0.1; // Sanity check for cost/token ratio
