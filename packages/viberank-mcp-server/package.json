@@ -1,5 +1,5 @@
 {
-  "name": "@viberank/mcp-server",
+  "name": "viberank-mcp-server",
   "version": "1.0.0",
   "description": "MCP server for submitting Claude usage stats to Viberank",
   "type": "module",
@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
@@ -23,8 +24,15 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "node-fetch": "^3.3.2",
-    "child_process": "^1.0.2"
+    "node-fetch": "^3.3.2"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "claude_desktop_config.example.json"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

@@ -52,7 +52,7 @@ If you're using Claude Desktop or another MCP-compatible client, you can use our
   "mcpServers": {
     "viberank": {
       "command": "npx",
-      "args": ["@viberank/mcp-server"]
+      "args": ["viberank-mcp-server"]
     }
   }
 }
@@ -106,8 +106,8 @@ To maintain leaderboard integrity, viberank validates all submissions:
 - ✅ **Realistic limits** - Flags unusually high usage for review
 
 #### Validation Limits
-- Maximum daily cost: $5,000
-- Maximum daily tokens: 50 million
+- Maximum daily cost: $25,000
+- Maximum daily tokens: 250 million
 - Cost per token ratio: 0.000001 to 0.1
 
 Submissions exceeding these limits are flagged for review and hidden from the main leaderboard to ensure fair competition.
