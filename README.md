@@ -42,7 +42,25 @@ This will:
 - Submit it to the leaderboard
 - Give you a direct link to your profile
 
-#### Option 2: Using curl
+#### Option 2: MCP Server (for Claude Desktop)
+
+If you're using Claude Desktop or another MCP-compatible client, you can use our MCP server for seamless integration:
+
+```json
+// Add to ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "viberank": {
+      "command": "npx",
+      "args": ["@viberank/mcp-server"]
+    }
+  }
+}
+```
+
+Then just ask Claude: "Submit my usage stats to Viberank"
+
+#### Option 3: Using curl
 
 If you prefer to use curl directly:
 
@@ -60,7 +78,7 @@ curl -X POST https://viberank.app/api/submit \
   -d @cc.json
 ```
 
-#### Option 3: Web Upload
+#### Option 4: Web Upload
 
 1. Visit [viberank.app](https://viberank.app)
 2. Sign in with GitHub
