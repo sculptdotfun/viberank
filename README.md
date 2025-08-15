@@ -106,7 +106,7 @@ To maintain leaderboard integrity, viberank validates all submissions:
 - ✅ **Realistic limits** - Flags unusually high usage for review
 
 #### Validation Limits
-- Maximum daily cost: $25,000
+- Maximum daily cost: $5,000
 - Maximum daily tokens: 250 million
 - Cost per token ratio: 0.000001 to 0.1
 
