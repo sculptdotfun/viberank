@@ -143,8 +143,9 @@ export const submit = mutation({
       suspiciousReasons.push(`Average daily cost of $${avgDailyCost.toFixed(2)} is unusually high`);
     }
     
-    // Check for future dates
+    // Check for future dates (allow today)
     const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today to allow current day submissions
     const futureDate = dates.find(date => new Date(date) > today);
     if (futureDate) {
       throw new Error(`Future date detected: ${futureDate}. Please check your data.`);
