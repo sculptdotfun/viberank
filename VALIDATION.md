@@ -43,12 +43,12 @@ inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens = totalTokens
 These submissions are accepted but flagged for review:
 
 ### 1. High Daily Usage
-- Daily cost > $5,000
-- Daily tokens > 50 million
-- These are possible but rare
+- Daily cost > $25,000
+- Daily tokens > 250 million
+- These are possible but rare (limits increased 5x to reduce false positives)
 
 ### 2. High Average Usage
-- Average daily cost > $2,500
+- Average daily cost > $12,500
 - Indicates sustained high usage
 
 ### 3. Flagging Behavior

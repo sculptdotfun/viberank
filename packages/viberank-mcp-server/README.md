@@ -14,7 +14,7 @@ Submit your Claude Code usage stats to [Viberank](https://viberank.app) directly
 
 ### Option 1: NPM Global Install
 ```bash
-npm install -g @viberank/mcp-server
+npm install -g viberank-mcp-server
 ```
 
 ### Option 2: Local Development
@@ -36,7 +36,7 @@ Add to your Claude Desktop configuration at `~/Library/Application Support/Claud
   "mcpServers": {
     "viberank": {
       "command": "npx",
-      "args": ["@viberank/mcp-server"]
+      "args": ["viberank-mcp-server"]
     }
   }
 }
@@ -51,7 +51,7 @@ Add to your Claude Desktop configuration at `%APPDATA%\Claude\claude_desktop_con
   "mcpServers": {
     "viberank": {
       "command": "npx",
-      "args": ["@viberank/mcp-server"]
+      "args": ["viberank-mcp-server"]
     }
   }
 }
@@ -61,7 +61,7 @@ Add to your Claude Desktop configuration at `%APPDATA%\Claude\claude_desktop_con
 
 For other MCP clients, use the following command:
 ```bash
-npx @viberank/mcp-server
+npx viberank-mcp-server
 ```
 
 Or if installed locally:
