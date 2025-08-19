@@ -282,7 +282,7 @@ class ViberankMCPServer {
       }
 
       // Submit to Viberank API
-      const response = await fetch('https://viberank.app/api/submit', {
+      const response = await fetch('https://www.viberank.app/api/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

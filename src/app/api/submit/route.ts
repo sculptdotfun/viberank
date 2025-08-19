@@ -7,8 +7,26 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export async function POST(request: NextRequest) {
   try {
+    // Check request size (Vercel has a 4.5MB limit for API routes)
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > 4.5 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "Request body too large. Please submit data in smaller batches." },
+        { status: 413 }
+      );
+    }
+    
     // Parse the request body
-    const ccData = await request.json();
+    let ccData;
+    try {
+      ccData = await request.json();
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      return NextResponse.json(
+        { error: "Invalid JSON format. Please ensure your cc.json file is valid JSON." },
+        { status: 400 }
+      );
+    }
     
     // Check for authentication
     const session = await getServerSession();
@@ -37,14 +55,21 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Submit to Convex
-    const submissionId = await convex.mutation(api.submissions.submit, {
+    // Submit to Convex with timeout handling
+    const submissionPromise = convex.mutation(api.submissions.submit, {
       username: githubUsername,
       githubUsername: githubUsername,
       source: source,
       verified: verified,
       ccData: ccData,
     });
+    
+    // Add a timeout of 25 seconds (Vercel has a 30 second timeout for API routes)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Database operation timed out")), 25000)
+    );
+    
+    const submissionId = await Promise.race([submissionPromise, timeoutPromise]);
     
     return NextResponse.json({
       success: true,
@@ -75,10 +100,32 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      
+      // Log more detailed error for debugging
+      console.error("Detailed error:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Check for timeout or Convex-specific errors
+      if (error.message.includes("timeout") || error.message.includes("deadline")) {
+        return NextResponse.json(
+          { error: "Request timed out. Please try again or submit smaller batches of data." },
+          { status: 504 }
+        );
+      }
+      
+      if (error.message.includes("Convex") || error.message.includes("mutation")) {
+        return NextResponse.json(
+          { error: `Database error: ${error.message}` },
+          { status: 500 }
+        );
+      }
     }
     
     return NextResponse.json(
-      { error: "Failed to submit data. Please check your cc.json file format." },
+      { error: "Failed to submit data. Please check your cc.json file format and try again." },
       { status: 500 }
     );
   }

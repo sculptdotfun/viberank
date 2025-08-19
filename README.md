@@ -72,7 +72,7 @@ npx ccusage@latest --json > cc.json
 GITHUB_USER=$(git config user.name)
 
 # Submit to viberank
-curl -X POST https://viberank.app/api/submit \
+curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $GITHUB_USER" \
   -d @cc.json
@@ -189,7 +189,7 @@ Open [http://localhost:3001](http://localhost:3001) to see the app.
 Submit usage data programmatically:
 
 ```bash
-curl -X POST https://viberank.app/api/submit \
+curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: YOUR_GITHUB_USERNAME" \
   -d @cc.json

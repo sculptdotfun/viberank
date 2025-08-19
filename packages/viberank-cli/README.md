@@ -43,7 +43,7 @@ You can also submit directly using curl:
 GITHUB_USER=$(git config user.name)
 
 # Submit with curl
-curl -X POST https://viberank.app/api/submit \
+curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $GITHUB_USER" \
   -d @cc.json
