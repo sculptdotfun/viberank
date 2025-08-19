@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Upload, Github, Sparkles, TrendingUp, Menu, X, Shield } from "lucide-react";
+import { Trophy, Upload, Github, Sparkles, TrendingUp, Menu, X, Shield, BookOpen } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,6 +31,7 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
   }, []);
 
   const navItems = [
+    { name: "Blog", href: "/blog", icon: BookOpen },
     ...(isAdmin ? [{ name: "Admin", href: "/admin", icon: Shield }] : []),
   ];
 
