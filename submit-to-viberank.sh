@@ -51,7 +51,7 @@ echo ""
 # Submit to Viberank
 echo -e "${YELLOW}Submitting to Viberank...${NC}"
 
-RESPONSE=$(curl -s -X POST https://viberank.fun/api/submit \
+RESPONSE=$(curl -s -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $GITHUB_USER" \
   -d @cc.json)

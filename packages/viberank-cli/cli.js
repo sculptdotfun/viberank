@@ -122,7 +122,7 @@ async function main() {
   try {
     const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
     
-    const response = await fetch('https://viberank.app/api/submit', {
+    const response = await fetch('https://www.viberank.app/api/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
