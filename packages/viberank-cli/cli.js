@@ -19,31 +19,51 @@ const CLI_VERSION = packageJson.version;
 async function main() {
   console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
 
-  // Get GitHub username from git config
+  // Try to get GitHub username from remote URL first, then fall back to git config
   let githubUser;
+  
+  // First, try to extract from GitHub remote URL
   try {
-    githubUser = execSync('git config user.name', { encoding: 'utf8' }).trim();
-  } catch (error) {
-    console.log(chalk.yellow('Warning: Could not get GitHub username from git config'));
-  }
-
-  if (!githubUser) {
-    const response = await prompts({
-      type: 'text',
-      name: 'username',
-      message: 'Please enter your GitHub username:',
-      validate: value => value.length > 0 || 'Username is required'
-    });
-    
-    if (!response.username) {
-      console.log(chalk.red('Username is required. Exiting.'));
-      process.exit(1);
+    const remoteUrl = execSync('git config --get remote.origin.url', { encoding: 'utf8' }).trim();
+    // Match GitHub URLs like:
+    // https://github.com/username/repo.git
+    // git@github.com:username/repo.git
+    // https://github.com/username/repo
+    const githubMatch = remoteUrl.match(/github\.com[:/]([^/]+)\//);
+    if (githubMatch) {
+      githubUser = githubMatch[1];
+      console.log(chalk.gray(`Detected GitHub username from repository: ${githubUser}`));
     }
-    
-    githubUser = response.username;
+  } catch (error) {
+    // Repository might not have a GitHub remote
+  }
+  
+  // If we couldn't get it from remote, try git config user.name as fallback
+  if (!githubUser) {
+    try {
+      githubUser = execSync('git config user.name', { encoding: 'utf8' }).trim();
+      console.log(chalk.yellow('Warning: Using git config user.name which might be your real name, not GitHub username'));
+      console.log(chalk.yellow('Please verify this is correct or enter your GitHub username manually'));
+    } catch (error) {
+      console.log(chalk.yellow('Could not detect GitHub username automatically'));
+    }
   }
 
-  console.log(`GitHub username: ${chalk.green(githubUser)}\n`);
+  // Always confirm with the user
+  const response = await prompts({
+    type: 'text',
+    name: 'username',
+    message: 'GitHub username:',
+    initial: githubUser || '',
+    validate: value => value.length > 0 || 'Username is required'
+  });
+  
+  if (!response.username) {
+    console.log(chalk.red('Username is required. Exiting.'));
+    process.exit(1);
+  }
+  
+  githubUser = response.username;
 
   // Check if cc.json already exists
   let ccJsonPath = path.join(process.cwd(), 'cc.json');
