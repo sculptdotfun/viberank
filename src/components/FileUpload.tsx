@@ -120,11 +120,14 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
             <p className="text-sm text-muted mb-3">
               Run this command in your terminal to generate your Claude usage statistics:
             </p>
-            <div className="bg-card rounded-lg p-3 border border-border/50">
+            <div className="bg-card rounded-lg p-3 border border-border/50 mb-2">
               <code className="text-sm font-mono text-accent">
                 npx ccusage --json &gt; cc.json
               </code>
             </div>
+            <p className="text-xs text-muted">
+              💡 Tip: Use <code className="text-accent">npx viberank</code> instead for automatic submission (no upload needed!)
+            </p>
           </div>
 
           <div>
