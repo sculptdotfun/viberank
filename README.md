@@ -182,6 +182,23 @@ Open [http://localhost:3001](http://localhost:3001) to see the app.
 - **CLI Tool**: Node.js with prompts and chalk
 - **Development**: Turbopack, ESLint, Prettier
 
+## Troubleshooting
+
+### npx viberank not working?
+
+If you encounter issues with `npx viberank`, try:
+
+1. **Clear npx cache**: `npx clear-npx-cache`
+2. **Use the latest version explicitly**: `npx viberank@latest`
+3. **Install globally** (optional): `npm install -g viberank` then run `viberank`
+4. **Check Node version**: Ensure you have Node.js 14 or higher
+
+### Common Issues
+
+- **"Failed to submit data"**: Check that your cc.json file is valid JSON
+- **"GitHub username not found"**: Run `git config --global user.name "YourGitHubUsername"`
+- **"No usage data found"**: Make sure you've used Claude Code at least once
+
 ## API Documentation
 
 ### POST /api/submit
