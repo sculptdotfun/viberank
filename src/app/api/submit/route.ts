@@ -22,8 +22,12 @@ export async function POST(request: NextRequest) {
     }
     
     // Log request details for debugging
+    const cliVersion = request.headers.get("X-CLI-Version");
     console.log("Submission request received:", {
-      headers: Object.fromEntries(request.headers.entries()),
+      cliVersion: cliVersion || "unknown",
+      userAgent: request.headers.get("user-agent"),
+      contentType: request.headers.get("content-type"),
+      contentLength: request.headers.get("content-length"),
       url: request.url,
       method: request.method,
       convexUrl: CONVEX_URL,
@@ -79,6 +83,18 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Check if ccData is null or undefined
+    if (!ccData || typeof ccData !== 'object') {
+      console.error("Invalid cc.json data: ccData is null or not an object", {
+        ccData: ccData,
+        type: typeof ccData
+      });
+      return NextResponse.json(
+        { error: "Invalid submission data. Please ensure your cc.json file contains valid data." },
+        { status: 400 }
+      );
+    }
+    
     // Validate the cc.json structure
     if (!ccData.daily || !ccData.totals) {
       console.error("Invalid cc.json structure:", {
@@ -87,7 +103,7 @@ export async function POST(request: NextRequest) {
         keys: Object.keys(ccData || {})
       });
       return NextResponse.json(
-        { error: "Invalid cc.json format. Missing 'daily' or 'totals' field." },
+        { error: "Invalid cc.json format. Missing 'daily' or 'totals' field. Please regenerate using: npx ccusage@latest --json > cc.json" },
         { status: 400 }
       );
     }
@@ -143,13 +159,27 @@ export async function POST(request: NextRequest) {
       submissionId = await Promise.race([submissionPromise, timeoutPromise]);
     } catch (convexError: any) {
       console.error("Convex mutation error:", {
-        message: convexError.message,
-        data: convexError.data,
-        code: convexError.code,
+        message: convexError?.message,
+        data: convexError?.data,
+        code: convexError?.code,
+        stack: convexError?.stack,
+        errorType: typeof convexError,
+        errorString: String(convexError),
+        fullError: JSON.stringify(convexError, null, 2)
       });
       
+      // Extract meaningful error message
+      let errorMessage = "Database operation failed";
+      if (convexError?.message) {
+        errorMessage = convexError.message;
+      } else if (typeof convexError === 'string') {
+        errorMessage = convexError;
+      } else if (convexError?.data?.message) {
+        errorMessage = convexError.data.message;
+      }
+      
       // Re-throw with more context
-      throw new Error(convexError.message || "Database operation failed");
+      throw new Error(errorMessage);
     }
     
     return NextResponse.json({
@@ -203,6 +233,15 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      // Handle Convex authentication/configuration errors
+      if (error.message.includes("Unauthenticated") || error.message.includes("authentication")) {
+        console.error("Convex authentication error - check CONVEX_URL configuration");
+        return NextResponse.json(
+          { error: "Server configuration error. The service is temporarily unavailable. Please try again later." },
+          { status: 503 }
+        );
+      }
+      
       // Handle Convex server errors more specifically
       if (error.message.includes("Server Error") && error.message.includes("Request ID")) {
         console.error("Convex Server Error detected. This could be due to:");
@@ -248,11 +287,25 @@ export async function POST(request: NextRequest) {
       error: error,
       isError: error instanceof Error,
       constructor: error?.constructor?.name,
-      message: error?.message || error?.toString()
+      message: error?.message || error?.toString(),
+      stringified: JSON.stringify(error, Object.getOwnPropertyNames(error))
     });
     
+    // Provide more detailed error message for unknown errors
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : (typeof error === 'string' ? error : 'Unknown error occurred');
+    
+    // If the error message contains useful information, include it
+    if (errorMessage && !errorMessage.includes('undefined') && errorMessage.length < 200) {
+      return NextResponse.json(
+        { error: `Submission failed: ${errorMessage}. Please try again or contact support if the issue persists.` },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to submit data. Please check your cc.json file format and try again." },
+      { error: "Failed to submit data. Please check your cc.json file format and try again. If this issue persists, please contact support." },
       { status: 500 }
     );
   }

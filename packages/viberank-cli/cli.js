@@ -12,8 +12,12 @@ import fetch from 'node-fetch';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Read package.json to get version
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const CLI_VERSION = packageJson.version;
+
 async function main() {
-  console.log(chalk.yellow.bold('\n🚀 Viberank Submission Tool\n'));
+  console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
 
   // Get GitHub username from git config
   let githubUser;
@@ -126,10 +130,47 @@ async function main() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-GitHub-User': githubUser
+        'X-GitHub-User': githubUser,
+        'X-CLI-Version': CLI_VERSION
       },
       body: JSON.stringify(ccData)
     });
+
+    // Check if response is ok before parsing
+    if (!response.ok) {
+      let errorMessage = `Server returned ${response.status} ${response.statusText}`;
+      
+      // Try to parse error details from response
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        if (errorData.requestId) {
+          errorMessage += ` (Request ID: ${errorData.requestId})`;
+        }
+      } catch {
+        // If JSON parsing fails, use the status text
+      }
+      
+      submitSpinner.fail('Failed to submit to Viberank');
+      console.error(chalk.red('Error:', errorMessage));
+      
+      // Provide helpful troubleshooting tips based on status code
+      if (response.status === 400) {
+        console.log(chalk.yellow('\nTroubleshooting tips:'));
+        console.log(chalk.yellow('- Ensure you\'re using the latest version of ccusage'));
+        console.log(chalk.yellow('- Try regenerating your cc.json file: npx ccusage@latest --json > cc.json'));
+        console.log(chalk.yellow('- Check that your cc.json file is valid JSON'));
+      } else if (response.status === 413) {
+        console.log(chalk.yellow('\nYour usage data is too large. Consider submitting data for a shorter time period.'));
+      } else if (response.status >= 500) {
+        console.log(chalk.yellow('\nThe server is experiencing issues. Please try again in a few moments.'));
+        console.log(chalk.yellow('If this persists, please report it at: https://github.com/sculptdotfun/viberank/issues'));
+      }
+      
+      process.exit(1);
+    }
 
     const result = await response.json();
 
@@ -139,11 +180,29 @@ async function main() {
     } else {
       submitSpinner.fail('Failed to submit to Viberank');
       console.error(chalk.red('Error:', result.error || 'Unknown error'));
+      
+      // Provide helpful context for common errors
+      if (result.error && result.error.includes('cc.json')) {
+        console.log(chalk.yellow('\nTry regenerating your cc.json file:'));
+        console.log(chalk.yellow('  npx ccusage@latest --json > cc.json'));
+      }
+      
       process.exit(1);
     }
   } catch (error) {
     submitSpinner.fail('Failed to submit to Viberank');
-    console.error(chalk.red('Error:', error.message));
+    
+    // Handle network errors specifically
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      console.error(chalk.red('Error: Unable to connect to Viberank server'));
+      console.log(chalk.yellow('\nPlease check your internet connection and try again.'));
+    } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
+      console.error(chalk.red('Error: Invalid response from server'));
+      console.log(chalk.yellow('\nThe server may be experiencing issues. Please try again later.'));
+    } else {
+      console.error(chalk.red('Error:', error.message));
+    }
+    
     process.exit(1);
   }
 
