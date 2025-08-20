@@ -1,6 +1,6 @@
 {
   "name": "viberank",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "CLI tool to submit Claude usage stats to Viberank leaderboard",
   "type": "module",
   "main": "cli.js",
