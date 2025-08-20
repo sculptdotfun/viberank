@@ -3,10 +3,32 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
 import { getServerSession } from "next-auth";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+// Initialize Convex client with error handling
+const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
+if (!CONVEX_URL) {
+  console.error("NEXT_PUBLIC_CONVEX_URL is not set!");
+}
+const convex = new ConvexHttpClient(CONVEX_URL || "");
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Convex URL is configured
+    if (!CONVEX_URL) {
+      console.error("NEXT_PUBLIC_CONVEX_URL environment variable is not set");
+      return NextResponse.json(
+        { error: "Server configuration error. Please contact support." },
+        { status: 500 }
+      );
+    }
+    
+    // Log request details for debugging
+    console.log("Submission request received:", {
+      headers: Object.fromEntries(request.headers.entries()),
+      url: request.url,
+      method: request.method,
+      convexUrl: CONVEX_URL,
+    });
+    
     // Check request size (Vercel has a 4.5MB limit for API routes)
     const contentLength = request.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > 4.5 * 1024 * 1024) {
@@ -55,6 +77,16 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Log submission details before sending to Convex
+    console.log("Submitting to Convex:", {
+      username: githubUsername,
+      source: source,
+      verified: verified,
+      dataSize: JSON.stringify(ccData).length,
+      dailyCount: ccData.daily?.length || 0,
+      totals: ccData.totals,
+    });
+    
     // Submit to Convex with timeout handling
     const submissionPromise = convex.mutation(api.submissions.submit, {
       username: githubUsername,
@@ -83,6 +115,15 @@ export async function POST(request: NextRequest) {
     
     // Provide specific error messages for validation errors
     if (error instanceof Error) {
+      // Log full error details for debugging
+      console.error("Detailed error:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        errorType: error.constructor.name,
+        errorString: error.toString(),
+      });
+      
       // Handle validation errors with 400 status
       const validationErrors = [
         "Token totals don't match",
@@ -101,18 +142,33 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Log more detailed error for debugging
-      console.error("Detailed error:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-      
       // Check for timeout or Convex-specific errors
       if (error.message.includes("timeout") || error.message.includes("deadline")) {
         return NextResponse.json(
           { error: "Request timed out. Please try again or submit smaller batches of data." },
           { status: 504 }
+        );
+      }
+      
+      // Handle Convex server errors more specifically
+      if (error.message.includes("Server Error") && error.message.includes("Request ID")) {
+        console.error("Convex Server Error detected. This could be due to:");
+        console.error("1. Convex service issues");
+        console.error("2. Invalid data that passed client validation");
+        console.error("3. Rate limiting or quota issues");
+        console.error("4. Network connectivity problems");
+        
+        // Extract request ID for debugging
+        const requestIdMatch = error.message.match(/Request ID: ([a-f0-9]+)/);
+        const requestId = requestIdMatch ? requestIdMatch[1] : "unknown";
+        
+        return NextResponse.json(
+          { 
+            error: "Database service error. Please try again in a few moments.",
+            requestId: requestId,
+            hint: "If this persists, please check Convex dashboard for service status."
+          },
+          { status: 503 }
         );
       }
       

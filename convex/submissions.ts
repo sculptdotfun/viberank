@@ -44,6 +44,15 @@ export const submit = mutation({
   handler: async (ctx, args) => {
     const { username, githubUsername, githubName, githubAvatar, source, verified, ccData } = args;
     
+    // Log submission attempt for debugging
+    console.log("Submission attempt:", {
+      username,
+      source,
+      verified,
+      dailyCount: ccData.daily?.length || 0,
+      totals: ccData.totals,
+    });
+    
     // Data validation and normalization
     // 1. Verify total tokens match sum of components
     const calculatedTotalTokens = ccData.totals.inputTokens + 
@@ -152,10 +161,16 @@ export const submit = mutation({
     }
     
     // Check for existing submission with overlapping date range and same source
-    const existingSubmissions = await ctx.db
-      .query("submissions")
-      .withIndex("by_username", (q) => q.eq("username", username))
-      .collect();
+    let existingSubmissions;
+    try {
+      existingSubmissions = await ctx.db
+        .query("submissions")
+        .withIndex("by_username", (q) => q.eq("username", username))
+        .collect();
+    } catch (dbError) {
+      console.error("Database query error:", dbError);
+      throw new Error("Failed to query existing submissions");
+    }
     
     let existingSubmission = null;
     for (const submission of existingSubmissions) {
@@ -237,57 +252,67 @@ export const submit = mutation({
         ...modelsUsed
       ]));
       
-      await ctx.db.patch(existingSubmission._id, {
-        githubUsername,
-        githubName,
-        githubAvatar,
-        totalTokens: mergedTotals.totalTokens,
-        totalCost: mergedTotals.totalCost,
-        inputTokens: mergedTotals.inputTokens,
-        outputTokens: mergedTotals.outputTokens,
-        cacheCreationTokens: mergedTotals.cacheCreationTokens,
-        cacheReadTokens: mergedTotals.cacheReadTokens,
-        dateRange: mergedDateRange,
-        modelsUsed: allModelsUsed,
-        dailyBreakdown: mergedDailyBreakdown,
-        submittedAt: Date.now(),
-        verified: verified,
-        source: source,
-        flaggedForReview: flaggedForReview || existingSubmission.flaggedForReview,
-        flagReasons: flaggedForReview ? suspiciousReasons : existingSubmission.flagReasons,
-      });
-      submissionId = existingSubmission._id;
+      try {
+        await ctx.db.patch(existingSubmission._id, {
+          githubUsername,
+          githubName,
+          githubAvatar,
+          totalTokens: mergedTotals.totalTokens,
+          totalCost: mergedTotals.totalCost,
+          inputTokens: mergedTotals.inputTokens,
+          outputTokens: mergedTotals.outputTokens,
+          cacheCreationTokens: mergedTotals.cacheCreationTokens,
+          cacheReadTokens: mergedTotals.cacheReadTokens,
+          dateRange: mergedDateRange,
+          modelsUsed: allModelsUsed,
+          dailyBreakdown: mergedDailyBreakdown,
+          submittedAt: Date.now(),
+          verified: verified,
+          source: source,
+          flaggedForReview: flaggedForReview || existingSubmission.flaggedForReview,
+          flagReasons: flaggedForReview ? suspiciousReasons : existingSubmission.flagReasons,
+        });
+        submissionId = existingSubmission._id;
+      } catch (updateError) {
+        console.error("Failed to update submission:", updateError);
+        throw new Error("Failed to update existing submission");
+      }
     } else {
       // Create new submission
-      submissionId = await ctx.db.insert("submissions", {
-        username,
-        githubUsername,
-        githubName,
-        githubAvatar,
-        totalTokens: ccData.totals.totalTokens,
-        totalCost: ccData.totals.totalCost,
-        inputTokens: ccData.totals.inputTokens,
-        outputTokens: ccData.totals.outputTokens,
-        cacheCreationTokens: ccData.totals.cacheCreationTokens,
-        cacheReadTokens: ccData.totals.cacheReadTokens,
-        dateRange,
-        modelsUsed,
-        dailyBreakdown: ccData.daily.map((day) => ({
-          date: day.date,
-          inputTokens: day.inputTokens,
-          outputTokens: day.outputTokens,
-          cacheCreationTokens: day.cacheCreationTokens,
-          cacheReadTokens: day.cacheReadTokens,
-          totalTokens: day.totalTokens,
-          totalCost: day.totalCost,
-          modelsUsed: day.modelsUsed,
-        })),
-        submittedAt: Date.now(),
-        verified: verified,
-        source: source,
-        flaggedForReview: flaggedForReview,
-        flagReasons: flaggedForReview ? suspiciousReasons : undefined,
-      });
+      try {
+        submissionId = await ctx.db.insert("submissions", {
+          username,
+          githubUsername,
+          githubName,
+          githubAvatar,
+          totalTokens: ccData.totals.totalTokens,
+          totalCost: ccData.totals.totalCost,
+          inputTokens: ccData.totals.inputTokens,
+          outputTokens: ccData.totals.outputTokens,
+          cacheCreationTokens: ccData.totals.cacheCreationTokens,
+          cacheReadTokens: ccData.totals.cacheReadTokens,
+          dateRange,
+          modelsUsed,
+          dailyBreakdown: ccData.daily.map((day) => ({
+            date: day.date,
+            inputTokens: day.inputTokens,
+            outputTokens: day.outputTokens,
+            cacheCreationTokens: day.cacheCreationTokens,
+            cacheReadTokens: day.cacheReadTokens,
+            totalTokens: day.totalTokens,
+            totalCost: day.totalCost,
+            modelsUsed: day.modelsUsed,
+          })),
+          submittedAt: Date.now(),
+          verified: verified,
+          source: source,
+          flaggedForReview: flaggedForReview,
+          flagReasons: flaggedForReview ? suspiciousReasons : undefined,
+        });
+      } catch (insertError) {
+        console.error("Failed to insert submission:", insertError);
+        throw new Error("Failed to create new submission");
+      }
     }
     
     // Update or create profile
