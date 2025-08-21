@@ -165,21 +165,44 @@ export async function POST(request: NextRequest) {
         stack: convexError?.stack,
         errorType: typeof convexError,
         errorString: String(convexError),
-        fullError: JSON.stringify(convexError, null, 2)
+        fullError: JSON.stringify(convexError, Object.getOwnPropertyNames(convexError))
       });
       
       // Extract meaningful error message
       let errorMessage = "Database operation failed";
+      let requestId = null;
+      
       if (convexError?.message) {
         errorMessage = convexError.message;
+        // Extract request ID if present
+        const requestIdMatch = convexError.message.match(/Request ID: ([a-f0-9]+)/i);
+        if (requestIdMatch) {
+          requestId = requestIdMatch[1];
+        }
       } else if (typeof convexError === 'string') {
         errorMessage = convexError;
       } else if (convexError?.data?.message) {
         errorMessage = convexError.data.message;
       }
       
+      // Log additional context for Server Error
+      if (errorMessage.includes("Server Error")) {
+        console.error("Convex Server Error - Potential causes:");
+        console.error("1. Convex service outage or degraded performance");
+        console.error("2. Data validation issue that passed client but failed on server");
+        console.error("3. Database quota or rate limiting");
+        console.error("4. Network connectivity issues between Vercel and Convex");
+        console.error("Request ID for support:", requestId || "unknown");
+        console.error("Convex URL:", CONVEX_URL);
+        console.error("Submission data size:", JSON.stringify(ccData).length, "bytes");
+      }
+      
       // Re-throw with more context
-      throw new Error(errorMessage);
+      const enhancedError = new Error(errorMessage);
+      if (requestId) {
+        (enhancedError as any).requestId = requestId;
+      }
+      throw enhancedError;
     }
     
     return NextResponse.json({
@@ -243,22 +266,20 @@ export async function POST(request: NextRequest) {
       }
       
       // Handle Convex server errors more specifically
-      if (error.message.includes("Server Error") && error.message.includes("Request ID")) {
-        console.error("Convex Server Error detected. This could be due to:");
-        console.error("1. Convex service issues");
-        console.error("2. Invalid data that passed client validation");
-        console.error("3. Rate limiting or quota issues");
-        console.error("4. Network connectivity problems");
+      if (error.message.includes("Server Error")) {
+        // Extract request ID if available
+        const requestId = (error as any).requestId || 
+          (error.message.match(/Request ID: ([a-f0-9]+)/i)?.[1]) || 
+          "unknown";
         
-        // Extract request ID for debugging
-        const requestIdMatch = error.message.match(/Request ID: ([a-f0-9]+)/);
-        const requestId = requestIdMatch ? requestIdMatch[1] : "unknown";
+        console.error("Returning 503 for Convex Server Error with request ID:", requestId);
         
         return NextResponse.json(
           { 
-            error: "Database service error. Please try again in a few moments.",
+            error: "The database service is temporarily unavailable. Please try again in a few moments.",
             requestId: requestId,
-            hint: "If this persists, please check Convex dashboard for service status."
+            details: "This is usually a temporary issue with the database service. If it persists for more than 5 minutes, please report it.",
+            retryAdvice: "Wait 30 seconds and try submitting again."
           },
           { status: 503 }
         );

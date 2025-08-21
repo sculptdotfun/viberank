@@ -51,6 +51,7 @@ export const submit = mutation({
       verified,
       dailyCount: ccData.daily?.length || 0,
       totals: ccData.totals,
+      timestamp: new Date().toISOString(),
     });
     
     // Data validation and normalization
@@ -168,8 +169,12 @@ export const submit = mutation({
         .withIndex("by_username", (q) => q.eq("username", username))
         .collect();
     } catch (dbError) {
-      console.error("Database query error:", dbError);
-      throw new Error("Failed to query existing submissions");
+      console.error("Database query error:", {
+        error: dbError,
+        username,
+        timestamp: new Date().toISOString()
+      });
+      throw new Error("Failed to query existing submissions. Please try again.");
     }
     
     let existingSubmission = null;
@@ -274,8 +279,13 @@ export const submit = mutation({
         });
         submissionId = existingSubmission._id;
       } catch (updateError) {
-        console.error("Failed to update submission:", updateError);
-        throw new Error("Failed to update existing submission");
+        console.error("Failed to update submission:", {
+          error: updateError,
+          submissionId: existingSubmission._id,
+          username,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error("Failed to update existing submission. Please try again.");
       }
     } else {
       // Create new submission
@@ -310,8 +320,13 @@ export const submit = mutation({
           flagReasons: flaggedForReview ? suspiciousReasons : undefined,
         });
       } catch (insertError) {
-        console.error("Failed to insert submission:", insertError);
-        throw new Error("Failed to create new submission");
+        console.error("Failed to insert submission:", {
+          error: insertError,
+          username,
+          dataSize: JSON.stringify(ccData).length,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error("Failed to create new submission. Please try again.");
       }
     }
     
