@@ -253,12 +253,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Allowed development origins for CORS
+const allowedDevOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001", 
+  "http://127.0.0.1:3001",
+  "http://35.175.206.198",
+  "http://35.175.206.198:3000",
+  "http://35.175.206.198:3001"
+];
+
 // Support OPTIONS for CORS if needed
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  const allowedOrigin = process.env.NODE_ENV === "development" && origin && allowedDevOrigins.includes(origin) 
+    ? origin 
+    : "*";
+
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": allowedOrigin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, X-User-Email",
     },
