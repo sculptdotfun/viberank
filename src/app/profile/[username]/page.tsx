@@ -1,7 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { useQuery } from "@/hooks/useApi";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
@@ -18,7 +17,7 @@ export default function ProfilePage() {
   const username = decodeURIComponent(params.username as string);
   const [selectedTimeRange, setSelectedTimeRange] = useState<"7d" | "30d" | "all">("30d");
   
-  const profileData = useQuery(api.submissions.getProfile, { username });
+  const profileData = useQuery<any>(`/api/profile/${username}`);
 
   if (profileData === undefined) {
     return (

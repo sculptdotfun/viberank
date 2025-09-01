@@ -1,25 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
-import { api } from "../../../../convex/_generated/api";
-import { getServerSession } from "next-auth";
-
-// Initialize Convex client with error handling
-const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
-if (!CONVEX_URL) {
-  console.error("NEXT_PUBLIC_CONVEX_URL is not set!");
-}
-const convex = new ConvexHttpClient(CONVEX_URL || "");
+import { createSubmission } from "@/lib/db/operations";
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if Convex URL is configured
-    if (!CONVEX_URL) {
-      console.error("NEXT_PUBLIC_CONVEX_URL environment variable is not set");
-      return NextResponse.json(
-        { error: "Server configuration error. Please contact support." },
-        { status: 500 }
-      );
-    }
     
     // Log request details for debugging
     const cliVersion = request.headers.get("X-CLI-Version");
@@ -30,7 +13,6 @@ export async function POST(request: NextRequest) {
       contentLength: request.headers.get("content-length"),
       url: request.url,
       method: request.method,
-      convexUrl: CONVEX_URL,
     });
     
     // Check request size (Vercel has a 4.5MB limit for API routes)
@@ -54,33 +36,28 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check for authentication
-    const session = await getServerSession();
+    // Get email from header (CLI) or web form
+    const email = request.headers.get("X-User-Email") || "anonymous";
+    const source: "cli" | "web" = request.headers.get("X-User-Email") ? "cli" : "web";
+    const verified = false; // Remove automatic verification since no auth
     
-    let githubUsername: string;
-    let source: "oauth" | "cli";
-    let verified: boolean;
+    console.log("Submission from:", email, "via", source);
     
-    if (session?.user?.username) {
-      // Authenticated via OAuth
-      githubUsername = session.user.username;
-      source = "oauth";
-      verified = true;
-      console.log("OAuth submission from:", githubUsername);
-    } else {
-      // CLI submission
-      githubUsername = request.headers.get("X-GitHub-User") || "anonymous";
-      source = "cli";
-      verified = false;
-      console.log("CLI submission from:", githubUsername);
-      
-      // Validate CLI submission has proper username
-      if (githubUsername === "anonymous" || !githubUsername) {
-        return NextResponse.json(
-          { error: "GitHub username is required for CLI submissions. Please provide X-GitHub-User header." },
-          { status: 400 }
-        );
-      }
+    // Validate submission has proper email
+    if (email === "anonymous" || !email) {
+      return NextResponse.json(
+        { error: "Email address is required. Please provide X-User-Email header." },
+        { status: 400 }
+      );
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: "Invalid email format. Please provide a valid email address." },
+        { status: 400 }
+      );
     }
     
     // Check if ccData is null or undefined
@@ -130,9 +107,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Log submission details before sending to Convex
-    console.log("Submitting to Convex:", {
-      username: githubUsername,
+    // Log submission details before sending to database
+    console.log("Submitting to database:", {
+      email: email,
       source: source,
       verified: verified,
       dataSize: JSON.stringify(ccData).length,
@@ -140,76 +117,48 @@ export async function POST(request: NextRequest) {
       totals: ccData.totals,
     });
     
-    // Submit to Convex with timeout handling
+    // Submit to database with timeout handling
     let submissionId;
     try {
-      const submissionPromise = convex.mutation(api.submissions.submit, {
-        username: githubUsername,
-        githubUsername: githubUsername,
+      submissionId = await createSubmission({
+        username: email,
+        email: email,
         source: source,
         verified: verified,
         ccData: ccData,
       });
-      
-      // Add a timeout of 25 seconds (Vercel has a 30 second timeout for API routes)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Database operation timed out")), 25000)
-      );
-      
-      submissionId = await Promise.race([submissionPromise, timeoutPromise]);
-    } catch (convexError: any) {
-      console.error("Convex mutation error:", {
-        message: convexError?.message,
-        data: convexError?.data,
-        code: convexError?.code,
-        stack: convexError?.stack,
-        errorType: typeof convexError,
-        errorString: String(convexError),
-        fullError: JSON.stringify(convexError, Object.getOwnPropertyNames(convexError))
+    } catch (dbError: any) {
+      console.error("Database error:", {
+        message: dbError?.message,
+        data: dbError?.data,
+        code: dbError?.code,
+        stack: dbError?.stack,
+        errorType: typeof dbError,
+        errorString: String(dbError),
+        fullError: JSON.stringify(dbError, Object.getOwnPropertyNames(dbError))
       });
       
       // Extract meaningful error message
       let errorMessage = "Database operation failed";
-      let requestId = null;
       
-      if (convexError?.message) {
-        errorMessage = convexError.message;
-        // Extract request ID if present
-        const requestIdMatch = convexError.message.match(/Request ID: ([a-f0-9]+)/i);
-        if (requestIdMatch) {
-          requestId = requestIdMatch[1];
-        }
-      } else if (typeof convexError === 'string') {
-        errorMessage = convexError;
-      } else if (convexError?.data?.message) {
-        errorMessage = convexError.data.message;
-      }
-      
-      // Log additional context for Server Error
-      if (errorMessage.includes("Server Error")) {
-        console.error("Convex Server Error - Potential causes:");
-        console.error("1. Convex service outage or degraded performance");
-        console.error("2. Data validation issue that passed client but failed on server");
-        console.error("3. Database quota or rate limiting");
-        console.error("4. Network connectivity issues between Vercel and Convex");
-        console.error("Request ID for support:", requestId || "unknown");
-        console.error("Convex URL:", CONVEX_URL);
-        console.error("Submission data size:", JSON.stringify(ccData).length, "bytes");
+      if (dbError?.message) {
+        errorMessage = dbError.message;
+      } else if (typeof dbError === 'string') {
+        errorMessage = dbError;
+      } else if (dbError?.data?.message) {
+        errorMessage = dbError.data.message;
       }
       
       // Re-throw with more context
       const enhancedError = new Error(errorMessage);
-      if (requestId) {
-        (enhancedError as any).requestId = requestId;
-      }
       throw enhancedError;
     }
     
     return NextResponse.json({
       success: true,
       submissionId,
-      message: `Successfully submitted data for ${githubUsername}`,
-      profileUrl: `https://viberank.app/profile/${githubUsername}`
+      message: `Successfully submitted data for ${email}`,
+      profileUrl: `https://viberank.app/profile/${encodeURIComponent(email)}`
     });
     
   } catch (error) {
@@ -256,39 +205,11 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Handle Convex authentication/configuration errors
-      if (error.message.includes("Unauthenticated") || error.message.includes("authentication")) {
-        console.error("Convex authentication error - check CONVEX_URL configuration");
+      // Handle database connection errors
+      if (error.message.includes("connection") || error.message.includes("connect")) {
         return NextResponse.json(
-          { error: "Server configuration error. The service is temporarily unavailable. Please try again later." },
+          { error: "Database connection error. The service is temporarily unavailable. Please try again later." },
           { status: 503 }
-        );
-      }
-      
-      // Handle Convex server errors more specifically
-      if (error.message.includes("Server Error")) {
-        // Extract request ID if available
-        const requestId = (error as any).requestId || 
-          (error.message.match(/Request ID: ([a-f0-9]+)/i)?.[1]) || 
-          "unknown";
-        
-        console.error("Returning 503 for Convex Server Error with request ID:", requestId);
-        
-        return NextResponse.json(
-          { 
-            error: "The database service is temporarily unavailable. Please try again in a few moments.",
-            requestId: requestId,
-            details: "This is usually a temporary issue with the database service. If it persists for more than 5 minutes, please report it.",
-            retryAdvice: "Wait 30 seconds and try submitting again."
-          },
-          { status: 503 }
-        );
-      }
-      
-      if (error.message.includes("Convex") || error.message.includes("mutation")) {
-        return NextResponse.json(
-          { error: `Database error: ${error.message}` },
-          { status: 500 }
         );
       }
       
@@ -339,7 +260,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-GitHub-User",
+      "Access-Control-Allow-Headers": "Content-Type, X-User-Email",
     },
   });
 }

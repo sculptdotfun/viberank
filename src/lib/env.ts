@@ -1,23 +1,17 @@
 // Client-side environment variables
 export const clientEnv = {
-  NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL!,
+  // No client-side env vars needed for PostgreSQL setup
 } as const;
 
-// Server-side environment variables (only available in server components/API routes)
+// Server-side environment variables (only available in server components/API routes)  
 export const serverEnv = {
-  GITHUB_ID: process.env.GITHUB_ID!,
-  GITHUB_SECRET: process.env.GITHUB_SECRET!,
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET!,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL!,
+  DATABASE_URL: process.env.DATABASE_URL || '',
 } as const;
 
 // Environment variable validation for server-side
 export function validateServerEnv() {
   const requiredEnvVars = [
-    'GITHUB_ID',
-    'GITHUB_SECRET',
-    'NEXTAUTH_SECRET',
-    'NEXTAUTH_URL'
+    'DATABASE_URL'
   ];
 
   const missingVars = requiredEnvVars.filter(
@@ -25,9 +19,10 @@ export function validateServerEnv() {
   );
 
   if (missingVars.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${missingVars.join(', ')}\n` +
-      'Please check your .env.local file.'
+    console.warn(
+      `Missing environment variables: ${missingVars.join(', ')}\n` +
+      'Database connection will not function without these variables.'
     );
+    // Don't throw during build - just warn
   }
 }
