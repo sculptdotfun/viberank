@@ -366,15 +366,19 @@ export const submit = mutation({
   },
 });
 
+// Paginated leaderboard - frontend should call with page number
 export const getLeaderboard = query({
   args: {
     sortBy: v.optional(v.union(v.literal("cost"), v.literal("tokens"))),
-    limit: v.optional(v.number()),
+    page: v.optional(v.number()), // Page number (0-based)
+    pageSize: v.optional(v.number()), // Items per page
     includeFlagged: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
-    const limit = Math.min(args.limit || 50, 100); // MUCH smaller limits to avoid 16MB
+    const page = args.page || 0;
+    const pageSize = Math.min(args.pageSize || 25, 50); // Max 50 per page
+    const offset = page * pageSize;
     const includeFlagged = args.includeFlagged || false;
     
     // Build the query based on sort preference
@@ -382,17 +386,28 @@ export const getLeaderboard = query({
       ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
       : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
     
-    // Fetch MUCH less - dailyBreakdown arrays make each record huge!
-    const bufferMultiplier = includeFlagged ? 1 : 1.5;
-    const fetchLimit = Math.min(limit * bufferMultiplier, 150); // Max 150 records TOTAL
-    let results = await query.take(fetchLimit);
+    // Fetch enough for current page + check for more
+    // Need to skip to offset then take pageSize + buffer for filtering
+    const bufferMultiplier = includeFlagged ? 1 : 2;
+    const fetchLimit = Math.min(offset + (pageSize * bufferMultiplier) + 1, 200);
+    let allResults = await query.take(fetchLimit);
     
     // Filter out flagged submissions if needed
     if (!includeFlagged) {
-      results = results.filter(sub => !sub.flaggedForReview);
+      allResults = allResults.filter(sub => !sub.flaggedForReview);
     }
     
-    return results.slice(0, limit);
+    // Apply pagination
+    const items = allResults.slice(offset, offset + pageSize);
+    const hasMore = allResults.length > offset + pageSize;
+    
+    return {
+      items,
+      page,
+      pageSize,
+      hasMore,
+      totalPages: Math.ceil(Math.min(allResults.length, 200) / pageSize),
+    };
   },
 });
 
