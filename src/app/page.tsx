@@ -131,7 +131,7 @@ export default function Home() {
               className="flex items-center justify-center gap-6 sm:gap-8 text-center flex-wrap mb-12"
             >
               <div>
-                <p className="text-2xl sm:text-3xl font-bold">{stats?.totalSubmissions || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold">{stats?.totalUsers || 0}</p>
                 <p className="text-xs sm:text-sm text-muted">Developers</p>
               </div>
               <div className="w-px h-12 bg-border/50 hidden sm:block" />

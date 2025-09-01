@@ -226,6 +226,28 @@ export async function POST(request: NextRequest) {
         errorString: error.toString(),
       });
       
+      // Handle rate limit errors
+      if (error.message.includes("Rate limit exceeded")) {
+        console.error("Rate limit error:", error.message);
+        // Extract wait time from error message if present
+        const waitMatch = error.message.match(/wait (\d+) seconds/);
+        const waitSeconds = waitMatch ? parseInt(waitMatch[1]) : 60;
+        return NextResponse.json(
+          { 
+            error: error.message,
+            retryAfter: waitSeconds 
+          },
+          { 
+            status: 429,
+            headers: {
+              'Retry-After': String(waitSeconds),
+              'X-RateLimit-Limit': '1',
+              'X-RateLimit-Remaining': '0',
+            }
+          }
+        );
+      }
+      
       // Handle validation errors with 400 status
       const validationErrors = [
         "Token totals don't match",
