@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, internal } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
+import { rateLimiter } from "./rateLimiter";
+import { ConvexError } from "convex/values";
 
 export const submit = mutation({
   args: {
@@ -44,6 +46,22 @@ export const submit = mutation({
   handler: async (ctx, args) => {
     const { username, githubUsername, githubName, githubAvatar, source, verified, ccData } = args;
     
+    // Apply rate limiting using Convex rate limiter component
+    try {
+      await rateLimiter.limit(ctx, "submitData", { 
+        key: username, // Rate limit per user
+        throws: true // Automatically throw on rate limit
+      });
+    } catch (error: any) {
+      // Check if it's a rate limit error
+      if (error?.data?.kind === "RateLimitError") {
+        const retryAfter = error.data.retryAfter;
+        const waitSeconds = Math.ceil((retryAfter - Date.now()) / 1000);
+        throw new Error(`Rate limit exceeded. Please wait ${waitSeconds} seconds before submitting again.`);
+      }
+      throw error;
+    }
+    
     // Log submission attempt for debugging
     console.log("Submission attempt:", {
       username,
@@ -55,15 +73,16 @@ export const submit = mutation({
     });
     
     // Data validation and normalization
-    // 1. Verify total tokens match sum of components
-    const calculatedTotalTokens = ccData.totals.inputTokens + 
-      ccData.totals.outputTokens + 
-      ccData.totals.cacheCreationTokens + 
-      ccData.totals.cacheReadTokens;
-    
-    if (Math.abs(calculatedTotalTokens - ccData.totals.totalTokens) > 1) {
-      throw new Error("Token totals don't match. Please use official ccusage tool.");
-    }
+    try {
+      // 1. Verify total tokens match sum of components
+      const calculatedTotalTokens = ccData.totals.inputTokens + 
+        ccData.totals.outputTokens + 
+        ccData.totals.cacheCreationTokens + 
+        ccData.totals.cacheReadTokens;
+      
+      if (Math.abs(calculatedTotalTokens - ccData.totals.totalTokens) > 1) {
+        throw new Error("Token totals don't match. Please use official ccusage tool.");
+      }
     
     // 2. Validate realistic ranges
     const MAX_DAILY_COST = 5000; // $5k/day is extremely high usage
@@ -159,6 +178,14 @@ export const submit = mutation({
     const futureDate = dates.find(date => new Date(date) > today);
     if (futureDate) {
       throw new Error(`Future date detected: ${futureDate}. Please check your data.`);
+    }
+    } catch (validationError: any) {
+      // Track failed validation attempts with rate limiting
+      await rateLimiter.limit(ctx, "failedSubmissions", { 
+        key: username,
+        throws: false // Don't throw, just track
+      });
+      throw validationError;
     }
     
     // Check for existing submission with overlapping date range and same source
