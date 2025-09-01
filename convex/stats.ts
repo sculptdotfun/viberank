@@ -1,70 +1,65 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
+// WARNING: This is not truly "global" - it only processes top submissions
+// to avoid 16MB limit. For accurate global stats, we need pre-aggregation.
 export const getGlobalStats = query({
   args: {},
   handler: async (ctx) => {
-    // Process submissions in batches to avoid bytes read limit
-    const pageSize = 100;
+    // IMPORTANT: We can't scan all submissions without hitting 16MB limit
+    // This gives approximate stats based on top submissions only
+    
+    // Get top submissions by cost (these are most important for stats)
+    const topByCost = await ctx.db
+      .query("submissions")
+      .withIndex("by_total_cost")
+      .order("desc")
+      .take(100); // Only top 100 to stay under limit
+    
+    // Calculate stats from this sample
     let totalCost = 0;
     let totalTokens = 0;
     let totalDays = 0;
-    let totalSubmissions = 0;
+    let validSubmissions = 0;
     const uniqueUsers = new Set<string>();
     const modelUsage: Record<string, number> = {};
     let topSubmission: any = null;
-    let lastId = null;
     
-    // Process submissions in batches
-    while (true) {
-      let query = ctx.db.query("submissions");
+    for (const submission of topByCost) {
+      // Skip flagged submissions
+      if (submission.flaggedForReview) continue;
       
-      if (lastId) {
-        query = query.filter(q => q.gt(q.field("_id"), lastId));
+      validSubmissions++;
+      uniqueUsers.add(submission.username);
+      totalCost += submission.totalCost;
+      totalTokens += submission.totalTokens;
+      totalDays += submission.dailyBreakdown.length;
+      
+      // Track top submission
+      if (!topSubmission || submission.totalCost > topSubmission.totalCost) {
+        topSubmission = submission;
       }
       
-      const batch = await query.take(pageSize);
-      
-      if (batch.length === 0) break;
-      
-      lastId = batch[batch.length - 1]._id;
-      totalSubmissions += batch.length;
-      
-      // Process each submission in the batch
-      for (const submission of batch) {
-        // Skip flagged submissions from stats
-        if (submission.flaggedForReview) continue;
-        
-        uniqueUsers.add(submission.username);
-        totalCost += submission.totalCost;
-        totalTokens += submission.totalTokens;
-        totalDays += submission.dailyBreakdown.length;
-        
-        // Track top submission
-        if (!topSubmission || submission.totalCost > topSubmission.totalCost) {
-          topSubmission = submission;
-        }
-        
-        // Track model usage
-        submission.modelsUsed.forEach(model => {
-          const key = model.includes("opus") ? "opus" : "sonnet";
-          modelUsage[key] = (modelUsage[key] || 0) + 1;
-        });
-      }
-      
-      // Limit total processing to prevent excessive reads
-      if (totalSubmissions >= 1000) { // Reduced limit for better performance
-        break;
-      }
+      // Track model usage
+      submission.modelsUsed.forEach(model => {
+        const key = model.includes("opus") ? "opus" : "sonnet";
+        modelUsage[key] = (modelUsage[key] || 0) + 1;
+      });
     }
     
-    const uniqueUserCount = uniqueUsers.size;
+    // Try to get a more accurate user count by querying profiles
+    const profileCount = await ctx.db
+      .query("profiles")
+      .take(1000) // Can fetch more profiles as they're smaller
+      .then(profiles => profiles.length);
+    
+    const uniqueUserCount = Math.max(uniqueUsers.size, profileCount);
     const avgCostPerUser = uniqueUserCount > 0 ? totalCost / uniqueUserCount : 0;
     const avgTokensPerUser = uniqueUserCount > 0 ? totalTokens / uniqueUserCount : 0;
     
     return {
       totalUsers: uniqueUserCount,
-      totalSubmissions,
+      totalSubmissions: validSubmissions, // Note: This is NOT all submissions
       totalCost,
       totalTokens,
       avgCostPerUser,
@@ -73,7 +68,8 @@ export const getGlobalStats = query({
       modelUsage,
       totalDays,
       avgTokensPerUser,
-      isPartialData: totalSubmissions >= 1000, // Indicate if we hit the limit
+      isApproximate: true, // IMPORTANT: These are approximate stats
+      basedOnTop: 100, // Based on top 100 submissions only
     };
   },
 });

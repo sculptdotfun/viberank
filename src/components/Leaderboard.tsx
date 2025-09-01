@@ -23,19 +23,19 @@ export default function Leaderboard() {
 
   const ITEMS_PER_PAGE = 25;
 
-  const submissions = useQuery(api.submissions.getLeaderboard, { 
-    sortBy, 
-    limit: 100, // Reduced limit for better performance
+  // Fetch only the current page from backend - proper pagination!
+  const result = useQuery(api.submissions.getLeaderboard, { 
+    sortBy,
+    page,
+    pageSize: ITEMS_PER_PAGE,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
 
-  // Paginate the results
-  const paginatedSubmissions = submissions?.slice(
-    page * ITEMS_PER_PAGE,
-    (page + 1) * ITEMS_PER_PAGE
-  );
-  const totalPages = submissions ? Math.ceil(submissions.length / ITEMS_PER_PAGE) : 0;
+  // Use data directly from backend - no client-side slicing needed
+  const paginatedSubmissions = result?.items;
+  const totalPages = result?.totalPages || 0;
+  const hasMore = result?.hasMore || false;
 
   const getRankDisplay = (rank: number) => {
     if (rank === 1) return (
@@ -498,7 +498,7 @@ export default function Leaderboard() {
           </div>
         )}
         
-        {submissions && submissions.length === 0 && (
+        {paginatedSubmissions && paginatedSubmissions.length === 0 && (
           <div className="text-center py-20">
             <Trophy className="w-12 h-12 text-muted mx-auto mb-4" />
             <p className="text-lg text-muted">No submissions yet</p>
@@ -510,7 +510,7 @@ export default function Leaderboard() {
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs sm:text-sm text-muted text-center sm:text-left">
-              Showing {page * ITEMS_PER_PAGE + 1}-{Math.min((page + 1) * ITEMS_PER_PAGE, submissions?.length || 0)} of {submissions?.length || 0}
+              Page {page + 1} of {totalPages || 1}
             </p>
             
             <div className="flex items-center gap-1">
