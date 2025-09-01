@@ -376,7 +376,7 @@ export const getLeaderboard = query({
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
-    const limit = Math.min(args.limit || 50, 100); // Reasonable page size
+    const limit = Math.min(args.limit || 25, 100); // Reduced default for better performance
     const includeFlagged = args.includeFlagged || false;
     
     // Build the query based on sort preference

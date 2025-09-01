@@ -23,12 +23,16 @@ export default function Leaderboard() {
 
   const ITEMS_PER_PAGE = 25;
 
-  const submissions = useQuery(api.submissions.getLeaderboard, { 
+  // Use the legacy endpoint that returns array directly for now
+  const rawSubmissions = useQuery(api.submissions.getLeaderboardLegacy, { 
     sortBy, 
-    limit: 200, // Fetch more to paginate client-side
+    limit: 100, // Reduced limit for better performance
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
+
+  // Handle both old array format and potential new format
+  const submissions = Array.isArray(rawSubmissions) ? rawSubmissions : rawSubmissions?.items;
 
   // Paginate the results
   const paginatedSubmissions = submissions?.slice(
