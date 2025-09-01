@@ -3,36 +3,65 @@ import { query } from "./_generated/server";
 export const getGlobalStats = query({
   args: {},
   handler: async (ctx) => {
-    const submissions = await ctx.db.query("submissions").collect();
+    // Process submissions in batches to avoid bytes read limit
+    const pageSize = 100;
+    let totalCost = 0;
+    let totalTokens = 0;
+    let totalDays = 0;
+    let totalSubmissions = 0;
+    const uniqueUsers = new Set<string>();
+    const modelUsage: Record<string, number> = {};
+    let topSubmission: any = null;
+    let lastId = null;
     
-    // Get unique users
-    const uniqueUsers = new Set(submissions.map(s => s.username)).size;
+    // Process submissions in batches
+    while (true) {
+      let query = ctx.db.query("submissions");
+      
+      if (lastId) {
+        query = query.filter(q => q.gt(q.field("_id"), lastId));
+      }
+      
+      const batch = await query.take(pageSize);
+      
+      if (batch.length === 0) break;
+      
+      lastId = batch[batch.length - 1]._id;
+      totalSubmissions += batch.length;
+      
+      // Process each submission in the batch
+      for (const submission of batch) {
+        uniqueUsers.add(submission.username);
+        totalCost += submission.totalCost;
+        totalTokens += submission.totalTokens;
+        totalDays += submission.dailyBreakdown.length;
+        
+        // Track top submission
+        if (!topSubmission || submission.totalCost > topSubmission.totalCost) {
+          topSubmission = submission;
+        }
+        
+        // Track model usage
+        submission.modelsUsed.forEach(model => {
+          const key = model.includes("opus") ? "opus" : "sonnet";
+          modelUsage[key] = (modelUsage[key] || 0) + 1;
+        });
+      }
+      
+      // Limit total processing to prevent excessive reads
+      if (totalSubmissions >= 5000) {
+        console.log("Reached maximum submissions limit for stats calculation");
+        break;
+      }
+    }
     
-    // Calculate totals
-    const totalCost = submissions.reduce((acc, s) => acc + s.totalCost, 0);
-    const totalTokens = submissions.reduce((acc, s) => acc + s.totalTokens, 0);
-    
-    // Get top submission
-    const topSubmission = submissions.sort((a, b) => b.totalCost - a.totalCost)[0];
-    
-    // Calculate average cost per user
-    const avgCostPerUser = uniqueUsers > 0 ? totalCost / uniqueUsers : 0;
-    
-    // Get model usage stats
-    const modelUsage = submissions.reduce((acc, s) => {
-      s.modelsUsed.forEach(model => {
-        const key = model.includes("opus") ? "opus" : "sonnet";
-        acc[key] = (acc[key] || 0) + 1;
-      });
-      return acc;
-    }, {} as Record<string, number>);
-    
-    // Calculate total days tracked
-    const totalDays = submissions.reduce((acc, s) => acc + s.dailyBreakdown.length, 0);
+    const uniqueUserCount = uniqueUsers.size;
+    const avgCostPerUser = uniqueUserCount > 0 ? totalCost / uniqueUserCount : 0;
+    const avgTokensPerUser = uniqueUserCount > 0 ? totalTokens / uniqueUserCount : 0;
     
     return {
-      totalUsers: uniqueUsers,
-      totalSubmissions: submissions.length,
+      totalUsers: uniqueUserCount,
+      totalSubmissions,
       totalCost,
       totalTokens,
       avgCostPerUser,
@@ -40,7 +69,7 @@ export const getGlobalStats = query({
       topUser: topSubmission?.username || "N/A",
       modelUsage,
       totalDays,
-      avgTokensPerUser: uniqueUsers > 0 ? totalTokens / uniqueUsers : 0,
+      avgTokensPerUser,
     };
   },
 });

@@ -167,7 +167,7 @@ export const submit = mutation({
       existingSubmissions = await ctx.db
         .query("submissions")
         .withIndex("by_username", (q) => q.eq("username", username))
-        .collect();
+        .take(50); // Limit to 50 most recent submissions for a user
     } catch (dbError) {
       console.error("Database query error:", {
         error: dbError,
@@ -376,7 +376,7 @@ export const getLeaderboard = query({
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
-    const limit = args.limit || 100;
+    const limit = Math.min(args.limit || 100, 500); // Cap at 500 to prevent excessive reads
     const dateFrom = args.dateFrom;
     const dateTo = args.dateTo;
     const includeFlagged = args.includeFlagged || false;
@@ -387,7 +387,9 @@ export const getLeaderboard = query({
         ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
         : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
       
-      let results = await query.take(limit * 2); // Take more to account for filtering
+      // Take a reasonable buffer to account for flagged submissions
+      const bufferSize = Math.min(limit * 3, 1000); // Cap the buffer size
+      let results = await query.take(bufferSize);
       
       // Filter out flagged submissions unless explicitly included
       if (!includeFlagged) {
@@ -397,18 +399,37 @@ export const getLeaderboard = query({
       return results.slice(0, limit);
     }
     
-    // For date filtering, we still need to fetch all and filter
-    let allSubmissions = await ctx.db
-      .query("submissions")
-      .collect();
+    // For date filtering, use pagination to avoid fetching all at once
+    const pageSize = 200; // Process in chunks
+    let processedCount = 0;
+    let allFilteredSubmissions = [];
+    let lastId = null;
     
-    // Filter out flagged submissions unless explicitly included
-    if (!includeFlagged) {
-      allSubmissions = allSubmissions.filter(sub => !sub.flaggedForReview);
-    }
-    
-    // Calculate filtered totals for each submission
-    const filteredSubmissions = allSubmissions.map(submission => {
+    while (processedCount < 2000) { // Limit total records processed
+      let query = ctx.db.query("submissions");
+      
+      // Use cursor pagination
+      if (lastId) {
+        query = query.filter(q => q.gt(q.field("_id"), lastId));
+      }
+      
+      const batch = await query.take(pageSize);
+      
+      if (batch.length === 0) break;
+      
+      lastId = batch[batch.length - 1]._id;
+      processedCount += batch.length;
+      
+      // Filter this batch
+      let filteredBatch = batch;
+      
+      // Filter out flagged submissions unless explicitly included
+      if (!includeFlagged) {
+        filteredBatch = filteredBatch.filter(sub => !sub.flaggedForReview);
+      }
+      
+      // Calculate filtered totals for each submission in this batch
+      const filteredSubmissions = filteredBatch.map(submission => {
       const filteredDays = submission.dailyBreakdown.filter(day => {
         const dayDate = new Date(day.date);
         const isAfterFrom = !dateFrom || dayDate >= new Date(dateFrom);
@@ -452,17 +473,25 @@ export const getLeaderboard = query({
         end: dates[dates.length - 1],
       };
       
-      return {
-        ...submission,
-        ...filteredTotals,
-        dateRange,
-        modelsUsed,
-        isFiltered: true,
-      };
-    }).filter(Boolean);
+        return {
+          ...submission,
+          ...filteredTotals,
+          dateRange,
+          modelsUsed,
+          isFiltered: true,
+        };
+      }).filter(Boolean);
+      
+      allFilteredSubmissions.push(...filteredSubmissions);
+      
+      // If we have enough results, we can stop early
+      if (allFilteredSubmissions.length >= limit * 3) {
+        break;
+      }
+    }
     
     // Sort by selected metric
-    const sorted = filteredSubmissions.sort((a, b) => {
+    const sorted = allFilteredSubmissions.sort((a, b) => {
       if (sortBy === "cost") {
         return b.totalCost - a.totalCost;
       }
@@ -481,7 +510,10 @@ export const getSubmission = query({
 });
 
 export const getProfile = query({
-  args: { username: v.string() },
+  args: { 
+    username: v.string(),
+    submissionLimit: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const profile = await ctx.db
       .query("profiles")
@@ -490,11 +522,14 @@ export const getProfile = query({
     
     if (!profile) return null;
     
+    const limit = Math.min(args.submissionLimit || 50, 100); // Default 50, max 100
+    
+    // Use index to efficiently query submissions and limit the number fetched
     const submissions = await ctx.db
       .query("submissions")
-      .filter((q) => q.eq(q.field("username"), args.username))
+      .withIndex("by_username", (q) => q.eq("username", args.username))
       .order("desc")
-      .collect();
+      .take(limit);
     
     return {
       ...profile,
@@ -505,13 +540,17 @@ export const getProfile = query({
 
 
 export const getFlaggedSubmissions = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit || 100, 500); // Default 100, max 500
+    
     const flaggedSubmissions = await ctx.db
       .query("submissions")
-      .filter((q) => q.eq(q.field("flaggedForReview"), true))
+      .withIndex("by_flagged", (q) => q.eq("flaggedForReview", true))
       .order("desc")
-      .collect();
+      .take(limit); // Limit the results
     
     return flaggedSubmissions;
   },
@@ -559,7 +598,7 @@ export const claimAndMergeSubmissions = mutation({
     const submissions = await ctx.db
       .query("submissions")
       .withIndex("by_github_username", (q) => q.eq("githubUsername", githubUsername))
-      .collect();
+      .take(100); // Limit to prevent excessive reads
     
     if (submissions.length === 0) {
       throw new Error("No submissions found");
@@ -675,7 +714,7 @@ export const checkClaimableSubmissions = query({
     const submissions = await ctx.db
       .query("submissions")
       .withIndex("by_github_username", (q) => q.eq("githubUsername", githubUsername))
-      .collect();
+      .take(100); // Limit to prevent excessive reads
     
     const cliSubmissions = submissions.filter(s => s.source === "cli");
     const oauthSubmissions = submissions.filter(s => s.source === "oauth");

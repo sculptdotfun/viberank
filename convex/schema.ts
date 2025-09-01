@@ -41,7 +41,8 @@ export default defineSchema({
     .index("by_total_tokens", ["totalTokens"])
     .index("by_submitted_at", ["submittedAt"])
     .index("by_username", ["username"])
-    .index("by_github_username", ["githubUsername"]),
+    .index("by_github_username", ["githubUsername"])
+    .index("by_flagged", ["flaggedForReview", "submittedAt"]),
   
   profiles: defineTable({
     username: v.string(),
