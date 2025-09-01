@@ -11,6 +11,9 @@ importers:
       '@auth/core':
         specifier: ^0.40.0
         version: 0.40.0
+      '@convex-dev/rate-limiter':
+        specifier: ^0.2.12
+        version: 0.2.12(convex@1.25.2(react@19.1.0))(react@19.1.0)
       '@vercel/analytics':
         specifier: ^1.5.0
         version: 1.5.0(next@15.3.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
@@ -106,6 +109,15 @@ packages:
   '@babel/runtime@7.27.6':
     resolution: {integrity: sha512-vbavdySgbTTrmFE+EsiqUTzlOr5bzlnJtUv9PynGCAKvfQqjIXbvFdumPM/GxMDfyuGMJaJAU6TO4zc1Jf1i8Q==}
     engines: {node: '>=6.9.0'}
+
+  '@convex-dev/rate-limiter@0.2.12':
+    resolution: {integrity: sha512-Z7YXDSPa28/8eqVJYUWQBwK9hTiJcXfWY2qZ44Im3VpuBFJZCqYjem7QWjvoTlBjVGqK7FKw26xRneei09hm2w==}
+    peerDependencies:
+      convex: ~1.16.5 || >=1.17.0 <1.35.0
+      react: ^18.3.1 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@emnapi/core@1.4.3':
     resolution: {integrity: sha512-4m62DuCE07lw01soJwPiBGC0nAww0Q+RY70VZ+n49yDIO13yyinhbWCeNnaob0lakDtWQzSdtNWzJeOJt2ma+g==}
@@ -2384,6 +2396,12 @@ snapshots:
       preact-render-to-string: 6.5.11(preact@10.24.3)
 
   '@babel/runtime@7.27.6': {}
+
+  '@convex-dev/rate-limiter@0.2.12(convex@1.25.2(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      convex: 1.25.2(react@19.1.0)
+    optionalDependencies:
+      react: 19.1.0
 
   '@emnapi/core@1.4.3':
     dependencies:
