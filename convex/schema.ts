@@ -56,13 +56,4 @@ export default defineSchema({
   })
     .index("by_username", ["username"])
     .index("by_github", ["githubUsername"]),
-  
-  // Cache for expensive computations
-  statsCache: defineTable({
-    key: v.string(), // e.g., "global", "7d", "30d"
-    data: v.any(), // The cached stats object
-    computedAt: v.number(), // Timestamp when computed
-    expiresAt: v.number(), // When to recompute
-  })
-    .index("by_key", ["key"]),
 });
