@@ -4,10 +4,17 @@
 
 ### 1. Copy Files to System Locations
 
+**Prerequisites:**
+1. Install ccusage: `npm install -g ccusage` (https://github.com/ryoppippi/ccusage)
+
 ```bash
 # Copy the script to system location
 sudo cp submit-ccusage.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/submit-ccusage.sh
+
+# Edit the plist file to set the correct email address
+# Replace "user@company.com" with the actual employee email
+nano com.company.ccusage.plist
 
 # Copy the plist to user's LaunchAgents directory
 cp com.company.ccusage.plist ~/Library/LaunchAgents/
@@ -16,8 +23,8 @@ cp com.company.ccusage.plist ~/Library/LaunchAgents/
 ### 2. Load the LaunchAgent
 
 ```bash
-# Load the agent (will start automatically on login)
-launchctl load ~/Library/LaunchAgents/com.company.ccusage.plist
+# Bootstrap the agent (modern approach)
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.company.ccusage.plist
 
 # Enable the agent
 launchctl enable gui/$(id -u)/com.company.ccusage
@@ -30,18 +37,17 @@ launchctl enable gui/$(id -u)/com.company.ccusage
 launchctl list | grep com.company.ccusage
 
 # Test the script manually
-/usr/local/bin/submit-ccusage.sh
+/usr/local/bin/submit-ccusage.sh user@company.com
 ```
 
 ## How It Works
 
 - **Schedule**: Runs daily at 10:00 AM and on system startup
 - **Duplicate Prevention**: Uses daily lock files (`/tmp/ccusage-submitted-YYYY-MM-DD`)
-- **Email Detection**: Prompts for manual input or uses `CC_USER_EMAIL` environment variable
-- **Data Source**: Reads from `~/.config/claude-code/cc.json`
+- **Email Parameter**: Takes email address as command line argument
+- **Data Generation**: Runs `ccusage` command to generate fresh usage data in temp file
 - **Logging**: Logs to `/tmp/ccusage-submit.log` and `/tmp/ccusage-submit-error.log`
-- **Cleanup**: Automatically removes files older than 7 days
-- **Archiving**: Saves submitted data to `~/.config/claude-code/submitted/`
+- **Cleanup**: Automatically removes files older than 7 days and cleans up temp files after submission
 
 ## Troubleshooting
 
@@ -53,40 +59,25 @@ tail -f /tmp/ccusage-submit-error.log
 
 ### Manual Test
 ```bash
-/usr/local/bin/submit-ccusage.sh
+/usr/local/bin/submit-ccusage.sh user@company.com
 ```
 
 ### Uninstall
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.company.ccusage.plist
+# Disable and remove the agent
+launchctl disable gui/$(id -u)/com.company.ccusage
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.company.ccusage.plist
 rm ~/Library/LaunchAgents/com.company.ccusage.plist
 sudo rm /usr/local/bin/submit-ccusage.sh
 ```
 
 ## Email Configuration
 
-The script will prompt for email input on first run. To avoid prompts in automated environments, set the environment variable:
-
-```bash
-# Option 1: Set environment variable globally
-echo 'export CC_USER_EMAIL="user@company.com"' >> ~/.bashrc
-echo 'export CC_USER_EMAIL="user@company.com"' >> ~/.zshrc
-
-# Option 2: Set in the plist file (add to EnvironmentVariables)
-```
-
-To set the email in the plist, add this to the plist file:
-```xml
-<key>EnvironmentVariables</key>
-<dict>
-    <key>CC_USER_EMAIL</key>
-    <string>user@company.com</string>
-</dict>
-```
+The script requires an email address as a command line parameter. In the plist file, this is already configured in the `ProgramArguments` section. Make sure to replace `user@company.com` with the actual employee email address before copying the plist file.
 
 ## Requirements
 
 - macOS with LaunchAgent support
 - `curl` (pre-installed on macOS)
-- User email configured via `CC_USER_EMAIL` environment variable or manual input
-- Claude Code installed and generating `cc.json` files
+- `ccusage` installed globally (`npm install -g ccusage`)
+- Access to Claude Code for the ccusage tool to read usage data

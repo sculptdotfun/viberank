@@ -8,6 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/submit-ccusage.sh</string>
+        <string>user@company.com</string>
     </array>
     
     <key>StartCalendarInterval</key>
