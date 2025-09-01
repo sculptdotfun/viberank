@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internal } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
 
 export const submit = mutation({
@@ -366,82 +366,143 @@ export const submit = mutation({
   },
 });
 
+// Paginated leaderboard query - returns items with cursor for next page
 export const getLeaderboard = query({
   args: {
     sortBy: v.optional(v.union(v.literal("cost"), v.literal("tokens"))),
     limit: v.optional(v.number()),
-    dateFrom: v.optional(v.string()),
-    dateTo: v.optional(v.string()),
+    cursor: v.optional(v.id("submissions")),
     includeFlagged: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
-    const limit = Math.min(args.limit || 100, 500); // Cap at 500 to prevent excessive reads
-    const dateFrom = args.dateFrom;
-    const dateTo = args.dateTo;
+    const limit = Math.min(args.limit || 50, 100); // Reasonable page size
     const includeFlagged = args.includeFlagged || false;
     
-    // Use indexes for efficient sorting when no date filter
-    if (!dateFrom && !dateTo) {
-      const query = sortBy === "cost" 
-        ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
-        : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
-      
-      // Take a reasonable buffer to account for flagged submissions
-      const bufferSize = Math.min(limit * 3, 1000); // Cap the buffer size
-      let results = await query.take(bufferSize);
-      
-      // Filter out flagged submissions unless explicitly included
-      if (!includeFlagged) {
-        results = results.filter(sub => !sub.flaggedForReview);
+    // Build the query based on sort preference
+    let query = sortBy === "cost" 
+      ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
+      : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
+    
+    // Apply cursor for pagination if provided
+    if (args.cursor) {
+      const cursorDoc = await ctx.db.get(args.cursor);
+      if (cursorDoc) {
+        // Continue from where we left off
+        const cursorValue = sortBy === "cost" ? cursorDoc.totalCost : cursorDoc.totalTokens;
+        query = query.filter(q => 
+          sortBy === "cost" 
+            ? q.lt(q.field("totalCost"), cursorValue)
+            : q.lt(q.field("totalTokens"), cursorValue)
+        );
       }
-      
-      return results.slice(0, limit);
     }
     
-    // For date filtering, use pagination to avoid fetching all at once
-    const pageSize = 200; // Process in chunks
-    let processedCount = 0;
-    let allFilteredSubmissions = [];
-    let lastId = null;
+    // Fetch enough to account for filtering
+    const bufferMultiplier = includeFlagged ? 1 : 2;
+    const fetchLimit = Math.min(limit * bufferMultiplier + 1, 200); // +1 to check hasMore
+    let results = await query.take(fetchLimit);
     
-    while (processedCount < 2000) { // Limit total records processed
-      let query = ctx.db.query("submissions");
+    // Filter out flagged submissions if needed
+    if (!includeFlagged) {
+      results = results.filter(sub => !sub.flaggedForReview);
+    }
+    
+    // Determine if there are more results
+    const hasMore = results.length > limit;
+    const items = results.slice(0, limit);
+    const nextCursor = hasMore && items.length > 0 
+      ? items[items.length - 1]._id 
+      : undefined;
+    
+    return {
+      items,
+      nextCursor,
+      hasMore,
+    };
+  },
+});
+
+// Legacy query for backward compatibility - returns array directly
+export const getLeaderboardLegacy = query({
+  args: {
+    sortBy: v.optional(v.union(v.literal("cost"), v.literal("tokens"))),
+    limit: v.optional(v.number()),
+    includeFlagged: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    // Call the paginated version directly
+    const sortBy = args.sortBy || "cost";
+    const limit = Math.min(args.limit || 100, 500);
+    const includeFlagged = args.includeFlagged || false;
+    
+    // Build the query based on sort preference
+    let query = sortBy === "cost" 
+      ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
+      : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
+    
+    // Fetch enough to account for filtering
+    const bufferMultiplier = includeFlagged ? 1 : 2;
+    const fetchLimit = Math.min(limit * bufferMultiplier, 1000);
+    let results = await query.take(fetchLimit);
+    
+    // Filter out flagged submissions if needed
+    if (!includeFlagged) {
+      results = results.filter(sub => !sub.flaggedForReview);
+    }
+    
+    return results.slice(0, limit);
+  },
+});
+
+// Separate query specifically for date-filtered leaderboard
+// This is expensive and should ideally use pre-aggregated data
+export const getLeaderboardByDateRange = query({
+  args: {
+    dateFrom: v.string(),
+    dateTo: v.string(),
+    sortBy: v.optional(v.union(v.literal("cost"), v.literal("tokens"))),
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.id("submissions")),
+    includeFlagged: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit || 50, 100);
+    const includeFlagged = args.includeFlagged || false;
+    const sortBy = args.sortBy || "cost";
+    
+    // NOTE: Date range filtering requires computing totals from dailyBreakdown
+    // This is inherently expensive. Consider:
+    // 1. Pre-computing weekly/monthly aggregates
+    // 2. Storing denormalized date-range totals
+    // 3. Using a separate analytics table
+    
+    let query = ctx.db.query("submissions");
+    
+    // Apply cursor if provided
+    if (args.cursor) {
+      query = query.filter(q => q.gt(q.field("_id"), args.cursor));
+    }
+    
+    // Fetch a batch to process
+    const batchSize = 100;
+    const batch = await query.take(batchSize);
+    
+    // Process and filter submissions
+    const processedItems = [];
+    
+    for (const submission of batch) {
+      // Skip flagged if not included
+      if (!includeFlagged && submission.flaggedForReview) continue;
       
-      // Use cursor pagination
-      if (lastId) {
-        query = query.filter(q => q.gt(q.field("_id"), lastId));
-      }
-      
-      const batch = await query.take(pageSize);
-      
-      if (batch.length === 0) break;
-      
-      lastId = batch[batch.length - 1]._id;
-      processedCount += batch.length;
-      
-      // Filter this batch
-      let filteredBatch = batch;
-      
-      // Filter out flagged submissions unless explicitly included
-      if (!includeFlagged) {
-        filteredBatch = filteredBatch.filter(sub => !sub.flaggedForReview);
-      }
-      
-      // Calculate filtered totals for each submission in this batch
-      const filteredSubmissions = filteredBatch.map(submission => {
+      // Filter daily breakdown by date range
       const filteredDays = submission.dailyBreakdown.filter(day => {
-        const dayDate = new Date(day.date);
-        const isAfterFrom = !dateFrom || dayDate >= new Date(dateFrom);
-        const isBeforeTo = !dateTo || dayDate <= new Date(dateTo);
-        return isAfterFrom && isBeforeTo;
+        return day.date >= args.dateFrom && day.date <= args.dateTo;
       });
       
-      if (filteredDays.length === 0) {
-        return null;
-      }
+      if (filteredDays.length === 0) continue;
       
-      // Calculate totals for filtered date range
+      // Calculate totals for the filtered date range
       const filteredTotals = filteredDays.reduce(
         (acc, day) => ({
           totalCost: acc.totalCost + day.totalCost,
@@ -461,44 +522,38 @@ export const getLeaderboard = query({
         }
       );
       
-      // Get unique models used in filtered range
-      const modelsUsed = Array.from(
-        new Set(filteredDays.flatMap(day => day.modelsUsed))
-      );
-      
-      // Get date range for filtered data
-      const dates = filteredDays.map(d => d.date).sort();
-      const dateRange = {
-        start: dates[0],
-        end: dates[dates.length - 1],
-      };
-      
-        return {
-          ...submission,
-          ...filteredTotals,
-          dateRange,
-          modelsUsed,
-          isFiltered: true,
-        };
-      }).filter(Boolean);
-      
-      allFilteredSubmissions.push(...filteredSubmissions);
-      
-      // If we have enough results, we can stop early
-      if (allFilteredSubmissions.length >= limit * 3) {
-        break;
-      }
+      processedItems.push({
+        ...submission,
+        ...filteredTotals,
+        originalTotals: {
+          totalCost: submission.totalCost,
+          totalTokens: submission.totalTokens,
+        },
+        isFiltered: true,
+      });
     }
     
-    // Sort by selected metric
-    const sorted = allFilteredSubmissions.sort((a, b) => {
-      if (sortBy === "cost") {
-        return b.totalCost - a.totalCost;
-      }
-      return b.totalTokens - a.totalTokens;
+    // Sort the processed items
+    processedItems.sort((a, b) => {
+      return sortBy === "cost" 
+        ? b.totalCost - a.totalCost
+        : b.totalTokens - a.totalTokens;
     });
     
-    return sorted.slice(0, limit);
+    // Return paginated results
+    const items = processedItems.slice(0, limit);
+    const hasMore = batch.length === batchSize;
+    const nextCursor = hasMore && batch.length > 0 
+      ? batch[batch.length - 1]._id 
+      : undefined;
+    
+    return {
+      items,
+      nextCursor,
+      hasMore,
+      // Signal that client may need to fetch more if we don't have enough results
+      needsMoreData: processedItems.length < limit && hasMore,
+    };
   },
 });
 

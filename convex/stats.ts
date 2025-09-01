@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import { v } from "convex/values";
 
 export const getGlobalStats = query({
   args: {},
@@ -31,6 +32,9 @@ export const getGlobalStats = query({
       
       // Process each submission in the batch
       for (const submission of batch) {
+        // Skip flagged submissions from stats
+        if (submission.flaggedForReview) continue;
+        
         uniqueUsers.add(submission.username);
         totalCost += submission.totalCost;
         totalTokens += submission.totalTokens;
@@ -49,8 +53,7 @@ export const getGlobalStats = query({
       }
       
       // Limit total processing to prevent excessive reads
-      if (totalSubmissions >= 5000) {
-        console.log("Reached maximum submissions limit for stats calculation");
+      if (totalSubmissions >= 1000) { // Reduced limit for better performance
         break;
       }
     }
@@ -70,6 +73,7 @@ export const getGlobalStats = query({
       modelUsage,
       totalDays,
       avgTokensPerUser,
+      isPartialData: totalSubmissions >= 1000, // Indicate if we hit the limit
     };
   },
 });
