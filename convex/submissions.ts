@@ -366,74 +366,15 @@ export const submit = mutation({
   },
 });
 
-// Paginated leaderboard query - returns items with cursor for next page
 export const getLeaderboard = query({
   args: {
     sortBy: v.optional(v.union(v.literal("cost"), v.literal("tokens"))),
     limit: v.optional(v.number()),
-    cursor: v.optional(v.id("submissions")),
     includeFlagged: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
-    const limit = Math.min(args.limit || 50, 100); // Reasonable page size
-    const includeFlagged = args.includeFlagged || false;
-    
-    // Build the query based on sort preference
-    let query = sortBy === "cost" 
-      ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
-      : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
-    
-    // Apply cursor for pagination if provided
-    if (args.cursor) {
-      const cursorDoc = await ctx.db.get(args.cursor);
-      if (cursorDoc) {
-        // Continue from where we left off
-        const cursorValue = sortBy === "cost" ? cursorDoc.totalCost : cursorDoc.totalTokens;
-        query = query.filter(q => 
-          sortBy === "cost" 
-            ? q.lt(q.field("totalCost"), cursorValue)
-            : q.lt(q.field("totalTokens"), cursorValue)
-        );
-      }
-    }
-    
-    // Fetch enough to account for filtering
-    const bufferMultiplier = includeFlagged ? 1 : 2;
-    const fetchLimit = Math.min(limit * bufferMultiplier + 1, 200); // +1 to check hasMore
-    let results = await query.take(fetchLimit);
-    
-    // Filter out flagged submissions if needed
-    if (!includeFlagged) {
-      results = results.filter(sub => !sub.flaggedForReview);
-    }
-    
-    // Determine if there are more results
-    const hasMore = results.length > limit;
-    const items = results.slice(0, limit);
-    const nextCursor = hasMore && items.length > 0 
-      ? items[items.length - 1]._id 
-      : undefined;
-    
-    return {
-      items,
-      nextCursor,
-      hasMore,
-    };
-  },
-});
-
-// Legacy query for backward compatibility - returns array directly
-export const getLeaderboardLegacy = query({
-  args: {
-    sortBy: v.optional(v.union(v.literal("cost"), v.literal("tokens"))),
-    limit: v.optional(v.number()),
-    includeFlagged: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    // Call the paginated version directly
-    const sortBy = args.sortBy || "cost";
-    const limit = Math.min(args.limit || 100, 500);
+    const limit = Math.min(args.limit || 100, 200); // Reasonable limits
     const includeFlagged = args.includeFlagged || false;
     
     // Build the query based on sort preference
@@ -443,7 +384,7 @@ export const getLeaderboardLegacy = query({
     
     // Fetch enough to account for filtering
     const bufferMultiplier = includeFlagged ? 1 : 2;
-    const fetchLimit = Math.min(limit * bufferMultiplier, 1000);
+    const fetchLimit = Math.min(limit * bufferMultiplier, 500);
     let results = await query.take(fetchLimit);
     
     // Filter out flagged submissions if needed
@@ -454,6 +395,8 @@ export const getLeaderboardLegacy = query({
     return results.slice(0, limit);
   },
 });
+
+// Removed getLeaderboardLegacy - not needed
 
 // Separate query specifically for date-filtered leaderboard
 // This is expensive and should ideally use pre-aggregated data

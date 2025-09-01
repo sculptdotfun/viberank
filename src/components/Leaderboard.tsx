@@ -25,7 +25,7 @@ export default function Leaderboard() {
 
   const submissions = useQuery(api.submissions.getLeaderboard, { 
     sortBy, 
-    limit: 200, // Fetch more to paginate client-side
+    limit: 100, // Reduced limit for better performance
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
