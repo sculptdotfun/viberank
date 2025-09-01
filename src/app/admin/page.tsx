@@ -1,33 +1,9 @@
-"use client";
-
-import { useState } from "react";
-import { useSession } from "next-auth/react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import { formatCurrency, formatNumber } from "@/lib/utils";
-import { AlertTriangle, CheckCircle, XCircle, ExternalLink } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import NavBar from "@/components/NavBar";
-
-// Add your admin GitHub usernames here
-const ADMIN_USERS = ["nikshepsvn"];
-
 export default function AdminPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null);
-  
-  const flaggedSubmissions = useQuery(api.submissions.getFlaggedSubmissions);
-  const updateFlagStatus = useMutation(api.submissions.updateFlagStatus);
-
-  // Check if user is admin
-  const isAdmin = session?.user?.username && ADMIN_USERS.includes(session.user.username);
-
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted">Loading...</div>
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-4">Admin Access Disabled</h1>
+        <p className="text-muted">Admin functionality has been disabled after removing authentication.</p>
       </div>
     );
   }

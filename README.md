@@ -68,32 +68,28 @@ If you prefer to use curl directly:
 # Generate usage data
 npx ccusage@latest --json > cc.json
 
-# Get your GitHub username
-GITHUB_USER=$(git config user.name)
+# Get your email address
+USER_EMAIL="your-email@example.com"
 
 # Submit to viberank
 curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
-  -H "X-GitHub-User: $GITHUB_USER" \
+  -H "X-User-Email: $USER_EMAIL" \
   -d @cc.json
 ```
 
-#### Option 4: Web Upload
+#### Option 4: API Only
 
-1. Visit [viberank.app](https://viberank.app)
-2. Sign in with GitHub
-3. Click "Submit Your Stats"
-4. Upload your `cc.json` file
+Web uploads have been disabled. Please use the CLI tool (`npx viberank`) or direct API submission methods above.
 
 ### Profile Pages
 
-Every user gets a beautiful profile page at `viberank.app/profile/{github-username}` featuring:
+Every user gets a beautiful profile page at `viberank.app/profile/{email-address}` featuring:
 
 - 📊 **Usage Chart** - Interactive area chart showing daily costs over time
 - 📈 **Statistics** - Total cost, tokens, days active, and averages
 - 📝 **Submission History** - Detailed breakdown of all submissions
 - 🏷️ **Model Usage** - See which Claude models you use most
-- 🔗 **GitHub Integration** - Links to your GitHub profile
 
 ### Data Validation & Fair Play
 
@@ -208,7 +204,7 @@ Submit usage data programmatically:
 ```bash
 curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
-  -H "X-GitHub-User: YOUR_GITHUB_USERNAME" \
+  -H "X-User-Email: YOUR_EMAIL_ADDRESS" \
   -d @cc.json
 ```
 
@@ -217,8 +213,8 @@ Response:
 {
   "success": true,
   "submissionId": "...",
-  "message": "Successfully submitted data for username",
-  "profileUrl": "https://viberank.app/profile/username"
+  "message": "Successfully submitted data for your-email@example.com",
+  "profileUrl": "https://viberank.app/profile/your-email@example.com"
 }
 ```
 

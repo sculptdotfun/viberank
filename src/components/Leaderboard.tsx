@@ -3,12 +3,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, BadgeCheck } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useSession } from "next-auth/react";
+import { useQuery } from "@/hooks/useApi";
 import Link from "next/link";
 import ShareCard from "./ShareCard";
-import { formatNumber, formatCurrency, getGitHubAvatarUrl } from "@/lib/utils";
+import { formatNumber, formatCurrency } from "@/lib/utils";
 
 type SortBy = "cost" | "tokens";
 
@@ -19,11 +17,10 @@ export default function Leaderboard() {
   const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
-  const { data: session } = useSession();
 
   const ITEMS_PER_PAGE = 25;
 
-  const submissions = useQuery(api.submissions.getLeaderboard, { 
+  const submissions = useQuery<any[]>("/api/leaderboard", { 
     sortBy, 
     limit: 200, // Fetch more to paginate client-side
     dateFrom: dateFrom || undefined,
@@ -240,8 +237,7 @@ export default function Leaderboard() {
                 <tbody>
                   {paginatedSubmissions.map((submission, index) => {
                     const actualRank = page * ITEMS_PER_PAGE + index + 1;
-                    const isCurrentUser = session?.user?.username === submission.githubUsername || 
-                                         session?.user?.email === submission.username;
+                    const isCurrentUser = false; // No authentication system anymore
                     
                     return (
                       <motion.tr
@@ -261,23 +257,9 @@ export default function Leaderboard() {
                         <td className="py-5 px-6">
                           <div className="flex items-center gap-3">
                             <div className="relative">
-                              {submission.githubAvatar ? (
-                                <img 
-                                  src={submission.githubAvatar} 
-                                  alt={submission.githubUsername || submission.username}
-                                  className="w-10 h-10 rounded-full ring-2 ring-border/20"
-                                />
-                              ) : submission.githubUsername ? (
-                                <img 
-                                  src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
-                                  alt={submission.githubUsername}
-                                  className="w-10 h-10 rounded-full ring-2 ring-border/20"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center ring-2 ring-border/20">
-                                  <User className="w-5 h-5 text-muted" />
-                                </div>
-                              )}
+                              <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center ring-2 ring-border/20">
+                                <User className="w-5 h-5 text-muted" />
+                              </div>
                               {actualRank <= 3 && (
                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-background rounded-full flex items-center justify-center">
                                   {getRankDisplay(actualRank)}
@@ -287,25 +269,12 @@ export default function Leaderboard() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <Link 
-                                  href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
+                                  href={`/profile/${encodeURIComponent(submission.email || submission.username)}`}
                                   className="font-medium hover:text-accent transition-colors"
                                 >
-                                  {submission.githubUsername || submission.username}
+                                  {submission.email || submission.username}
                                 </Link>
-                                {submission.verified && (
-                                  <div className="group/badge relative inline-flex">
-                                    <BadgeCheck className="w-4 h-4 text-blue-500" />
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover/badge:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                      Verified via GitHub authentication
-                                    </div>
-                                  </div>
-                                )}
                               </div>
-                              {submission.githubName && submission.githubName !== submission.githubUsername && (
-                                <p className="text-xs text-muted mt-0.5">
-                                  {submission.githubName}
-                                </p>
-                              )}
                             </div>
                           </div>
                         </td>
@@ -362,8 +331,7 @@ export default function Leaderboard() {
             <div className="sm:hidden space-y-3">
               {paginatedSubmissions.map((submission, index) => {
                 const actualRank = page * ITEMS_PER_PAGE + index + 1;
-                const isCurrentUser = session?.user?.username === submission.githubUsername || 
-                                     session?.user?.email === submission.username;
+                const isCurrentUser = false; // No authentication system anymore
                 
                 return (
                   <motion.div
@@ -383,43 +351,16 @@ export default function Leaderboard() {
                         <div className="flex items-center justify-center w-7 h-7 flex-shrink-0">
                           <span className="text-base font-bold text-muted">{actualRank}</span>
                         </div>
-                        {submission.githubAvatar ? (
-                          <img 
-                            src={submission.githubAvatar} 
-                            alt={submission.githubUsername || submission.username}
-                            className="w-10 h-10 rounded-full flex-shrink-0"
-                          />
-                        ) : submission.githubUsername ? (
-                          <img 
-                            src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
-                            alt={submission.githubUsername}
-                            className="w-10 h-10 rounded-full flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center flex-shrink-0">
-                            <User className="w-5 h-5 text-muted" />
-                          </div>
-                        )}
+                        <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center flex-shrink-0">
+                          <User className="w-5 h-5 text-muted" />
+                        </div>
                         <div className="min-w-0">
                           <Link 
-                            href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
+                            href={`/profile/${encodeURIComponent(submission.email || submission.username)}`}
                             className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors text-sm truncate"
                           >
-                            <span className="truncate">{submission.githubUsername || submission.username}</span>
-                            {submission.verified && (
-                              <div className="group/badge relative inline-flex flex-shrink-0">
-                                <BadgeCheck className="w-3.5 h-3.5 text-blue-500" />
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover/badge:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                  Verified via GitHub authentication
-                                </div>
-                              </div>
-                            )}
+                            <span className="truncate">{submission.email || submission.username}</span>
                           </Link>
-                          {submission.githubName && submission.githubName !== submission.githubUsername && (
-                            <p className="text-xs text-muted truncate">
-                              {submission.githubName}
-                            </p>
-                          )}
                         </div>
                       </div>
                       {isCurrentUser && (
