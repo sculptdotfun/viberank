@@ -4,8 +4,8 @@ import { v } from "convex/values";
 export const getGlobalStats = query({
   args: {},
   handler: async (ctx) => {
-    // Process submissions in batches to avoid bytes read limit
-    const pageSize = 100;
+    // Process submissions in SMALL batches to avoid 16MB bytes read limit
+    const pageSize = 25; // Much smaller batch - each submission can be 100KB+
     let totalCost = 0;
     let totalTokens = 0;
     let totalDays = 0;
@@ -53,7 +53,7 @@ export const getGlobalStats = query({
       }
       
       // Limit total processing to prevent excessive reads
-      if (totalSubmissions >= 1000) { // Reduced limit for better performance
+      if (totalSubmissions >= 200) { // MUCH lower limit to avoid 16MB
         break;
       }
     }
@@ -73,7 +73,7 @@ export const getGlobalStats = query({
       modelUsage,
       totalDays,
       avgTokensPerUser,
-      isPartialData: totalSubmissions >= 1000, // Indicate if we hit the limit
+      isPartialData: totalSubmissions >= 200, // Indicate if we hit the limit
     };
   },
 });

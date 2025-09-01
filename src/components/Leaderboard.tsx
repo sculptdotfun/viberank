@@ -25,7 +25,7 @@ export default function Leaderboard() {
 
   const submissions = useQuery(api.submissions.getLeaderboard, { 
     sortBy, 
-    limit: 100, // Reduced limit for better performance
+    limit: 50, // Much smaller to avoid 16MB limit
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });

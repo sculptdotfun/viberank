@@ -374,7 +374,7 @@ export const getLeaderboard = query({
   },
   handler: async (ctx, args) => {
     const sortBy = args.sortBy || "cost";
-    const limit = Math.min(args.limit || 100, 200); // Reasonable limits
+    const limit = Math.min(args.limit || 50, 100); // MUCH smaller limits to avoid 16MB
     const includeFlagged = args.includeFlagged || false;
     
     // Build the query based on sort preference
@@ -382,9 +382,9 @@ export const getLeaderboard = query({
       ? ctx.db.query("submissions").withIndex("by_total_cost").order("desc")
       : ctx.db.query("submissions").withIndex("by_total_tokens").order("desc");
     
-    // Fetch enough to account for filtering
-    const bufferMultiplier = includeFlagged ? 1 : 2;
-    const fetchLimit = Math.min(limit * bufferMultiplier, 500);
+    // Fetch MUCH less - dailyBreakdown arrays make each record huge!
+    const bufferMultiplier = includeFlagged ? 1 : 1.5;
+    const fetchLimit = Math.min(limit * bufferMultiplier, 150); // Max 150 records TOTAL
     let results = await query.take(fetchLimit);
     
     // Filter out flagged submissions if needed
@@ -520,7 +520,7 @@ export const getProfile = query({
     
     if (!profile) return null;
     
-    const limit = Math.min(args.submissionLimit || 50, 100); // Default 50, max 100
+    const limit = Math.min(args.submissionLimit || 10, 25); // Much smaller - submissions are huge
     
     // Use index to efficiently query submissions and limit the number fetched
     const submissions = await ctx.db
@@ -542,7 +542,7 @@ export const getFlaggedSubmissions = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = Math.min(args.limit || 100, 500); // Default 100, max 500
+    const limit = Math.min(args.limit || 25, 50); // Much smaller limits
     
     const flaggedSubmissions = await ctx.db
       .query("submissions")
