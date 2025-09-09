@@ -58,7 +58,7 @@ export const submit = mutation({
     // 2. Validate realistic ranges
     const MAX_DAILY_COST = 5000; // $5k/day is extremely high usage
     const MAX_DAILY_TOKENS = 50_000_000; // 50M tokens/day
-    const MIN_COST_PER_TOKEN = 0.000001; // Sanity check for cost/token ratio
+    const MIN_COST_PER_TOKEN = 0.0000001; // Adjusted for cache read tokens which are very cheap
     const MAX_COST_PER_TOKEN = 0.1; // Sanity check for cost/token ratio
     
     // Check totals
@@ -125,7 +125,7 @@ export const submit = mutation({
     
     // 5. Sort dates to ensure consistent range
     const dates = ccData.daily.map((d) => d.date).sort();
-    const dateRange = {
+    let dateRange = {
       start: dates[0] || "",
       end: dates[dates.length - 1] || "",
     };
@@ -225,7 +225,7 @@ export const submit = mutation({
       
       // Update date range to encompass all dates
       const allDates = mergedDailyBreakdown.map(d => d.date);
-      const mergedDateRange = {
+      dateRange = {
         start: allDates[0] || dateRange.start,
         end: allDates[allDates.length - 1] || dateRange.end,
       };
@@ -246,7 +246,7 @@ export const submit = mutation({
         outputTokens: mergedTotals.outputTokens,
         cacheCreationTokens: mergedTotals.cacheCreationTokens,
         cacheReadTokens: mergedTotals.cacheReadTokens,
-        dateRange: mergedDateRange,
+        dateRange: dateRange,
         modelsUsed: allModelsUsed,
         dailyBreakdown: mergedDailyBreakdown,
         submittedAt: Date.now(),

@@ -1,0 +1,20 @@
+{
+  "totals": {
+    "cacheCreationTokens": 10319123,
+    "cacheReadTokens": 308720701,
+    "inputTokens": 78274,
+    "outputTokens": 257437,
+    "totalCost": 135.40929855000002,
+    "totalTokens": 319375535
+  },
+  "daily": [{
+    "date": "2025-09-08",
+    "inputTokens": 78274,
+    "outputTokens": 257437,
+    "cacheCreationTokens": 10319123,
+    "cacheReadTokens": 308720701,
+    "totalTokens": 319375535,
+    "totalCost": 135.40929855000002,
+    "modelsUsed": ["claude-3-5-sonnet"]
+  }]
+}
