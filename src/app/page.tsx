@@ -131,7 +131,7 @@ export default function Home() {
               className="flex items-center justify-center gap-6 sm:gap-8 text-center flex-wrap mb-12"
             >
               <div>
-                <p className="text-2xl sm:text-3xl font-bold">{stats?.totalSubmissions || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold">{stats?.totalUsers || 0}</p>
                 <p className="text-xs sm:text-sm text-muted">Developers</p>
               </div>
               <div className="w-px h-12 bg-border/50 hidden sm:block" />
@@ -205,8 +205,8 @@ export default function Home() {
                   </svg>
                   Option 1: Terminal (Recommended)
                 </h4>
-                <p className="text-sm text-muted mb-4">Quick submit via command line</p>
-                <div className="flex items-center gap-3 bg-background rounded-lg p-3 border border-border/50">
+                <p className="text-sm text-muted mb-4">No installation needed - npx handles everything!</p>
+                <div className="flex items-center gap-3 bg-background rounded-lg p-3 border border-border/50 mb-3">
                   <code className="text-sm font-mono text-accent">npx viberank</code>
                   <motion.button
                     whileHover={{ scale: 1.1 }}
@@ -226,6 +226,15 @@ export default function Home() {
                     )}
                   </motion.button>
                 </div>
+                <details className="text-xs text-muted">
+                  <summary className="cursor-pointer hover:text-foreground transition-colors">Having issues?</summary>
+                  <div className="mt-2 space-y-1 pl-3">
+                    <p>• Try: <code className="text-accent">npx viberank@latest</code></p>
+                    <p>• Clear cache: <code className="text-accent">npx clear-npx-cache</code></p>
+                    <p>• Set git username: <code className="text-accent">git config --global user.name "YourGitHubUsername"</code></p>
+                    <p>• Requires Node.js 14+</p>
+                  </div>
+                </details>
               </div>
 
               {/* Manual Upload Option */}

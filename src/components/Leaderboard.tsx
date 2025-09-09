@@ -23,19 +23,19 @@ export default function Leaderboard() {
 
   const ITEMS_PER_PAGE = 25;
 
-  const submissions = useQuery(api.submissions.getLeaderboard, { 
-    sortBy, 
-    limit: 200, // Fetch more to paginate client-side
+  // Fetch only the current page from backend - proper pagination!
+  const result = useQuery(api.submissions.getLeaderboard, { 
+    sortBy,
+    page,
+    pageSize: ITEMS_PER_PAGE,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
 
-  // Paginate the results
-  const paginatedSubmissions = submissions?.slice(
-    page * ITEMS_PER_PAGE,
-    (page + 1) * ITEMS_PER_PAGE
-  );
-  const totalPages = submissions ? Math.ceil(submissions.length / ITEMS_PER_PAGE) : 0;
+  // Use data directly from backend - no client-side slicing needed
+  const paginatedSubmissions = result?.items;
+  const totalPages = result?.totalPages || 0;
+  const hasMore = result?.hasMore || false;
 
   const getRankDisplay = (rank: number) => {
     if (rank === 1) return (
@@ -287,7 +287,7 @@ export default function Leaderboard() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <Link 
-                                  href={`/profile/${submission.githubUsername || submission.username}`}
+                                  href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                                   className="font-medium hover:text-accent transition-colors"
                                 >
                                   {submission.githubUsername || submission.username}
@@ -343,7 +343,7 @@ export default function Leaderboard() {
                               </motion.button>
                             )}
                             <Link
-                              href={`/profile/${submission.githubUsername || submission.username}`}
+                              href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                               className="p-1.5 rounded-lg hover:bg-card/50 transition-all opacity-0 group-hover:opacity-100"
                             >
                               <ArrowUpRight className="w-3.5 h-3.5 text-muted hover:text-foreground" />
@@ -402,7 +402,7 @@ export default function Leaderboard() {
                         )}
                         <div className="min-w-0">
                           <Link 
-                            href={`/profile/${submission.githubUsername || submission.username}`}
+                            href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                             className="group inline-flex items-center gap-1 font-medium hover:text-accent transition-colors text-sm truncate"
                           >
                             <span className="truncate">{submission.githubUsername || submission.username}</span>
@@ -498,7 +498,7 @@ export default function Leaderboard() {
           </div>
         )}
         
-        {submissions && submissions.length === 0 && (
+        {paginatedSubmissions && paginatedSubmissions.length === 0 && (
           <div className="text-center py-20">
             <Trophy className="w-12 h-12 text-muted mx-auto mb-4" />
             <p className="text-lg text-muted">No submissions yet</p>
@@ -510,7 +510,7 @@ export default function Leaderboard() {
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs sm:text-sm text-muted text-center sm:text-left">
-              Showing {page * ITEMS_PER_PAGE + 1}-{Math.min((page + 1) * ITEMS_PER_PAGE, submissions?.length || 0)} of {submissions?.length || 0}
+              Page {page + 1} of {totalPages || 1}
             </p>
             
             <div className="flex items-center gap-1">

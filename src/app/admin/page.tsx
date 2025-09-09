@@ -100,7 +100,7 @@ export default function AdminPage() {
                             {submission.githubUsername || submission.username}
                           </h3>
                           <Link
-                            href={`/profile/${submission.githubUsername || submission.username}`}
+                            href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                             className="text-accent hover:underline flex items-center gap-1"
                           >
                             View Profile

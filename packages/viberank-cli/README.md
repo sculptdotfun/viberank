@@ -2,9 +2,9 @@
 
 CLI tool to submit your Claude usage stats to the [Viberank](https://viberank.app) leaderboard.
 
-## Usage
+## Installation & Usage
 
-Simply run:
+You don't need to install anything! Simply run:
 
 ```bash
 npx viberank
@@ -15,8 +15,18 @@ This will:
 2. Submit it to the Viberank leaderboard
 3. Give you a link to view your profile
 
+### Alternative Installation
+
+If you prefer to install globally:
+
+```bash
+npm install -g viberank
+viberank
+```
+
 ## Prerequisites
 
+- Node.js 14 or higher
 - You need to have used Claude Code at least once
 - Git should be configured with your GitHub username
 
@@ -43,11 +53,20 @@ You can also submit directly using curl:
 GITHUB_USER=$(git config user.name)
 
 # Submit with curl
-curl -X POST https://viberank.app/api/submit \
+curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $GITHUB_USER" \
   -d @cc.json
 ```
+
+## Troubleshooting
+
+### Common Issues
+
+- **"npx viberank" not found**: Try `npx viberank@latest` or clear npx cache with `npx clear-npx-cache`
+- **"Failed to submit data"**: Ensure your cc.json is valid JSON format
+- **"GitHub username not found"**: Run `git config --global user.name "YourGitHubUsername"`
+- **"No usage data"**: Make sure you've used Claude Code at least once
 
 ## Data Validation
 

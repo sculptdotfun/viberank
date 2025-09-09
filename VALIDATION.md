@@ -44,7 +44,7 @@ These submissions are accepted but flagged for review:
 
 ### 1. High Daily Usage
 - Daily cost > $5,000
-- Daily tokens > 50 million
+- Daily tokens > 250 million (increased 5x from 50M to reduce false positives)
 - These are possible but rare
 
 ### 2. High Average Usage

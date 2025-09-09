@@ -42,7 +42,25 @@ This will:
 - Submit it to the leaderboard
 - Give you a direct link to your profile
 
-#### Option 2: Using curl
+#### Option 2: MCP Server (for Claude Desktop)
+
+If you're using Claude Desktop or another MCP-compatible client, you can use our MCP server for seamless integration:
+
+```json
+// Add to ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "viberank": {
+      "command": "npx",
+      "args": ["viberank-mcp-server"]
+    }
+  }
+}
+```
+
+Then just ask Claude: "Submit my usage stats to Viberank"
+
+#### Option 3: Using curl
 
 If you prefer to use curl directly:
 
@@ -54,13 +72,13 @@ npx ccusage@latest --json > cc.json
 GITHUB_USER=$(git config user.name)
 
 # Submit to viberank
-curl -X POST https://viberank.app/api/submit \
+curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $GITHUB_USER" \
   -d @cc.json
 ```
 
-#### Option 3: Web Upload
+#### Option 4: Web Upload
 
 1. Visit [viberank.app](https://viberank.app)
 2. Sign in with GitHub
@@ -89,7 +107,7 @@ To maintain leaderboard integrity, viberank validates all submissions:
 
 #### Validation Limits
 - Maximum daily cost: $5,000
-- Maximum daily tokens: 50 million
+- Maximum daily tokens: 250 million
 - Cost per token ratio: 0.000001 to 0.1
 
 Submissions exceeding these limits are flagged for review and hidden from the main leaderboard to ensure fair competition.
@@ -164,6 +182,23 @@ Open [http://localhost:3001](http://localhost:3001) to see the app.
 - **CLI Tool**: Node.js with prompts and chalk
 - **Development**: Turbopack, ESLint, Prettier
 
+## Troubleshooting
+
+### npx viberank not working?
+
+If you encounter issues with `npx viberank`, try:
+
+1. **Clear npx cache**: `npx clear-npx-cache`
+2. **Use the latest version explicitly**: `npx viberank@latest`
+3. **Install globally** (optional): `npm install -g viberank` then run `viberank`
+4. **Check Node version**: Ensure you have Node.js 14 or higher
+
+### Common Issues
+
+- **"Failed to submit data"**: Check that your cc.json file is valid JSON
+- **"GitHub username not found"**: Run `git config --global user.name "YourGitHubUsername"`
+- **"No usage data found"**: Make sure you've used Claude Code at least once
+
 ## API Documentation
 
 ### POST /api/submit
@@ -171,7 +206,7 @@ Open [http://localhost:3001](http://localhost:3001) to see the app.
 Submit usage data programmatically:
 
 ```bash
-curl -X POST https://viberank.app/api/submit \
+curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: YOUR_GITHUB_USERNAME" \
   -d @cc.json

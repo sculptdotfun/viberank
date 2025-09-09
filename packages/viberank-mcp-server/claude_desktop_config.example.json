@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "viberank": {
+      "command": "npx",
+      "args": ["@viberank/mcp-server"],
+      "env": {}
+    }
+  }
+}

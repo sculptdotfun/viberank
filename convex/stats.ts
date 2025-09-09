@@ -1,38 +1,77 @@
 import { query } from "./_generated/server";
+import { v } from "convex/values";
 
+// WARNING: This is not truly "global" - it only processes top submissions
+// to avoid 16MB limit. For accurate global stats, we need pre-aggregation.
 export const getGlobalStats = query({
   args: {},
   handler: async (ctx) => {
-    const submissions = await ctx.db.query("submissions").collect();
+    // IMPORTANT: We use a multi-pronged approach to get more accurate stats
+    // while staying under Convex's limits
     
-    // Get unique users
-    const uniqueUsers = new Set(submissions.map(s => s.username)).size;
+    // 1. Get unique user count from profiles (more accurate for user count)
+    const profileCount = await ctx.db
+      .query("profiles")
+      .take(5000) // Profiles are smaller, we can fetch more
+      .then(profiles => profiles.length);
     
-    // Calculate totals
-    const totalCost = submissions.reduce((acc, s) => acc + s.totalCost, 0);
-    const totalTokens = submissions.reduce((acc, s) => acc + s.totalTokens, 0);
+    // 2. Get top submissions for cost/token stats (these matter most)
+    const topByCost = await ctx.db
+      .query("submissions")
+      .withIndex("by_total_cost")
+      .order("desc")
+      .take(500); // Increased from 100 to 500 for better coverage
     
-    // Get top submission
-    const topSubmission = submissions.sort((a, b) => b.totalCost - a.totalCost)[0];
+    // 3. Calculate stats from the sample
+    let totalCost = 0;
+    let totalTokens = 0;
+    let totalDays = 0;
+    let validSubmissions = 0;
+    const uniqueUsersFromSubmissions = new Set<string>();
+    const modelUsage: Record<string, number> = {};
+    let topSubmission: any = null;
     
-    // Calculate average cost per user
-    const avgCostPerUser = uniqueUsers > 0 ? totalCost / uniqueUsers : 0;
-    
-    // Get model usage stats
-    const modelUsage = submissions.reduce((acc, s) => {
-      s.modelsUsed.forEach(model => {
+    for (const submission of topByCost) {
+      // Skip flagged submissions
+      if (submission.flaggedForReview) continue;
+      
+      validSubmissions++;
+      uniqueUsersFromSubmissions.add(submission.username);
+      totalCost += submission.totalCost;
+      totalTokens += submission.totalTokens;
+      totalDays += submission.dailyBreakdown.length;
+      
+      // Track top submission
+      if (!topSubmission || submission.totalCost > topSubmission.totalCost) {
+        topSubmission = submission;
+      }
+      
+      // Track model usage
+      submission.modelsUsed.forEach(model => {
         const key = model.includes("opus") ? "opus" : "sonnet";
-        acc[key] = (acc[key] || 0) + 1;
+        modelUsage[key] = (modelUsage[key] || 0) + 1;
       });
-      return acc;
-    }, {} as Record<string, number>);
+    }
     
-    // Calculate total days tracked
-    const totalDays = submissions.reduce((acc, s) => acc + s.dailyBreakdown.length, 0);
+    // 4. Get additional submission count for better approximation
+    const totalSubmissionCount = await ctx.db
+      .query("submissions")
+      .withIndex("by_total_cost")
+      .take(1000) // Just count, don't process
+      .then(subs => subs.filter(s => !s.flaggedForReview).length);
+    
+    // Use the maximum of different counting methods for most accurate user count
+    const uniqueUserCount = Math.max(
+      uniqueUsersFromSubmissions.size,
+      profileCount
+    );
+    
+    const avgCostPerUser = uniqueUserCount > 0 ? totalCost / uniqueUserCount : 0;
+    const avgTokensPerUser = uniqueUserCount > 0 ? totalTokens / uniqueUserCount : 0;
     
     return {
-      totalUsers: uniqueUsers,
-      totalSubmissions: submissions.length,
+      totalUsers: uniqueUserCount,
+      totalSubmissions: Math.max(validSubmissions, totalSubmissionCount),
       totalCost,
       totalTokens,
       avgCostPerUser,
@@ -40,7 +79,9 @@ export const getGlobalStats = query({
       topUser: topSubmission?.username || "N/A",
       modelUsage,
       totalDays,
-      avgTokensPerUser: uniqueUsers > 0 ? totalTokens / uniqueUsers : 0,
+      avgTokensPerUser,
+      isApproximate: true, // IMPORTANT: These are approximate stats
+      basedOnTop: 500, // Based on top 500 submissions for stats
     };
   },
 });

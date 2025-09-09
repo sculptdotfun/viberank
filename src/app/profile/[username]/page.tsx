@@ -15,7 +15,7 @@ import { useState } from "react";
 
 export default function ProfilePage() {
   const params = useParams();
-  const username = params.username as string;
+  const username = decodeURIComponent(params.username as string);
   const [selectedTimeRange, setSelectedTimeRange] = useState<"7d" | "30d" | "all">("30d");
   
   const profileData = useQuery(api.submissions.getProfile, { username });
