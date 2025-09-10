@@ -72,6 +72,12 @@ export const submit = mutation({
       timestamp: new Date().toISOString(),
     });
     
+    // Declare dateRange and modelsUsed outside try block so they're accessible later
+    let dateRange: { start: string; end: string };
+    let modelsUsed: string[];
+    let flaggedForReview = false;
+    const suspiciousReasons: string[] = [];
+    
     // Data validation and normalization
     try {
       // 1. Verify total tokens match sum of components
@@ -113,8 +119,6 @@ export const submit = mutation({
     
     // 3. Validate date format and daily data
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    let flaggedForReview = false;
-    const suspiciousReasons: string[] = [];
     
     for (const day of ccData.daily) {
       if (!dateRegex.test(day.date)) {
@@ -148,13 +152,13 @@ export const submit = mutation({
     }
     
     // 4. Extract unique models
-    const modelsUsed = Array.from(
+    modelsUsed = Array.from(
       new Set(ccData.daily.flatMap((day) => day.modelsUsed))
     );
     
     // 5. Sort dates to ensure consistent range
     const dates = ccData.daily.map((d) => d.date).sort();
-    let dateRange = {
+    dateRange = {
       start: dates[0] || "",
       end: dates[dates.length - 1] || "",
     };
