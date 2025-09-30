@@ -2,19 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Upload, Github, Sparkles, TrendingUp, Menu, X, Shield, BookOpen } from "lucide-react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { Trophy, Upload, Github, Menu, X, Shield } from "lucide-react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 interface NavBarProps {
   onUploadClick: () => void;
-  onUpdatesClick: () => void;
 }
 
 const ADMIN_USERS = ["nikshepsvn"];
 
-export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
+export default function NavBar({ onUploadClick }: NavBarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
@@ -31,7 +30,6 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
   }, []);
 
   const navItems = [
-    { name: "Blog", href: "/blog", icon: BookOpen },
     ...(isAdmin ? [{ name: "Admin", href: "/admin", icon: Shield }] : []),
   ];
 
@@ -106,52 +104,13 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                 Submit
               </motion.button>
 
-              {/* Auth Button */}
-              {session ? (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => signOut()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-accent/10 transition-colors text-sm"
-                >
-                  <img
-                    src={session.user?.image || ""}
-                    alt={session.user?.name || ""}
-                    className="w-5 h-5 rounded-full"
-                  />
-                  <span className="hidden lg:inline">Sign out</span>
-                </motion.button>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => signIn("github")}
-                  className="px-4 py-2 rounded-full border border-border hover:bg-accent/10 transition-colors text-sm"
-                >
-                  Sign in
-                </motion.button>
-              )}
 
-              {/* Secondary actions */}
+              {/* GitHub link */}
               <div className="flex items-center gap-1 border-l border-border/50 pl-2">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onUpdatesClick}
-                  className="p-2 rounded-full hover:bg-accent/10 transition-colors relative"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <motion.span
-                    className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent rounded-full"
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                </motion.button>
-
                 <motion.a
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  href="https://github.com/sculptdotfun/viberank"
+                  href="https://github.com/EastAgile/viberank"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 rounded-full hover:bg-accent/10 transition-colors"
@@ -223,17 +182,8 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                   );
                 })}
                 
-                {/* Secondary Actions */}
+                {/* GitHub Link */}
                 <div className="flex items-center gap-3 px-4 py-2">
-                  <button
-                    onClick={() => {
-                      onUpdatesClick();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="p-2 rounded-lg hover:bg-accent/10 transition-colors"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                  </button>
                   <a
                     href="https://github.com/sculptdotfun/viberank"
                     target="_blank"
@@ -242,35 +192,6 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                   >
                     <Github className="w-4 h-4" />
                   </a>
-                </div>
-                
-                <div className="border-t border-border/50 pt-2 mt-2">
-                  {session ? (
-                    <button
-                      onClick={() => {
-                        signOut();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-3 rounded-lg hover:bg-accent/10 transition-colors flex items-center gap-3 text-left"
-                    >
-                      <img
-                        src={session.user?.image || ""}
-                        alt={session.user?.name || ""}
-                        className="w-5 h-5 rounded-full"
-                      />
-                      Sign out
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        signIn("github");
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-3 rounded-lg border border-border hover:bg-accent/10 transition-colors"
-                    >
-                      Sign in with GitHub
-                    </button>
-                  )}
                 </div>
               </div>
             </motion.div>

@@ -2,19 +2,17 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Upload, Github, Sparkles, TrendingUp, Merge, X } from "lucide-react";
+import { Trophy, Upload, Github, TrendingUp, Merge, X } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
-import UpdatesModal from "@/components/UpdatesModal";
 import NavBar from "@/components/NavBar";
 import { formatNumber, formatLargeNumber } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 
 export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showUpdatesModal, setShowUpdatesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [showMergeBanner, setShowMergeBanner] = useState(true);
   const [merging, setMerging] = useState(false);
@@ -53,9 +51,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <NavBar 
+      <NavBar
         onUploadClick={() => setShowUploadModal(true)}
-        onUpdatesClick={() => setShowUpdatesModal(true)}
       />
 
       {/* Claim/Merge Banner */}
@@ -250,8 +247,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Updates Modal */}
-      <UpdatesModal isOpen={showUpdatesModal} onClose={() => setShowUpdatesModal(false)} />
     </div>
   );
 }

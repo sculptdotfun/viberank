@@ -3,10 +3,10 @@ import { components } from "./_generated/api";
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Submission rate limits - very strict to prevent abuse
-  submitData: { 
-    kind: "fixed window", 
-    rate: 1, // Only 1 submission per hour per user
-    period: HOUR,
+  submitData: {
+    kind: "fixed window",
+    rate: 1, // Only 1 submission per minute per user
+    period: MINUTE,
   },
   
   // API endpoint rate limits

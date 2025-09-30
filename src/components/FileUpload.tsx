@@ -3,10 +3,10 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Github } from "lucide-react";
+import { Upload, FileJson, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 
 interface CCData {
@@ -137,33 +137,6 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
             </p>
           </div>
 
-          {/* Verification status notice */}
-          {session ? (
-            <div className="flex items-center gap-2 p-3 bg-accent/10 rounded-lg border border-accent/20">
-              <CheckCircle className="w-4 h-4 text-accent flex-shrink-0" />
-              <div className="text-sm">
-                <span className="font-medium">Signed in as {session.user.username || session.user?.name}</span>
-                <span className="text-muted"> - Your submission will be verified</span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                <div className="text-sm">
-                  <span className="font-medium">Submitting without verification</span>
-                  <span className="text-muted"> - Sign in to get verified badge</span>
-                </div>
-              </div>
-              <button
-                onClick={() => signIn("github")}
-                className="text-sm px-3 py-1 rounded-md bg-yellow-500/20 hover:bg-yellow-500/30 transition-colors flex items-center gap-1.5"
-              >
-                <Github className="w-3.5 h-3.5" />
-                Sign in
-              </button>
-            </div>
-          )}
         </div>
 
         {/* File Upload */}
