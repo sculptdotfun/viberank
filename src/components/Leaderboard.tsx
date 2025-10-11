@@ -23,19 +23,35 @@ export default function Leaderboard() {
 
   const ITEMS_PER_PAGE = 25;
 
-  // Fetch only the current page from backend - proper pagination!
-  const result = useQuery(api.submissions.getLeaderboard, { 
-    sortBy,
-    page,
-    pageSize: ITEMS_PER_PAGE,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-  });
+  // Use date range query when filters are active, otherwise use regular paginated query
+  const isDateFiltered = dateFrom && dateTo;
+
+  const regularResult = useQuery(
+    api.submissions.getLeaderboard,
+    !isDateFiltered ? {
+      sortBy,
+      page,
+      pageSize: ITEMS_PER_PAGE,
+    } : "skip"
+  );
+
+  const dateFilteredResult = useQuery(
+    api.submissions.getLeaderboardByDateRange,
+    isDateFiltered ? {
+      dateFrom: dateFrom || "",
+      dateTo: dateTo || "",
+      sortBy,
+      limit: ITEMS_PER_PAGE,
+    } : "skip"
+  );
+
+  // Use the appropriate result based on which query ran
+  const result = isDateFiltered ? dateFilteredResult : regularResult;
 
   // Use data directly from backend - no client-side slicing needed
   const paginatedSubmissions = result?.items;
-  const totalPages = result?.totalPages || 0;
-  const hasMore = result?.hasMore || false;
+  // Regular query has totalPages, date filtered query doesn't
+  const totalPages = !isDateFiltered && regularResult ? regularResult.totalPages : 1;
 
   const getRankDisplay = (rank: number) => {
     if (rank === 1) return (
@@ -469,7 +485,7 @@ export default function Leaderboard() {
             </div>
 
             {/* Share Card Modal */}
-            {showShareCard && submissions && submissions.find(s => s._id === showShareCard) && (
+            {showShareCard && paginatedSubmissions && paginatedSubmissions.find(s => s._id === showShareCard) && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -478,11 +494,11 @@ export default function Leaderboard() {
               >
                 <div onClick={(e) => e.stopPropagation()}>
                   <ShareCard
-                    rank={submissions.findIndex(s => s._id === showShareCard) + 1}
-                    username={submissions.find(s => s._id === showShareCard)!.username}
-                    totalCost={submissions.find(s => s._id === showShareCard)!.totalCost}
-                    totalTokens={submissions.find(s => s._id === showShareCard)!.totalTokens}
-                    dateRange={submissions.find(s => s._id === showShareCard)!.dateRange}
+                    rank={paginatedSubmissions.findIndex(s => s._id === showShareCard) + 1 + (page * ITEMS_PER_PAGE)}
+                    username={paginatedSubmissions.find(s => s._id === showShareCard)!.username}
+                    totalCost={paginatedSubmissions.find(s => s._id === showShareCard)!.totalCost}
+                    totalTokens={paginatedSubmissions.find(s => s._id === showShareCard)!.totalTokens}
+                    dateRange={paginatedSubmissions.find(s => s._id === showShareCard)!.dateRange}
                     onClose={() => setShowShareCard(null)}
                   />
                 </div>
