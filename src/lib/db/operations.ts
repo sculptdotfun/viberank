@@ -222,7 +222,7 @@ export async function getLeaderboard(options: {
       // Helper to indicate this is a filtered view if needed
       isFiltered: true
     };
-  });
+  }).filter(sub => sub.totalCost > 0 || sub.totalTokens > 0);
 
   // 4. Sort based on the (potentially recalculated) values
   processedResults.sort((a, b) => {
