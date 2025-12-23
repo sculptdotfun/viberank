@@ -1,6 +1,6 @@
 import { getDb } from './index';
 import { submissions, profiles, type Submission, type Profile } from './schema';
-import { eq, desc, and, or, gte, lte, isNotNull } from 'drizzle-orm';
+import { eq, desc, and, or, gte, lte, isNotNull, isNull } from 'drizzle-orm';
 
 // Submission operations
 export async function createSubmission(data: {
@@ -168,18 +168,81 @@ export async function getLeaderboard(options: {
 } = {}) {
   const { sortBy = 'cost', limit = 100, dateFrom, dateTo, includeFlagged = false } = options;
   
-  let query = getDb().select().from(submissions);
+  // 1. Get unique users via profiles table first to solve duplicates issue
+  const allProfiles = await getDb()
+    .select({
+      submissionId: profiles.bestSubmission
+    })
+    .from(profiles)
+    .where(isNotNull(profiles.bestSubmission));
+    
+  if (allProfiles.length === 0) return [];
   
-  if (!includeFlagged) {
-    query = query.where(or(eq(submissions.flaggedForReview, false), eq(submissions.flaggedForReview, null)));
-  }
+  const submissionIds = allProfiles.map(p => p.submissionId!);
   
-  const orderBy = sortBy === 'cost' ? desc(submissions.totalCost) : desc(submissions.totalTokens);
-  const results = await query.orderBy(orderBy).limit(limit);
+  // 2. Fetch the actual submissions
+  let query = getDb().select().from(submissions).where(
+    and(
+      // Only get the best submission for each profile
+      or(...submissionIds.map(id => eq(submissions.id, id))),
+      // Filter out flagged if needed
+      includeFlagged ? undefined : or(eq(submissions.flaggedForReview, false), isNull(submissions.flaggedForReview))
+    )
+  );
   
-  // If date filtering is needed, we'd need to implement client-side filtering
-  // similar to the Convex implementation
-  return results;
+  const results = await query;
+  
+  // 3. Process data for date filtering and recalculation
+  const processedResults = results.map(sub => {
+    // If no date filter, return as is (but ensure numbers are numbers)
+    if (!dateFrom && !dateTo) {
+      return {
+        ...sub,
+        totalCost: parseFloat(sub.totalCost),
+        totalTokens: sub.totalTokens
+      };
+    }
+
+    // Filter daily breakdown
+    const filteredDaily = sub.dailyBreakdown.filter(day => {
+      if (dateFrom && day.date < dateFrom) return false;
+      if (dateTo && day.date > dateTo) return false;
+      return true;
+    });
+
+    // Recalculate totals based on filtered days
+    const newTotalCost = filteredDaily.reduce((acc, day) => acc + day.totalCost, 0);
+    const newTotalTokens = filteredDaily.reduce((acc, day) => acc + day.totalTokens, 0);
+
+    return {
+      ...sub,
+      totalCost: newTotalCost, 
+      totalTokens: newTotalTokens,
+      dailyBreakdown: filteredDaily,
+      // Helper to indicate this is a filtered view if needed
+      isFiltered: true
+    };
+  });
+
+  // 4. Sort based on the (potentially recalculated) values
+  processedResults.sort((a, b) => {
+    if (sortBy === 'cost') {
+      return b.totalCost - a.totalCost;
+    } else {
+      return b.totalTokens - a.totalTokens;
+    }
+  });
+
+  // 5. Apply limit
+  // Convert totalCost back to string to match expected return type signature if needed
+  // or keep as number if upstream handles it. 
+  // The schema defines totalCost as decimal string, but for sorting we needed numbers.
+  // Let's cast back to string to be safe with existing types if strictly needed, 
+  // but usually for JSON response numbers are fine or better. 
+  // However, the original type has totalCost as string (decimal).
+  // Let's keep it consistent with the return type expected by the frontend (it seems to handle raw JSON)
+  
+  return processedResults.slice(0, limit);
 }
 
 export async function getSubmission(id: number) {

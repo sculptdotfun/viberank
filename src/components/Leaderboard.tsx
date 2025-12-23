@@ -12,7 +12,7 @@ type SortBy = "cost" | "tokens";
 
 export default function Leaderboard() {
   const [sortBy, setSortBy] = useState<SortBy>("cost");
-  const [showShareCard, setShowShareCard] = useState<string | null>(null);
+  const [showShareCard, setShowShareCard] = useState<number | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
@@ -241,7 +241,7 @@ export default function Leaderboard() {
                     
                     return (
                       <motion.tr
-                        key={submission._id}
+                        key={submission.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.3) }}
@@ -294,7 +294,7 @@ export default function Leaderboard() {
                               {formatNumber(submission.totalTokens)}
                             </p>
                             <p className="text-xs text-muted mt-0.5">
-                              {submission.dailyBreakdown.length} days
+                              {submission.dailyBreakdown.length} active days
                             </p>
                           </div>
                         </td>
@@ -304,7 +304,7 @@ export default function Leaderboard() {
                               <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={() => setShowShareCard(submission._id)}
+                                onClick={() => setShowShareCard(submission.id)}
                                 className="p-1.5 rounded-lg hover:bg-card/50 transition-all opacity-0 group-hover:opacity-100"
                                 title="Share your rank"
                               >
@@ -335,7 +335,7 @@ export default function Leaderboard() {
                 
                 return (
                   <motion.div
-                    key={submission._id}
+                    key={submission.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -367,7 +367,7 @@ export default function Leaderboard() {
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => setShowShareCard(submission._id)}
+                          onClick={() => setShowShareCard(submission.id)}
                           className="p-1.5 -mr-1 flex-shrink-0"
                         >
                           <Share2 className="w-4 h-4 text-muted" />
@@ -392,7 +392,7 @@ export default function Leaderboard() {
                             {formatNumber(submission.totalTokens)}
                           </p>
                           <p className="text-[10px] text-muted/70">
-                            {submission.dailyBreakdown.length} days
+                            {submission.dailyBreakdown.length} active days
                           </p>
                         </div>
                       </div>
@@ -410,7 +410,7 @@ export default function Leaderboard() {
             </div>
 
             {/* Share Card Modal */}
-            {showShareCard && submissions && submissions.find(s => s._id === showShareCard) && (
+            {showShareCard && submissions && submissions.find(s => s.id === showShareCard) && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -419,11 +419,11 @@ export default function Leaderboard() {
               >
                 <div onClick={(e) => e.stopPropagation()}>
                   <ShareCard
-                    rank={submissions.findIndex(s => s._id === showShareCard) + 1}
-                    username={submissions.find(s => s._id === showShareCard)!.username}
-                    totalCost={submissions.find(s => s._id === showShareCard)!.totalCost}
-                    totalTokens={submissions.find(s => s._id === showShareCard)!.totalTokens}
-                    dateRange={submissions.find(s => s._id === showShareCard)!.dateRange}
+                    rank={submissions.findIndex(s => s.id === showShareCard) + 1}
+                    username={submissions.find(s => s.id === showShareCard)!.username}
+                    totalCost={submissions.find(s => s.id === showShareCard)!.totalCost}
+                    totalTokens={submissions.find(s => s.id === showShareCard)!.totalTokens}
+                    dateRange={submissions.find(s => s.id === showShareCard)!.dateRange}
                     onClose={() => setShowShareCard(null)}
                   />
                 </div>
