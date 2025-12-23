@@ -13,7 +13,13 @@ export default function Home() {
   const [showMergeBanner, setShowMergeBanner] = useState(true);
   const [merging, setMerging] = useState(false);
   
-  const stats = useQuery<any>("/api/stats");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  const stats = useQuery<any>("/api/stats", {
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  });
   // TODO: Implement claim and merge functionality with PostgreSQL
   const claimStatus = null;
   const claimAndMergeMutation = null;
@@ -123,7 +129,14 @@ export default function Home() {
 
         {/* Leaderboard Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12">
-          <Leaderboard />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12">
+          <Leaderboard 
+            dateFrom={dateFrom} 
+            dateTo={dateTo} 
+            setDateFrom={setDateFrom} 
+            setDateTo={setDateTo} 
+          />
+        </div>
         </div>
       </main>
 

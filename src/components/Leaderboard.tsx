@@ -10,11 +10,16 @@ import { formatNumber, formatCurrency } from "@/lib/utils";
 
 type SortBy = "cost" | "tokens";
 
-export default function Leaderboard() {
+interface LeaderboardProps {
+  dateFrom: string;
+  dateTo: string;
+  setDateFrom: (date: string) => void;
+  setDateTo: (date: string) => void;
+}
+
+export default function Leaderboard({ dateFrom, dateTo, setDateFrom, setDateTo }: LeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortBy>("cost");
   const [showShareCard, setShowShareCard] = useState<number | null>(null);
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
 

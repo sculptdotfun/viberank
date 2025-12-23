@@ -308,33 +308,69 @@ export async function updateFlagStatus(submissionId: number, flagged: boolean, r
   return { success: true };
 }
 
-export async function getGlobalStats() {
+export async function getGlobalStats(options: { dateFrom?: string; dateTo?: string } = {}) {
+  const { dateFrom, dateTo } = options;
   const allSubmissions = await getDb().select().from(submissions);
   
-  const uniqueUsers = new Set(allSubmissions.map(s => s.username)).size;
-  const totalCost = allSubmissions.reduce((acc, s) => acc + parseFloat(s.totalCost), 0);
-  const totalTokens = allSubmissions.reduce((acc, s) => acc + s.totalTokens, 0);
+  // Filter and recalculate based on date range if provided
+  const processedSubmissions = allSubmissions.map(sub => {
+    if (!dateFrom && !dateTo) {
+      return {
+        ...sub,
+        totalCost: parseFloat(sub.totalCost),
+        totalTokens: sub.totalTokens
+      };
+    }
+
+    const filteredDaily = sub.dailyBreakdown.filter(day => {
+      if (dateFrom && day.date < dateFrom) return false;
+      if (dateTo && day.date > dateTo) return false;
+      return true;
+    });
+
+    return {
+      ...sub,
+      totalCost: filteredDaily.reduce((acc, day) => acc + day.totalCost, 0),
+      totalTokens: filteredDaily.reduce((acc, day) => acc + day.totalTokens, 0),
+      dailyBreakdown: filteredDaily,
+      isFiltered: true
+    };
+  }).filter(sub => sub.totalCost > 0 || sub.totalTokens > 0);
   
-  const topSubmission = allSubmissions.sort((a, b) => parseFloat(b.totalCost) - parseFloat(a.totalCost))[0];
+  const uniqueUsers = new Set(processedSubmissions.map(s => s.username)).size;
+  const totalCost = processedSubmissions.reduce((acc, s) => acc + s.totalCost, 0);
+  const totalTokens = processedSubmissions.reduce((acc, s) => acc + s.totalTokens, 0);
+  
+  const topSubmission = processedSubmissions.sort((a, b) => b.totalCost - a.totalCost)[0];
   const avgCostPerUser = uniqueUsers > 0 ? totalCost / uniqueUsers : 0;
   
   const modelUsage = allSubmissions.reduce((acc, s) => {
-    s.modelsUsed.forEach((model: string) => {
-      const key = model.includes("opus") ? "opus" : "sonnet";
-      acc[key] = (acc[key] || 0) + 1;
-    });
+    // Note: Model usage is hard to filter by date from current schema without iterating days
+    // For now, we'll keep global model usage or we could iterate filtered days
+    const submissionToUse = dateFrom || dateTo ? processedSubmissions.find(p => p.id === s.id) : s;
+    
+    if (submissionToUse && submissionToUse.dailyBreakdown) {
+       submissionToUse.dailyBreakdown.forEach((day: any) => {
+         if (day.modelsUsed) {
+            day.modelsUsed.forEach((model: string) => {
+               const key = model.includes("opus") ? "opus" : "sonnet";
+               acc[key] = (acc[key] || 0) + 1;
+            });
+         }
+       });
+    }
     return acc;
   }, {} as Record<string, number>);
   
-  const totalDays = allSubmissions.reduce((acc, s) => acc + s.dailyBreakdown.length, 0);
+  const totalDays = processedSubmissions.reduce((acc, s) => acc + s.dailyBreakdown.length, 0);
   
   return {
     totalUsers: uniqueUsers,
-    totalSubmissions: allSubmissions.length,
+    totalSubmissions: processedSubmissions.length,
     totalCost,
     totalTokens,
     avgCostPerUser,
-    topCost: topSubmission ? parseFloat(topSubmission.totalCost) : 0,
+    topCost: topSubmission ? topSubmission.totalCost : 0,
     topUser: topSubmission?.username || "N/A",
     modelUsage,
     totalDays,
