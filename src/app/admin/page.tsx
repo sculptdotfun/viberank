@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { AlertTriangle, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
+import { useFlaggedSubmissions, useUpdateFlagStatus } from "@/lib/data/hooks/useSubmissions";
 
 // Add your admin GitHub usernames here
 const ADMIN_USERS = ["nikshepsvn"];
@@ -17,9 +16,9 @@ export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null);
-  
-  const flaggedSubmissions = useQuery(api.submissions.getFlaggedSubmissions);
-  const updateFlagStatus = useMutation(api.submissions.updateFlagStatus);
+
+  const { data: flaggedSubmissions } = useFlaggedSubmissions();
+  const { mutate: updateFlagStatus } = useUpdateFlagStatus();
 
   // Check if user is admin
   const isAdmin = session?.user?.username && ADMIN_USERS.includes(session.user.username);
@@ -48,10 +47,7 @@ export default function AdminPage() {
   }
 
   const handleUnflag = async (submissionId: string) => {
-    await updateFlagStatus({
-      submissionId: submissionId as any,
-      flagged: false,
-    });
+    await updateFlagStatus(submissionId, false);
   };
 
   return (
@@ -90,7 +86,7 @@ export default function AdminPage() {
               <div className="space-y-4">
                 {flaggedSubmissions.map((submission) => (
                   <div
-                    key={submission._id}
+                    key={submission.id}
                     className="bg-card/30 rounded-lg p-6 border border-border/50 hover:border-accent/30 transition-colors"
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -116,7 +112,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => handleUnflag(submission._id)}
+                        onClick={() => handleUnflag(submission.id)}
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
                       >
                         <CheckCircle className="w-4 h-4" />
@@ -170,17 +166,17 @@ export default function AdminPage() {
                     <button
                       onClick={() =>
                         setSelectedSubmission(
-                          selectedSubmission === submission._id ? null : submission._id
+                          selectedSubmission === submission.id ? null : submission.id
                         )
                       }
                       className="mt-4 text-sm text-accent hover:underline"
                     >
-                      {selectedSubmission === submission._id
+                      {selectedSubmission === submission.id
                         ? "Hide details"
                         : "Show daily breakdown"}
                     </button>
 
-                    {selectedSubmission === submission._id && (
+                    {selectedSubmission === submission.id && (
                       <div className="mt-4 space-y-2">
                         <h4 className="font-semibold mb-2">Daily Breakdown</h4>
                         <div className="max-h-64 overflow-y-auto space-y-2">

@@ -1,10 +1,8 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { 
+import {
   Github, Calendar, DollarSign, Zap, ArrowLeft, ExternalLink,
   TrendingUp, Code2, BarChart3, Activity, Hash
 } from "lucide-react";
@@ -12,15 +10,16 @@ import Link from "next/link";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from "react";
+import { useProfile } from "@/lib/data/hooks/useProfiles";
 
 export default function ProfilePage() {
   const params = useParams();
   const username = decodeURIComponent(params.username as string);
   const [selectedTimeRange, setSelectedTimeRange] = useState<"7d" | "30d" | "all">("30d");
-  
-  const profileData = useQuery(api.submissions.getProfile, { username });
 
-  if (profileData === undefined) {
+  const { data: profileData, isLoading } = useProfile(username);
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

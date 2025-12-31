@@ -4,10 +4,9 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Github } from "lucide-react";
-import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { useSession, signIn } from "next-auth/react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
+import { useSubmit } from "@/lib/data/hooks/useSubmissions";
 
 interface CCData {
   daily: Array<{
@@ -40,8 +39,8 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
   const [uploadState, setUploadState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [parsedData, setParsedData] = useState<CCData | null>(null);
-  
-  const submitMutation = useMutation(api.submissions.submit);
+
+  const { mutate: submit } = useSubmit();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -81,22 +80,22 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
 
   const handleSubmit = async () => {
     if (!parsedData) return;
-    
+
     setUploadState("loading");
     try {
       // Submit will use session if available, otherwise submit as unverified
-      await submitMutation({
+      await submit({
         username: session?.user?.username || "anonymous",
         githubUsername: session?.user?.username,
-        githubName: session?.user?.name,
-        githubAvatar: session?.user?.image,
+        githubName: session?.user?.name || undefined,
+        githubAvatar: session?.user?.image || undefined,
         source: session ? "oauth" : "cli",
         verified: !!session,
         ccData: parsedData,
       });
       setUploadState("success");
       setParsedData(null);
-      
+
       // Call onSuccess callback after successful submission
       setTimeout(() => {
         onSuccess?.();

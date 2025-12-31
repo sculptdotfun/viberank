@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Upload, Github, Sparkles, TrendingUp, Merge, X } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
 import UpdatesModal from "@/components/UpdatesModal";
 import NavBar from "@/components/NavBar";
 import { formatNumber, formatLargeNumber } from "@/lib/utils";
 import { useSession } from "next-auth/react";
+import { useGlobalStats } from "@/lib/data/hooks/useStats";
+import { useCheckClaimableSubmissions, useClaimAndMergeSubmissions } from "@/lib/data/hooks/useSubmissions";
 
 export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -18,14 +18,13 @@ export default function Home() {
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [showMergeBanner, setShowMergeBanner] = useState(true);
   const [merging, setMerging] = useState(false);
-  
+
   const { data: session } = useSession();
-  const stats = useQuery(api.stats.getGlobalStats);
-  const claimStatus = useQuery(
-    api.submissions.checkClaimableSubmissions, 
-    session?.user?.username ? { githubUsername: session.user.username } : "skip"
+  const { data: stats } = useGlobalStats();
+  const { data: claimStatus } = useCheckClaimableSubmissions(
+    session?.user?.username || null
   );
-  const claimAndMergeMutation = useMutation(api.submissions.claimAndMergeSubmissions);
+  const { mutate: claimAndMerge } = useClaimAndMergeSubmissions();
 
   const copyCommand = () => {
     navigator.clipboard.writeText("npx viberank");
@@ -35,10 +34,10 @@ export default function Home() {
   
   const handleClaimAndMerge = async () => {
     if (!session?.user?.username) return;
-    
+
     setMerging(true);
     try {
-      const result = await claimAndMergeMutation({ githubUsername: session.user.username });
+      await claimAndMerge(session.user.username);
       setShowMergeBanner(false);
       // Refresh the page to show updated data
       window.location.reload();

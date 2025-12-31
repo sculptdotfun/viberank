@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, BadgeCheck } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import ShareCard from "./ShareCard";
 import { formatNumber, formatCurrency, getGitHubAvatarUrl } from "@/lib/utils";
+import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 
 type SortBy = "cost" | "tokens";
 
@@ -26,23 +25,16 @@ export default function Leaderboard() {
   // Use date range query when filters are active, otherwise use regular paginated query
   const isDateFiltered = dateFrom && dateTo;
 
-  const regularResult = useQuery(
-    api.submissions.getLeaderboard,
-    !isDateFiltered ? {
-      sortBy,
-      page,
-      pageSize: ITEMS_PER_PAGE,
-    } : "skip"
+  const { data: regularResult } = useLeaderboard(
+    !isDateFiltered
+      ? { sortBy, page, pageSize: ITEMS_PER_PAGE }
+      : "skip"
   );
 
-  const dateFilteredResult = useQuery(
-    api.submissions.getLeaderboardByDateRange,
-    isDateFiltered ? {
-      dateFrom: dateFrom || "",
-      dateTo: dateTo || "",
-      sortBy,
-      limit: ITEMS_PER_PAGE,
-    } : "skip"
+  const { data: dateFilteredResult } = useLeaderboardByDateRange(
+    isDateFiltered
+      ? { dateFrom, dateTo, sortBy, limit: ITEMS_PER_PAGE }
+      : "skip"
   );
 
   // Use the appropriate result based on which query ran
@@ -261,7 +253,7 @@ export default function Leaderboard() {
                     
                     return (
                       <motion.tr
-                        key={submission._id}
+                        key={submission.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.3) }}
@@ -351,7 +343,7 @@ export default function Leaderboard() {
                               <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={() => setShowShareCard(submission._id)}
+                                onClick={() => setShowShareCard(submission.id)}
                                 className="p-1.5 rounded-lg hover:bg-card/50 transition-all opacity-0 group-hover:opacity-100"
                                 title="Share your rank"
                               >
@@ -383,14 +375,14 @@ export default function Leaderboard() {
                 
                 return (
                   <motion.div
-                    key={submission._id}
+                    key={submission.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
                     whileHover={{ scale: 1.01 }}
                     className={`p-4 rounded-xl border transition-all shadow-sm ${
-                      isCurrentUser 
-                        ? "border-accent/30 bg-accent/5 shadow-accent/10" 
+                      isCurrentUser
+                        ? "border-accent/30 bg-accent/5 shadow-accent/10"
                         : "border-border/50 bg-card/30 hover:bg-card/50 hover:shadow-md"
                     }`}
                   >
@@ -442,7 +434,7 @@ export default function Leaderboard() {
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => setShowShareCard(submission._id)}
+                          onClick={() => setShowShareCard(submission.id)}
                           className="p-1.5 -mr-1 flex-shrink-0"
                         >
                           <Share2 className="w-4 h-4 text-muted" />
@@ -485,7 +477,7 @@ export default function Leaderboard() {
             </div>
 
             {/* Share Card Modal */}
-            {showShareCard && paginatedSubmissions && paginatedSubmissions.find(s => s._id === showShareCard) && (
+            {showShareCard && paginatedSubmissions && paginatedSubmissions.find(s => s.id === showShareCard) && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -494,11 +486,11 @@ export default function Leaderboard() {
               >
                 <div onClick={(e) => e.stopPropagation()}>
                   <ShareCard
-                    rank={paginatedSubmissions.findIndex(s => s._id === showShareCard) + 1 + (page * ITEMS_PER_PAGE)}
-                    username={paginatedSubmissions.find(s => s._id === showShareCard)!.username}
-                    totalCost={paginatedSubmissions.find(s => s._id === showShareCard)!.totalCost}
-                    totalTokens={paginatedSubmissions.find(s => s._id === showShareCard)!.totalTokens}
-                    dateRange={paginatedSubmissions.find(s => s._id === showShareCard)!.dateRange}
+                    rank={paginatedSubmissions.findIndex(s => s.id === showShareCard) + 1 + (page * ITEMS_PER_PAGE)}
+                    username={paginatedSubmissions.find(s => s.id === showShareCard)!.username}
+                    totalCost={paginatedSubmissions.find(s => s.id === showShareCard)!.totalCost}
+                    totalTokens={paginatedSubmissions.find(s => s.id === showShareCard)!.totalTokens}
+                    dateRange={paginatedSubmissions.find(s => s.id === showShareCard)!.dateRange}
                     onClose={() => setShowShareCard(null)}
                   />
                 </div>
