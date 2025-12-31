@@ -3,10 +3,31 @@ import { ArrowLeft } from "lucide-react";
 
 const blogPosts = [
   {
+    slug: "mcp-servers-guide",
+    title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
+    excerpt: "Learn how to extend Claude Code with MCP servers. Connect to GitHub, PostgreSQL, Slack, and build custom integrations for AI-powered development.",
+    date: "December 15, 2025",
+    readTime: "9 min read",
+  },
+  {
+    slug: "cursor-vs-claude-code-vs-copilot",
+    title: "Cursor vs Claude Code vs GitHub Copilot: AI Coding Tools Compared (2025)",
+    excerpt: "In-depth comparison of the top AI coding assistants. Features, pricing, use cases, and which one fits your development workflow.",
+    date: "November 28, 2025",
+    readTime: "10 min read",
+  },
+  {
+    slug: "claude-code-complete-guide",
+    title: "Claude Code Complete Guide 2025: Installation, Commands & Best Practices",
+    excerpt: "Master Claude Code with this comprehensive guide covering installation, essential commands, MCP servers, hooks, and advanced workflows.",
+    date: "October 12, 2025",
+    readTime: "12 min read",
+  },
+  {
     slug: "vibe-coding-revolution",
     title: "Vibe Coding Explained: What Karpathy's Viral Term Really Means",
     excerpt: "From Andrej Karpathy's viral tweet to Claude Code, Cursor, and Conductor—understand what vibe coding really means for developers and the future of software.",
-    date: "January 19, 2025",
+    date: "September 5, 2025",
     readTime: "8 min read",
   },
 ];

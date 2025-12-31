@@ -15,6 +15,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: 'https://viberank.com/blog/mcp-servers-guide',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: 'https://viberank.com/blog/cursor-vs-claude-code-vs-copilot',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: 'https://viberank.com/blog/claude-code-complete-guide',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
       url: 'https://viberank.com/blog/vibe-coding-revolution',
       lastModified: new Date(),
       changeFrequency: 'monthly',

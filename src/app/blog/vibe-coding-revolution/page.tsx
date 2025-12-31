@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     description: "From Karpathy's viral tweet to Claude Code and Cursor—understand what vibe coding really means for developers.",
     url: "https://viberank.com/blog/vibe-coding-revolution",
     type: "article",
-    publishedTime: "2025-01-19T00:00:00.000Z",
+    publishedTime: "2025-09-05T00:00:00.000Z",
     authors: ["Viberank Team"],
     images: [
       {
@@ -36,8 +36,8 @@ export default function VibeCodingRevolution() {
     "headline": "Vibe Coding Explained: What Karpathy's Viral Term Really Means",
     "description": "Understand vibe coding—from Andrej Karpathy's viral tweet to how developers use Claude Code, Cursor, and Conductor.",
     "image": "https://viberank.com/api/og?title=Vibe%20Coding%20Explained",
-    "datePublished": "2025-01-19T00:00:00.000Z",
-    "dateModified": "2025-01-19T00:00:00.000Z",
+    "datePublished": "2025-09-05T00:00:00.000Z",
+    "dateModified": "2025-09-05T00:00:00.000Z",
     "author": {
       "@type": "Organization",
       "name": "Viberank",
@@ -78,7 +78,7 @@ export default function VibeCodingRevolution() {
           <div className="flex items-center gap-6 text-sm text-stone-400 mb-8">
             <span className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              January 19, 2025
+              September 5, 2025
             </span>
             <span className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
