@@ -30,18 +30,18 @@ export default function ProfilePage() {
     );
   }
 
-  if (profileData === null) {
+  if (!profileData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
           <h1 className="text-2xl font-light mb-2">Profile not found</h1>
           <p className="text-muted mb-6">No profile found for @{username}</p>
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="inline-flex items-center gap-2 text-accent hover:text-accent-hover transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -52,8 +52,11 @@ export default function ProfilePage() {
     );
   }
 
+  // Ensure submissions is always an array
+  const submissions = profileData.submissions || [];
+
   // Calculate statistics
-  const totalCost = profileData.submissions.reduce((sum, sub) => sum + sub.totalCost, 0);
+  const totalCost = submissions.reduce((sum, sub) => sum + sub.totalCost, 0);
   const totalTokens = profileData.submissions.reduce((sum, sub) => sum + sub.totalTokens, 0);
   const daysActive = new Set(profileData.submissions.flatMap(sub => sub.dailyBreakdown.map(d => d.date))).size;
   const avgDailyCost = totalCost / daysActive;
