@@ -3,8 +3,11 @@
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Github, Calendar, DollarSign, Zap, ArrowLeft, ExternalLink,
-  TrendingUp, Code2, BarChart3, Activity, Hash
+  GitHubLogoIcon,
+} from "@radix-ui/react-icons";
+import {
+  Calendar, Zap, ArrowLeft, ExternalLink,
+  TrendingUp, Code2, Activity
 } from "lucide-react";
 import Link from "next/link";
 import { formatNumber, formatCurrency } from "@/lib/utils";
@@ -53,17 +56,18 @@ export default function ProfilePage() {
   }
 
   // Ensure submissions is always an array
-  const submissions = profileData.submissions || [];
+  const submissions = profileData.submissions ?? [];
+  const latestSubmission = submissions[0];
 
-  // Calculate statistics
+  // Calculate statistics with safe defaults
   const totalCost = submissions.reduce((sum, sub) => sum + sub.totalCost, 0);
-  const totalTokens = profileData.submissions.reduce((sum, sub) => sum + sub.totalTokens, 0);
-  const daysActive = new Set(profileData.submissions.flatMap(sub => sub.dailyBreakdown.map(d => d.date))).size;
+  const totalTokens = submissions.reduce((sum, sub) => sum + sub.totalTokens, 0);
+  const allDailyBreakdowns = submissions.flatMap(sub => sub.dailyBreakdown ?? []);
+  const daysActive = new Set(allDailyBreakdowns.map(d => d.date)).size || 1;
   const avgDailyCost = totalCost / daysActive;
 
   // Prepare chart data
-  const allDailyData = profileData.submissions.flatMap(sub => sub.dailyBreakdown);
-  const dailyDataMap = allDailyData.reduce((acc, day) => {
+  const dailyDataMap = allDailyBreakdowns.reduce((acc, day) => {
     if (!acc[day.date]) {
       acc[day.date] = { date: day.date, cost: 0, tokens: 0 };
     }
@@ -77,11 +81,21 @@ export default function ProfilePage() {
     .slice(selectedTimeRange === "7d" ? -7 : selectedTimeRange === "30d" ? -30 : 0);
 
   // Get primary model used
-  const modelCounts = profileData.submissions.flatMap(s => s.modelsUsed).reduce((acc, model) => {
+  const modelCounts = submissions.flatMap(s => s.modelsUsed ?? []).reduce((acc, model) => {
     acc[model] = (acc[model] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
   const primaryModel = Object.entries(modelCounts).sort(([,a], [,b]) => b - a)[0]?.[0];
+
+  // Get token breakdown from latest submission
+  const inputTokens = latestSubmission?.inputTokens ?? 0;
+  const outputTokens = latestSubmission?.outputTokens ?? 0;
+  const cacheReadTokens = latestSubmission?.cacheReadTokens ?? 0;
+  const cacheCreationTokens = latestSubmission?.cacheCreationTokens ?? 0;
+  const latestDailyBreakdown = latestSubmission?.dailyBreakdown ?? [];
+  const maxDailyCost = latestDailyBreakdown.length > 0
+    ? Math.max(...latestDailyBreakdown.map(d => d.totalCost))
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -89,8 +103,8 @@ export default function ProfilePage() {
       <header className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
-            <Link 
-              href="/" 
+            <Link
+              href="/"
               className="inline-flex items-center gap-2 text-muted hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -127,7 +141,7 @@ export default function ProfilePage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 hover:text-accent transition-colors"
                   >
-                    <Github className="w-4 h-4" />
+                    <GitHubLogoIcon className="w-4 h-4" />
                     @{profileData.githubUsername || username}
                     <ExternalLink className="w-3 h-3" />
                   </a>
@@ -152,7 +166,7 @@ export default function ProfilePage() {
                 <p className="text-2xl font-bold">${formatCurrency(totalCost)}</p>
                 <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
               </div>
-              
+
               <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
                 <p className="text-sm text-muted mb-1">Total Tokens</p>
                 <p className="text-2xl font-bold">{formatNumber(totalTokens)}</p>
@@ -196,7 +210,7 @@ export default function ProfilePage() {
                 ))}
               </div>
             </div>
-            
+
             {sortedDailyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={sortedDailyData}>
@@ -207,39 +221,39 @@ export default function ProfilePage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#3a3734" strokeOpacity={0.3} />
-                  <XAxis 
-                    dataKey="date" 
+                  <XAxis
+                    dataKey="date"
                     stroke="#a8a29e"
                     tick={{ fontSize: 11, fill: '#a8a29e' }}
                     tickFormatter={(date) => new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                   />
-                  <YAxis 
-                    stroke="#a8a29e" 
+                  <YAxis
+                    stroke="#a8a29e"
                     tick={{ fontSize: 11, fill: '#a8a29e' }}
                     tickFormatter={(value) => `$${value}`}
                   />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#252321', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#252321',
                       border: '1px solid #3a3734',
                       borderRadius: '6px',
                       fontSize: '12px'
                     }}
                     formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
-                    labelFormatter={(date) => new Date(date).toLocaleDateString('en', { 
+                    labelFormatter={(date) => new Date(date).toLocaleDateString('en', {
                       weekday: 'short',
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric' 
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
                     })}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="cost" 
-                    stroke="#dc8850" 
+                  <Area
+                    type="monotone"
+                    dataKey="cost"
+                    stroke="#dc8850"
                     strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorGradient)" 
+                    fillOpacity={1}
+                    fill="url(#colorGradient)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -262,48 +276,48 @@ export default function ProfilePage() {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-muted">Input Tokens</span>
-                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.inputTokens || 0)}</span>
+                    <span className="font-mono text-sm">{formatNumber(inputTokens)}</span>
                   </div>
                   <div className="w-full bg-background rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-accent h-2 rounded-full transition-all"
-                      style={{ width: `${(profileData.submissions[0]?.inputTokens || 0) / totalTokens * 100}%` }}
+                      style={{ width: `${totalTokens > 0 ? (inputTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-muted">Output Tokens</span>
-                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.outputTokens || 0)}</span>
+                    <span className="font-mono text-sm">{formatNumber(outputTokens)}</span>
                   </div>
                   <div className="w-full bg-background rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-blue-500 h-2 rounded-full transition-all"
-                      style={{ width: `${(profileData.submissions[0]?.outputTokens || 0) / totalTokens * 100}%` }}
+                      style={{ width: `${totalTokens > 0 ? (outputTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-muted">Cache Read</span>
-                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.cacheReadTokens || 0)}</span>
+                    <span className="font-mono text-sm">{formatNumber(cacheReadTokens)}</span>
                   </div>
                   <div className="w-full bg-background rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-green-500 h-2 rounded-full transition-all"
-                      style={{ width: `${(profileData.submissions[0]?.cacheReadTokens || 0) / totalTokens * 100}%` }}
+                      style={{ width: `${totalTokens > 0 ? (cacheReadTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-muted">Cache Creation</span>
-                    <span className="font-mono text-sm">{formatNumber(profileData.submissions[0]?.cacheCreationTokens || 0)}</span>
+                    <span className="font-mono text-sm">{formatNumber(cacheCreationTokens)}</span>
                   </div>
                   <div className="w-full bg-background rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-purple-500 h-2 rounded-full transition-all"
-                      style={{ width: `${(profileData.submissions[0]?.cacheCreationTokens || 0) / totalTokens * 100}%` }}
+                      style={{ width: `${totalTokens > 0 ? (cacheCreationTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
@@ -320,7 +334,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-sm text-muted">Most Expensive Day</span>
                   <span className="font-mono text-sm">
-                    ${formatCurrency(Math.max(...profileData.submissions[0]?.dailyBreakdown.map(d => d.totalCost) || [0]))}
+                    ${formatCurrency(maxDailyCost)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
@@ -334,11 +348,14 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center py-2">
                   <span className="text-sm text-muted">Last Updated</span>
                   <span className="text-sm">
-                    {new Date(profileData.submissions[0]?.submittedAt || 0).toLocaleDateString('en', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
+                    {latestSubmission?.submittedAt
+                      ? new Date(latestSubmission.submittedAt).toLocaleDateString('en', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      : 'N/A'
+                    }
                   </span>
                 </div>
               </div>
