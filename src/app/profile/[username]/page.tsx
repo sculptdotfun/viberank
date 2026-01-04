@@ -80,8 +80,9 @@ export default function ProfilePage() {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(selectedTimeRange === "7d" ? -7 : selectedTimeRange === "30d" ? -30 : 0);
 
-  // Get primary model used
-  const modelCounts = submissions.flatMap(s => s.modelsUsed ?? []).reduce((acc, model) => {
+  // Get primary model used - count from daily breakdowns for more accurate representation
+  const allModelsUsed = allDailyBreakdowns.flatMap(d => d.modelsUsed ?? []);
+  const modelCounts = allModelsUsed.reduce((acc, model) => {
     acc[model] = (acc[model] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -152,7 +153,11 @@ export default function ProfilePage() {
                   {primaryModel && (
                     <span className="flex items-center gap-1">
                       <Code2 className="w-4 h-4" />
-                      {primaryModel.includes("opus") ? "Opus 4" : "Sonnet 3.5"} user
+                      {primaryModel.includes("opus-4-5") ? "Opus 4.5" :
+                       primaryModel.includes("opus") ? "Opus 4" :
+                       primaryModel.includes("sonnet-4-5") ? "Sonnet 4.5" :
+                       primaryModel.includes("sonnet") ? "Sonnet 4" :
+                       primaryModel.includes("haiku") ? "Haiku 4.5" : "Claude"} user
                     </span>
                   )}
                 </div>

@@ -173,10 +173,11 @@ class SupabaseSubmissionsService implements SubmissionsService {
     );
 
     // Check for existing submission with overlapping date range
+    // Use ilike for case-insensitive username matching
     const { data: existingSubmissions } = await this.client
       .from("submissions")
       .select("*")
-      .eq("username", data.username)
+      .ilike("username", data.username)
       .eq("source", data.source)
       .or(
         `and(date_range_start.lte.${dateRangeEnd},date_range_end.gte.${dateRangeStart})`
@@ -240,15 +241,18 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     // Validate date format and daily data
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    // Use UTC to avoid timezone issues - get today's date in UTC
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
 
     for (const day of ccData.daily) {
       if (!dateRegex.test(day.date)) {
         throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
       }
 
-      if (new Date(day.date) > today) {
+      // Parse date as UTC to match how we're comparing
+      const dayDate = new Date(day.date + "T00:00:00Z");
+      if (dayDate > todayUTC) {
         throw new Error(`Future date detected: ${day.date}`);
       }
 
@@ -879,19 +883,21 @@ class SupabaseProfilesService implements ProfilesService {
     username: string,
     submissionLimit: number = 10
   ): Promise<ProfileWithSubmissions | null> {
+    // Use ilike for case-insensitive username matching
     const { data: profile } = await this.client
       .from("profiles")
       .select("*")
-      .eq("username", username)
+      .ilike("username", username)
       .single();
 
     if (!profile) return null;
 
     const limit = Math.min(submissionLimit, 25);
+    // Use the stored username (with correct case) for submission lookup
     const { data: submissions } = await this.client
       .from("submissions")
       .select("*")
-      .eq("username", username)
+      .ilike("username", profile.username)
       .order("submitted_at", { ascending: false })
       .limit(limit);
 
