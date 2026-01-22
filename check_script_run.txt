@@ -1,0 +1,8 @@
+# Check if the lock file exists (indicates successful submission today)
+ls -la /tmp/ccusage-submitted-$(date +%Y-%m-%d)
+
+# View today's log entries
+cat /tmp/ccusage-submit.log | grep "$(date +%Y-%m-%d)"
+
+# Check for any errors
+cat /tmp/ccusage-submit-error.log 2>/dev/null

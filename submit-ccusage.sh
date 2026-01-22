@@ -7,6 +7,9 @@
 set -e
 
 # Check if email argument is provided
+# Ensure local paths are included for cron/launchd matching user environment
+export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/homebrew/opt/node@20/bin:$PATH"
+
 if [ $# -eq 0 ]; then
     echo "Usage: $0 <email@company.com>"
     echo "Example: $0 john.doe@company.com"
@@ -55,7 +58,7 @@ if ! command -v ccusage &> /dev/null; then
 fi
 
 # Generate usage data to temp file
-if ! ccusage > "$CC_DATA_FILE" 2>> "$ERROR_LOG"; then
+if ! ccusage --json > "$CC_DATA_FILE" 2>> "$ERROR_LOG"; then
     log_error "Failed to generate Claude Code usage data"
     exit 1
 fi
