@@ -18,24 +18,17 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#1a1918',
+          backgroundColor: '#121212',
           borderRadius: 36,
         }}
       >
-        <svg width="140" height="140" viewBox="0 0 32 32" fill="none">
-          <path d="M6 16L6 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M12 11L12 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M18 6L18 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M24 18L24 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <circle cx="6" cy="13" r="2.5" fill="#dc8850"/>
-          <circle cx="12" cy="8" r="2.5" fill="#dc8850"/>
-          <circle cx="18" cy="3" r="2.5" fill="#dc8850"/>
-          <circle cx="24" cy="15" r="2.5" fill="#dc8850"/>
+        <svg width="100" height="100" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="14" width="5" height="7" rx="1" fill="#f97316" opacity="0.5"/>
+          <rect x="9.5" y="8" width="5" height="13" rx="1" fill="#f97316" opacity="0.75"/>
+          <rect x="16" y="3" width="5" height="18" rx="1" fill="#f97316"/>
         </svg>
       </div>
     ),
-    {
-      ...size,
-    },
+    { ...size }
   );
 }

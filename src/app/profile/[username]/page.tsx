@@ -101,12 +101,12 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-6">
           <div className="flex items-center justify-between h-14">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-muted hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to leaderboard
@@ -115,24 +115,24 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-5xl mx-auto px-6 py-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.3 }}
         >
           {/* Profile Header */}
           <div className="mb-8">
-            <div className="flex items-start gap-6 mb-6">
+            <div className="flex items-start gap-5 mb-6">
               {profileData.avatar && (
                 <img
                   src={profileData.avatar}
                   alt={profileData.githubName || username}
-                  className="w-20 h-20 rounded-full"
+                  className="w-16 h-16 rounded-full"
                 />
               )}
               <div className="flex-1">
-                <h1 className="text-3xl font-light mb-2">
+                <h1 className="text-2xl font-semibold mb-2">
                   {profileData.githubName || username}
                 </h1>
                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted">
@@ -165,38 +165,38 @@ export default function ProfilePage() {
             </div>
 
             {/* Key Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
-                <p className="text-sm text-muted mb-1">Total Spent</p>
-                <p className="text-2xl font-bold">${formatCurrency(totalCost)}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <p className="text-xs text-muted mb-1">Total Spent</p>
+                <p className="text-xl font-semibold font-mono">${formatCurrency(totalCost)}</p>
                 <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
-                <p className="text-sm text-muted mb-1">Total Tokens</p>
-                <p className="text-2xl font-bold">{formatNumber(totalTokens)}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <p className="text-xs text-muted mb-1">Total Tokens</p>
+                <p className="text-xl font-semibold font-mono">{formatNumber(totalTokens)}</p>
                 <p className="text-xs text-muted mt-1">{formatNumber(Math.round(totalTokens / daysActive))}/day</p>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
-                <p className="text-sm text-muted mb-1">Days Active</p>
-                <p className="text-2xl font-bold">{daysActive}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <p className="text-xs text-muted mb-1">Days Active</p>
+                <p className="text-xl font-semibold">{daysActive}</p>
                 <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submissions</p>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
-                <p className="text-sm text-muted mb-1">Global Rank</p>
-                <p className="text-2xl font-bold">-</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <p className="text-xs text-muted mb-1">Global Rank</p>
+                <p className="text-xl font-semibold">-</p>
                 <p className="text-xs text-muted mt-1">Coming soon</p>
               </div>
             </div>
           </div>
 
           {/* Usage Chart */}
-          <div className="bg-card border border-border rounded-lg p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-light flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-accent" />
+          <div className="bg-card border border-border rounded-lg p-5 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-medium flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-accent" />
                 Usage Over Time
               </h2>
               <div className="flex gap-1">
@@ -204,43 +204,43 @@ export default function ProfilePage() {
                   <button
                     key={range}
                     onClick={() => setSelectedTimeRange(range)}
-                    className={`px-3 py-1.5 text-xs transition-colors ${
+                    className={`px-3 py-1 text-xs rounded-md transition-colors ${
                       selectedTimeRange === range
-                        ? "text-foreground border-b-2 border-accent"
-                        : "text-muted hover:text-foreground"
+                        ? "bg-accent text-white"
+                        : "text-muted hover:text-foreground hover:bg-surface-2"
                     }`}
                   >
-                    {range === "all" ? "All time" : `Last ${range}`}
+                    {range === "all" ? "All" : range}
                   </button>
                 ))}
               </div>
             </div>
 
             {sortedDailyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={sortedDailyData}>
                   <defs>
                     <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#dc8850" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#dc8850" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#3a3734" strokeOpacity={0.3} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2e2e2e" strokeOpacity={0.5} />
                   <XAxis
                     dataKey="date"
-                    stroke="#a8a29e"
-                    tick={{ fontSize: 11, fill: '#a8a29e' }}
+                    stroke="#888888"
+                    tick={{ fontSize: 11, fill: '#888888' }}
                     tickFormatter={(date) => new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                   />
                   <YAxis
-                    stroke="#a8a29e"
-                    tick={{ fontSize: 11, fill: '#a8a29e' }}
+                    stroke="#888888"
+                    tick={{ fontSize: 11, fill: '#888888' }}
                     tickFormatter={(value) => `$${value}`}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#252321',
-                      border: '1px solid #3a3734',
+                      backgroundColor: '#1e1e1e',
+                      border: '1px solid #2e2e2e',
                       borderRadius: '6px',
                       fontSize: '12px'
                     }}
@@ -255,7 +255,7 @@ export default function ProfilePage() {
                   <Area
                     type="monotone"
                     dataKey="cost"
-                    stroke="#dc8850"
+                    stroke="#f97316"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorGradient)"
@@ -263,65 +263,65 @@ export default function ProfilePage() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted text-sm">
+              <div className="h-[200px] flex items-center justify-center text-muted text-sm">
                 No data for selected time range
               </div>
             )}
           </div>
 
           {/* Additional Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Token Breakdown */}
-            <div className="bg-card border border-border rounded-lg p-6">
-              <h2 className="text-lg font-light mb-6 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-accent" />
+            <div className="bg-card border border-border rounded-lg p-5">
+              <h2 className="text-base font-medium mb-4 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-accent" />
                 Token Breakdown
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted">Input Tokens</span>
-                    <span className="font-mono text-sm">{formatNumber(inputTokens)}</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-muted">Input Tokens</span>
+                    <span className="font-mono text-xs">{formatNumber(inputTokens)}</span>
                   </div>
-                  <div className="w-full bg-background rounded-full h-2">
+                  <div className="w-full bg-surface-1 rounded-full h-1.5">
                     <div
-                      className="bg-accent h-2 rounded-full transition-all"
+                      className="bg-accent h-1.5 rounded-full transition-all"
                       style={{ width: `${totalTokens > 0 ? (inputTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted">Output Tokens</span>
-                    <span className="font-mono text-sm">{formatNumber(outputTokens)}</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-muted">Output Tokens</span>
+                    <span className="font-mono text-xs">{formatNumber(outputTokens)}</span>
                   </div>
-                  <div className="w-full bg-background rounded-full h-2">
+                  <div className="w-full bg-surface-1 rounded-full h-1.5">
                     <div
-                      className="bg-blue-500 h-2 rounded-full transition-all"
+                      className="bg-blue-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${totalTokens > 0 ? (outputTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted">Cache Read</span>
-                    <span className="font-mono text-sm">{formatNumber(cacheReadTokens)}</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-muted">Cache Read</span>
+                    <span className="font-mono text-xs">{formatNumber(cacheReadTokens)}</span>
                   </div>
-                  <div className="w-full bg-background rounded-full h-2">
+                  <div className="w-full bg-surface-1 rounded-full h-1.5">
                     <div
-                      className="bg-green-500 h-2 rounded-full transition-all"
+                      className="bg-green-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${totalTokens > 0 ? (cacheReadTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted">Cache Creation</span>
-                    <span className="font-mono text-sm">{formatNumber(cacheCreationTokens)}</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-muted">Cache Creation</span>
+                    <span className="font-mono text-xs">{formatNumber(cacheCreationTokens)}</span>
                   </div>
-                  <div className="w-full bg-background rounded-full h-2">
+                  <div className="w-full bg-surface-1 rounded-full h-1.5">
                     <div
-                      className="bg-purple-500 h-2 rounded-full transition-all"
+                      className="bg-purple-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${totalTokens > 0 ? (cacheCreationTokens / totalTokens * 100) : 0}%` }}
                     />
                   </div>
@@ -330,29 +330,27 @@ export default function ProfilePage() {
             </div>
 
             {/* Usage Insights */}
-            <div className="bg-card border border-border rounded-lg p-6">
-              <h2 className="text-lg font-light mb-6 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-accent" />
+            <div className="bg-card border border-border rounded-lg p-5">
+              <h2 className="text-base font-medium mb-4 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-accent" />
                 Usage Insights
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-sm text-muted">Most Expensive Day</span>
-                  <span className="font-mono text-sm">
-                    ${formatCurrency(maxDailyCost)}
-                  </span>
+                  <span className="text-xs text-muted">Most Expensive Day</span>
+                  <span className="font-mono text-xs">${formatCurrency(maxDailyCost)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-sm text-muted">Average Daily Cost</span>
-                  <span className="font-mono text-sm">${formatCurrency(avgDailyCost)}</span>
+                  <span className="text-xs text-muted">Average Daily Cost</span>
+                  <span className="font-mono text-xs">${formatCurrency(avgDailyCost)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-sm text-muted">Total Days Tracked</span>
-                  <span className="font-mono text-sm">{daysActive} days</span>
+                  <span className="text-xs text-muted">Total Days Tracked</span>
+                  <span className="font-mono text-xs">{daysActive} days</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-muted">Last Updated</span>
-                  <span className="text-sm">
+                  <span className="text-xs text-muted">Last Updated</span>
+                  <span className="text-xs">
                     {latestSubmission?.submittedAt
                       ? new Date(latestSubmission.submittedAt).toLocaleDateString('en', {
                           month: 'short',

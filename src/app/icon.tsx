@@ -18,23 +18,17 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#1a1918',
-          borderRadius: 8,
+          backgroundColor: '#121212',
+          borderRadius: 6,
         }}
       >
-        {/* Modern leaderboard/ranking icon */}
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          {/* Rising bars representing rankings */}
-          <rect x="3" y="14" width="5" height="7" rx="1" fill="#dc8850" opacity="0.6"/>
-          <rect x="9.5" y="8" width="5" height="13" rx="1" fill="#dc8850" opacity="0.8"/>
-          <rect x="16" y="3" width="5" height="18" rx="1" fill="#dc8850"/>
-          {/* Trophy crown accent on tallest bar */}
-          <path d="M16 3 L18.5 0 L21 3" stroke="#f5f3f0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="14" width="5" height="7" rx="1" fill="#f97316" opacity="0.5"/>
+          <rect x="9.5" y="8" width="5" height="13" rx="1" fill="#f97316" opacity="0.75"/>
+          <rect x="16" y="3" width="5" height="18" rx="1" fill="#f97316"/>
         </svg>
       </div>
     ),
-    {
-      ...size,
-    },
+    { ...size }
   );
 }

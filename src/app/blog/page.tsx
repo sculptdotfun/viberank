@@ -35,30 +35,30 @@ const blogPosts = [
 export default function BlogPage() {
   return (
     <>
-      <Link 
-        href="/" 
-        className="inline-flex items-center gap-2 text-stone-400 hover:text-orange-400 transition-colors mb-8"
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors mb-8"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
       </Link>
-      
-      <h1 className="text-4xl font-bold text-stone-100 mb-4">Blog</h1>
-      <p className="text-stone-400 mb-12">
+
+      <h1 className="text-3xl font-semibold text-foreground mb-3">Blog</h1>
+      <p className="text-muted mb-10">
         Insights on AI-powered development, Claude Code, and the future of programming.
       </p>
-      
-      <div className="space-y-8">
+
+      <div className="space-y-6">
         {blogPosts.map((post) => (
-          <article key={post.slug} className="border-b border-stone-800 pb-8">
-            <Link href={`/blog/${post.slug}`} className="group">
-              <h2 className="text-2xl font-semibold text-stone-100 group-hover:text-orange-400 transition-colors mb-2">
+          <article key={post.slug} className="border-b border-border pb-6">
+            <Link href={`/blog/${post.slug}`} className="group block">
+              <h2 className="text-xl font-medium text-foreground group-hover:text-accent transition-colors mb-2">
                 {post.title}
               </h2>
-              <p className="text-stone-400 mb-3">{post.excerpt}</p>
-              <div className="flex items-center gap-4 text-sm text-stone-500">
+              <p className="text-muted text-sm mb-3 leading-relaxed">{post.excerpt}</p>
+              <div className="flex items-center gap-3 text-xs text-muted">
                 <span>{post.date}</span>
-                <span>•</span>
+                <span>·</span>
                 <span>{post.readTime}</span>
               </div>
             </Link>
