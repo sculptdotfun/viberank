@@ -3,11 +3,8 @@
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  GitHubLogoIcon,
-} from "@radix-ui/react-icons";
-import {
   Calendar, Zap, ArrowLeft, ExternalLink,
-  TrendingUp, Code2, Activity
+  TrendingUp, Code2, Activity, Github
 } from "lucide-react";
 import Link from "next/link";
 import { formatNumber, formatCurrency } from "@/lib/utils";
@@ -142,7 +139,7 @@ export default function ProfilePage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 hover:text-accent transition-colors"
                   >
-                    <GitHubLogoIcon className="w-4 h-4" />
+                    <Github className="w-4 h-4" />
                     @{profileData.githubUsername || username}
                     <ExternalLink className="w-3 h-3" />
                   </a>
