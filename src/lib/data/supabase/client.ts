@@ -808,9 +808,29 @@ class SupabaseSubmissionsService implements SubmissionsService {
     );
 
     // Delete other submissions (cascade deletes their daily breakdowns)
+    const deletedCount = submissions.length - 1;
     for (const submission of submissions) {
       if (submission.id !== baseSubmission.id) {
         await this.client.from("submissions").delete().eq("id", submission.id);
+      }
+    }
+
+    // Update profile totalSubmissions to reflect merged count
+    if (deletedCount > 0) {
+      const { data: profile } = await this.client
+        .from("profiles")
+        .select("id, total_submissions")
+        .eq("github_username", githubUsername)
+        .single();
+
+      if (profile) {
+        await this.client
+          .from("profiles")
+          .update({
+            total_submissions: Math.max(1, profile.total_submissions - deletedCount),
+            best_submission_id: baseSubmission.id,
+          })
+          .eq("id", profile.id);
       }
     }
 

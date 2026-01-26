@@ -81,16 +81,22 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
   const handleSubmit = async () => {
     if (!parsedData) return;
 
+    // Require authentication for web uploads to ensure submissions can be claimed
+    if (!session?.user?.username) {
+      setErrorMessage("Please sign in with GitHub to submit your stats. This ensures you can claim and manage your submission.");
+      setUploadState("error");
+      return;
+    }
+
     setUploadState("loading");
     try {
-      // Submit will use session if available, otherwise submit as unverified
       await submit({
-        username: session?.user?.username || "anonymous",
-        githubUsername: session?.user?.username,
-        githubName: session?.user?.name || undefined,
-        githubAvatar: session?.user?.image || undefined,
-        source: session ? "oauth" : "cli",
-        verified: !!session,
+        username: session.user.username,
+        githubUsername: session.user.username,
+        githubName: session.user.name || undefined,
+        githubAvatar: session.user.image || undefined,
+        source: "oauth",
+        verified: true,
         ccData: parsedData,
       });
       setUploadState("success");

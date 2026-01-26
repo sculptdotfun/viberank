@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, User, Share2, Filter, Clock, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, BadgeCheck } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, Share2, X, ChevronDown, ArrowUpRight, ChevronLeft, ChevronRight, BadgeCheck } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import ShareCard from "./ShareCard";
-import { formatNumber, formatCurrency, getGitHubAvatarUrl } from "@/lib/utils";
+import Avatar from "./Avatar";
+import { formatNumber, formatCurrency } from "@/lib/utils";
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 
 type SortBy = "cost" | "tokens";
@@ -42,8 +43,8 @@ export default function Leaderboard() {
 
   // Use data directly from backend - no client-side slicing needed
   const paginatedSubmissions = result?.items;
-  // Regular query has totalPages, date filtered query doesn't
-  const totalPages = !isDateFiltered && regularResult ? regularResult.totalPages : 1;
+  // Regular query has totalPages, date filtered query doesn't - ensure it's always a number
+  const totalPages = (!isDateFiltered && regularResult?.totalPages) || 1;
 
   const getRankDisplay = (rank: number) => {
     if (rank === 1) return (
@@ -269,23 +270,12 @@ export default function Leaderboard() {
                         <td className="py-5 px-6">
                           <div className="flex items-center gap-3">
                             <div className="relative">
-                              {submission.githubAvatar ? (
-                                <img 
-                                  src={submission.githubAvatar} 
-                                  alt={submission.githubUsername || submission.username}
-                                  className="w-10 h-10 rounded-full ring-2 ring-border/20"
-                                />
-                              ) : submission.githubUsername ? (
-                                <img 
-                                  src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
-                                  alt={submission.githubUsername}
-                                  className="w-10 h-10 rounded-full ring-2 ring-border/20"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center ring-2 ring-border/20">
-                                  <User className="w-5 h-5 text-muted" />
-                                </div>
-                              )}
+                              <Avatar
+                                src={submission.githubAvatar}
+                                githubUsername={submission.githubUsername}
+                                name={submission.githubName || submission.username}
+                                size="md"
+                              />
                               {actualRank <= 3 && (
                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-background rounded-full flex items-center justify-center">
                                   {getRankDisplay(actualRank)}
@@ -323,7 +313,7 @@ export default function Leaderboard() {
                               ${formatCurrency(submission.totalCost)}
                             </p>
                             <p className="text-xs text-muted mt-0.5">
-                              ${(submission.totalCost / submission.dailyBreakdown.length).toFixed(0)}/day
+                              ${(submission.dailyBreakdown.length > 0 ? submission.totalCost / submission.dailyBreakdown.length : 0).toFixed(0)}/day
                             </p>
                           </div>
                         </td>
@@ -391,23 +381,13 @@ export default function Leaderboard() {
                         <div className="flex items-center justify-center w-7 h-7 flex-shrink-0">
                           <span className="text-base font-bold text-muted">{actualRank}</span>
                         </div>
-                        {submission.githubAvatar ? (
-                          <img 
-                            src={submission.githubAvatar} 
-                            alt={submission.githubUsername || submission.username}
-                            className="w-10 h-10 rounded-full flex-shrink-0"
-                          />
-                        ) : submission.githubUsername ? (
-                          <img 
-                            src={getGitHubAvatarUrl(submission.githubUsername, 40)} 
-                            alt={submission.githubUsername}
-                            className="w-10 h-10 rounded-full flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center flex-shrink-0">
-                            <User className="w-5 h-5 text-muted" />
-                          </div>
-                        )}
+                        <Avatar
+                          src={submission.githubAvatar}
+                          githubUsername={submission.githubUsername}
+                          name={submission.githubName || submission.username}
+                          size="md"
+                          className="flex-shrink-0"
+                        />
                         <div className="min-w-0">
                           <Link 
                             href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
@@ -450,7 +430,7 @@ export default function Leaderboard() {
                             ${formatCurrency(submission.totalCost)}
                           </p>
                           <p className="text-[10px] text-muted/70">
-                            ${(submission.totalCost / submission.dailyBreakdown.length).toFixed(0)}/day
+                            ${(submission.dailyBreakdown.length > 0 ? submission.totalCost / submission.dailyBreakdown.length : 0).toFixed(0)}/day
                           </p>
                         </div>
                         <div>

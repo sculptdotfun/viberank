@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Upload, Github, Sparkles, TrendingUp, Menu, X, Shield, BookOpen } from "lucide-react";
+import { Upload, Github, Sparkles, Menu, X, Shield, BookOpen, BarChart3 } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Avatar from "./Avatar";
 
 interface NavBarProps {
   onUploadClick: () => void;
@@ -55,15 +56,17 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
             {/* Logo */}
             <Link
               href="/"
-              className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-accent/10 transition-colors"
+              className="flex items-center gap-2.5 px-4 py-2 rounded-full hover:bg-accent/10 transition-colors"
             >
-              <div className="relative">
-                <div className="absolute inset-0 bg-accent/20 rounded-lg blur-xl" />
-                <div className="relative">
-                  <Trophy className="w-5 h-5 text-accent" />
-                </div>
+              <div className="relative flex items-center justify-center w-6 h-6">
+                {/* Modern bar chart icon */}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-accent">
+                  <rect x="3" y="14" width="5" height="7" rx="1" fill="currentColor" opacity="0.5"/>
+                  <rect x="9.5" y="8" width="5" height="13" rx="1" fill="currentColor" opacity="0.75"/>
+                  <rect x="16" y="3" width="5" height="18" rx="1" fill="currentColor"/>
+                </svg>
               </div>
-              <span className="font-semibold">viberank</span>
+              <span className="font-semibold tracking-tight">viberank</span>
             </Link>
 
             {/* Nav Items */}
@@ -112,12 +115,14 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => signOut()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-accent/10 transition-colors text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border hover:bg-accent/10 transition-colors text-sm"
                 >
-                  <img
-                    src={session.user?.image || ""}
-                    alt={session.user?.name || ""}
-                    className="w-5 h-5 rounded-full"
+                  <Avatar
+                    src={session.user?.image}
+                    name={session.user?.name || session.user?.username}
+                    size="sm"
+                    showRing={false}
+                    className="w-5 h-5"
                   />
                   <span className="hidden lg:inline">Sign out</span>
                 </motion.button>
@@ -126,8 +131,9 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => signIn("github")}
-                  className="px-4 py-2 rounded-full border border-border hover:bg-accent/10 transition-colors text-sm"
+                  className="px-4 py-2 rounded-full border border-border hover:bg-accent/10 transition-colors text-sm flex items-center gap-2"
                 >
+                  <Github className="w-4 h-4" />
                   Sign in
                 </motion.button>
               )}
@@ -168,8 +174,12 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#1a1918] backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/" className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-accent" />
-            <span className="font-semibold">viberank</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-accent">
+              <rect x="3" y="14" width="5" height="7" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="9.5" y="8" width="5" height="13" rx="1" fill="currentColor" opacity="0.75"/>
+              <rect x="16" y="3" width="5" height="18" rx="1" fill="currentColor"/>
+            </svg>
+            <span className="font-semibold tracking-tight">viberank</span>
           </Link>
 
           <div className="flex items-center gap-2">
@@ -253,10 +263,12 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                       }}
                       className="w-full px-4 py-3 rounded-lg hover:bg-accent/10 transition-colors flex items-center gap-3 text-left"
                     >
-                      <img
-                        src={session.user?.image || ""}
-                        alt={session.user?.name || ""}
-                        className="w-5 h-5 rounded-full"
+                      <Avatar
+                        src={session.user?.image}
+                        name={session.user?.name || session.user?.username}
+                        size="sm"
+                        showRing={false}
+                        className="w-5 h-5"
                       />
                       Sign out
                     </button>
@@ -266,8 +278,9 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
                         signIn("github");
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full px-4 py-3 rounded-lg border border-border hover:bg-accent/10 transition-colors"
+                      className="w-full px-4 py-3 rounded-lg border border-border hover:bg-accent/10 transition-colors flex items-center justify-center gap-2"
                     >
+                      <Github className="w-4 h-4" />
                       Sign in with GitHub
                     </button>
                   )}

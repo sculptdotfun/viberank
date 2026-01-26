@@ -22,7 +22,7 @@ export default function Home() {
   const { data: session } = useSession();
   const { data: stats } = useGlobalStats();
   const { data: claimStatus } = useCheckClaimableSubmissions(
-    session?.user?.username || null
+    session?.user?.username || undefined
   );
   const { mutate: claimAndMerge } = useClaimAndMergeSubmissions();
 

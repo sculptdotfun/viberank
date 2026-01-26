@@ -19,18 +19,17 @@ export default function Icon() {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#1a1918',
-          borderRadius: 6,
+          borderRadius: 8,
         }}
       >
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <path d="M6 16L6 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M12 11L12 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M18 6L18 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <path d="M24 18L24 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-          <circle cx="6" cy="13" r="2.5" fill="#dc8850"/>
-          <circle cx="12" cy="8" r="2.5" fill="#dc8850"/>
-          <circle cx="18" cy="3" r="2.5" fill="#dc8850"/>
-          <circle cx="24" cy="15" r="2.5" fill="#dc8850"/>
+        {/* Modern leaderboard/ranking icon */}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          {/* Rising bars representing rankings */}
+          <rect x="3" y="14" width="5" height="7" rx="1" fill="#dc8850" opacity="0.6"/>
+          <rect x="9.5" y="8" width="5" height="13" rx="1" fill="#dc8850" opacity="0.8"/>
+          <rect x="16" y="3" width="5" height="18" rx="1" fill="#dc8850"/>
+          {/* Trophy crown accent on tallest bar */}
+          <path d="M16 3 L18.5 0 L21 3" stroke="#f5f3f0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
     ),
