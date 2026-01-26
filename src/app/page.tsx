@@ -2,14 +2,12 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Upload, Github, Sparkles, TrendingUp, Merge, X } from "lucide-react";
+import { Upload, Github, Merge, X, Terminal, Copy, Check } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import Leaderboard from "@/components/Leaderboard";
 import UpdatesModal from "@/components/UpdatesModal";
 import NavBar from "@/components/NavBar";
-import { formatNumber, formatLargeNumber } from "@/lib/utils";
 import { useSession } from "next-auth/react";
-import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import { useCheckClaimableSubmissions, useClaimAndMergeSubmissions } from "@/lib/data/hooks/useSubmissions";
 
 export default function Home() {
@@ -20,7 +18,6 @@ export default function Home() {
   const [merging, setMerging] = useState(false);
 
   const { data: session } = useSession();
-  const { data: stats } = useGlobalStats();
   const { data: claimStatus } = useCheckClaimableSubmissions(
     session?.user?.username || undefined
   );
@@ -31,7 +28,7 @@ export default function Home() {
     setCopiedToClipboard(true);
     setTimeout(() => setCopiedToClipboard(false), 2000);
   };
-  
+
   const handleClaimAndMerge = async () => {
     if (!session?.user?.username) return;
 
@@ -39,7 +36,6 @@ export default function Home() {
     try {
       await claimAndMerge(session.user.username);
       setShowMergeBanner(false);
-      // Refresh the page to show updated data
       window.location.reload();
     } catch (error) {
       console.error("Failed to process:", error);
@@ -52,7 +48,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <NavBar 
+      <NavBar
         onUploadClick={() => setShowUploadModal(true)}
         onUpdatesClick={() => setShowUpdatesModal(true)}
       />
@@ -64,20 +60,18 @@ export default function Home() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-14 md:top-20 left-0 right-0 z-40"
+            className="fixed top-16 md:top-20 left-0 right-0 z-40 px-4"
           >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
-              <div className="bg-accent/10 border border-accent/20 rounded-lg p-3 sm:p-4 flex items-center justify-between">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <Merge className="w-5 h-5 text-accent flex-shrink-0" />
+                  <Merge className="w-4 h-4 text-accent" />
                   <div>
-                    <p className="text-sm font-medium">
-                      {claimStatus.actionText}
-                    </p>
-                    <p className="text-xs text-muted mt-0.5">
-                      {claimStatus.actionNeeded === "claim" 
-                        ? "Add verification badge to your submission"
-                        : `Combine your ${claimStatus.totalSubmissions} submissions into one verified entry`
+                    <p className="text-sm font-medium">{claimStatus.actionText}</p>
+                    <p className="text-xs text-muted">
+                      {claimStatus.actionNeeded === "claim"
+                        ? "Verify your submission"
+                        : `Merge ${claimStatus.totalSubmissions} submissions`
                       }
                     </p>
                   </div>
@@ -86,13 +80,13 @@ export default function Home() {
                   <button
                     onClick={handleClaimAndMerge}
                     disabled={merging}
-                    className="px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 bg-accent text-white text-sm rounded font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
                   >
-                    {merging ? "Processing..." : claimStatus.actionNeeded === "claim" ? "Verify" : "Merge"}
+                    {merging ? "..." : claimStatus.actionNeeded === "claim" ? "Verify" : "Merge"}
                   </button>
                   <button
                     onClick={() => setShowMergeBanner(false)}
-                    className="p-1.5 hover:bg-accent/10 rounded-lg transition-colors"
+                    className="p-1 hover:bg-border rounded transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -104,150 +98,131 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className={`flex-1 ${showMergeBanner && claimStatus?.actionNeeded ? 'pt-28 md:pt-32' : 'pt-14 md:pt-0'} transition-all`}>
-        {/* Hero Section */}
-        <div className="relative bg-gradient-to-b from-accent/5 via-transparent to-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-20 md:pt-32 pb-6 sm:pb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="text-center mb-8 sm:mb-12"
-            >
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Claude Code Leaderboard
-              </h2>
-              <p className="text-base sm:text-lg text-muted max-w-2xl mx-auto px-4">
-                Track and compare AI-powered development usage across the community
-              </p>
-            </motion.div>
-
-            {/* Compact Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="flex items-center justify-center gap-6 sm:gap-8 text-center flex-wrap mb-12"
-            >
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold">{stats?.totalUsers || 0}</p>
-                <p className="text-xs sm:text-sm text-muted">Developers</p>
+      <main className={`${showMergeBanner && claimStatus?.actionNeeded ? 'pt-28 md:pt-32' : 'pt-20 md:pt-24'}`}>
+        {/* Header */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1">Claude Code Leaderboard</h1>
+              <p className="text-muted text-sm sm:text-base">Track usage and compare with other developers</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border">
+                <Terminal className="w-4 h-4 text-muted" />
+                <code className="font-mono text-accent">npx viberank</code>
+                <button
+                  onClick={copyCommand}
+                  className="p-1 hover:bg-border rounded transition-colors"
+                >
+                  {copiedToClipboard ? (
+                    <Check className="w-3.5 h-3.5 text-success" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-muted" />
+                  )}
+                </button>
               </div>
-              <div className="w-px h-12 bg-border/50 hidden sm:block" />
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold">
-                  {stats ? formatNumber(stats.totalTokens) : "0"}
-                </p>
-                <p className="text-xs sm:text-sm text-muted">Total Tokens</p>
-              </div>
-              <div className="w-px h-12 bg-border/50 hidden sm:block" />
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold text-accent">
-                  ${stats ? formatLargeNumber(Math.round(stats.totalCost)) : "0"}
-                </p>
-                <p className="text-xs sm:text-sm text-muted">Total Spent</p>
-              </div>
-            </motion.div>
-
+            </div>
           </div>
         </div>
 
-        {/* Leaderboard Section */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12">
+        {/* Leaderboard */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-6">
           <Leaderboard />
         </div>
+
+        {/* Footer */}
+        <footer className="border-t border-border py-4 mt-4">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="flex items-center justify-between text-sm text-muted">
+              <div className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-accent">
+                  <rect x="3" y="14" width="5" height="7" rx="1" fill="currentColor" opacity="0.5"/>
+                  <rect x="9.5" y="8" width="5" height="13" rx="1" fill="currentColor" opacity="0.75"/>
+                  <rect x="16" y="3" width="5" height="18" rx="1" fill="currentColor"/>
+                </svg>
+                <span className="font-medium text-foreground">viberank</span>
+              </div>
+              <a
+                href="https://github.com/sculptdotfun/viberank"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors flex items-center gap-1.5"
+              >
+                <Github className="w-4 h-4" />
+                <span className="hidden sm:inline">Source</span>
+              </a>
+            </div>
+          </div>
+        </footer>
       </main>
 
       {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
-            onClick={() => setShowUploadModal(false)}
-          />
-          
+      <AnimatePresence>
+        {showUploadModal && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="relative bg-background border border-border rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Submit Your Stats</h3>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="p-2 hover:bg-accent/10 rounded-lg transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            <div
+              className="fixed inset-0 bg-black/50"
+              onClick={() => setShowUploadModal(false)}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="relative bg-card border border-border rounded-xl shadow-lg max-w-md w-full max-h-[80vh] overflow-hidden"
+            >
+              <div className="border-b border-border px-4 py-3 flex items-center justify-between">
+                <h3 className="font-semibold">Submit Stats</h3>
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="p-1.5 hover:bg-border rounded transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
-              {/* CLI Option */}
-              <div className="mb-6 p-6 bg-card/50 rounded-xl border border-border/50">
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Option 1: Terminal (Recommended)
-                </h4>
-                <p className="text-sm text-muted mb-4">No installation needed - npx handles everything!</p>
-                <div className="flex items-center gap-3 bg-background rounded-lg p-3 border border-border/50 mb-3">
-                  <code className="text-sm font-mono text-accent">npx viberank</code>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={copyCommand}
-                    className="ml-auto p-1.5 hover:bg-accent/10 rounded transition-colors"
-                    title="Copy to clipboard"
-                  >
-                    {copiedToClipboard ? (
-                      <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                  </motion.button>
-                </div>
-                <details className="text-xs text-muted">
-                  <summary className="cursor-pointer hover:text-foreground transition-colors">Having issues?</summary>
-                  <div className="mt-2 space-y-1 pl-3">
-                    <p>• Try: <code className="text-accent">npx viberank@latest</code></p>
-                    <p>• Clear cache: <code className="text-accent">npx clear-npx-cache</code></p>
-                    <p>• Set git username: <code className="text-accent">git config --global user.name "YourGitHubUsername"</code></p>
-                    <p>• Requires Node.js 14+</p>
-                  </div>
-                </details>
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Manual Upload Option */}
-              <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  Option 2: Manual Upload
-                </h4>
-                <FileUpload onSuccess={() => setShowUploadModal(false)} />
+              <div className="p-4 overflow-y-auto">
+                {/* CLI Option */}
+                <div className="mb-4 p-3 rounded-lg bg-accent/5 border border-accent/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Terminal className="w-4 h-4 text-accent" />
+                    <span className="font-medium text-sm">Terminal</span>
+                    <span className="px-1.5 py-0.5 rounded bg-accent/20 text-accent text-xs">Recommended</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-background rounded p-2 border border-border">
+                    <code className="text-sm font-mono text-accent flex-1">npx viberank</code>
+                    <button
+                      onClick={copyCommand}
+                      className="p-1 hover:bg-border rounded transition-colors"
+                    >
+                      {copiedToClipboard ? (
+                        <Check className="w-3.5 h-3.5 text-success" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-muted" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Manual Upload */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Upload className="w-4 h-4 text-muted" />
+                    <span className="font-medium text-sm">Manual Upload</span>
+                  </div>
+                  <FileUpload onSuccess={() => setShowUploadModal(false)} />
+                </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Updates Modal */}
       <UpdatesModal isOpen={showUpdatesModal} onClose={() => setShowUpdatesModal(false)} />
