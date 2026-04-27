@@ -2,6 +2,8 @@
 
 A community-driven leaderboard for Claude Code (formerly Claude Engineer) usage. Track your AI-assisted coding progress and compete with developers worldwide.
 
+![viberank — a global leaderboard for Claude Code usage. Submit your cc.json, see how you rank by cost, tokens, and days active.](assets/hero.gif)
+
 ![viberank](https://img.shields.io/badge/viberank-Track%20Your%20Claude%20Code%20Usage-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-15.3.4-black)
