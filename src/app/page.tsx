@@ -34,7 +34,7 @@ export default function Home() {
 
     setMerging(true);
     try {
-      await claimAndMerge(session.user.username);
+      await claimAndMerge();
       setShowMergeBanner(false);
       window.location.reload();
     } catch (error) {

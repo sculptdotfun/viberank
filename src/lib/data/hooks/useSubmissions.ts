@@ -171,34 +171,32 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
  * Hook for submitting usage data
  */
 export function useSubmit() {
-  const backend = getDatabaseBackend();
-  const convexMutation = useConvexMutation(api.submissions.submit);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const mutate = useCallback(
-    async (data: SubmitData): Promise<string> => {
-      setIsLoading(true);
-      setError(null);
+  const mutate = useCallback(async (data: SubmitData): Promise<string> => {
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        if (backend === "supabase") {
-          const { createSupabaseDataLayer } = await import("../supabase/client");
-          const dataLayer = createSupabaseDataLayer();
-          return await dataLayer.submissions.submit(data);
-        }
-
-        return await convexMutation(data);
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
+    try {
+      const res = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data.ccData),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body?.error || "Submit failed");
       }
-    },
-    [backend, convexMutation]
-  );
+      return body.submissionId as string;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   return { mutate, isLoading, error };
 }
@@ -380,34 +378,24 @@ export function useCheckClaimableSubmissions(githubUsername: string | undefined)
  * Hook for claiming and merging submissions
  */
 export function useClaimAndMergeSubmissions() {
-  const backend = getDatabaseBackend();
-  const convexMutation = useConvexMutation(api.submissions.claimAndMergeSubmissions);
   const [isLoading, setIsLoading] = useState(false);
 
-  const mutate = useCallback(
-    async (githubUsername: string): Promise<ClaimResult> => {
-      setIsLoading(true);
+  const mutate = useCallback(async (): Promise<ClaimResult> => {
+    setIsLoading(true);
 
-      try {
-        if (backend === "supabase") {
-          const { createSupabaseDataLayer } = await import("../supabase/client");
-          const dataLayer = createSupabaseDataLayer();
-          return await dataLayer.submissions.claimAndMergeSubmissions(githubUsername);
-        }
+    try {
+      const res = await fetch("/api/claim", { method: "POST" });
+      const body = await res.json();
 
-        const result = await convexMutation({ githubUsername });
-        return {
-          success: result.success,
-          action: result.action as "already_verified" | "claimed" | "merged",
-          submissionId: result.submissionId || "",
-          mergedCount: result.mergedCount || 0,
-        };
-      } finally {
-        setIsLoading(false);
+      if (!res.ok) {
+        throw new Error(body?.error || "Claim/merge request failed");
       }
-    },
-    [backend, convexMutation]
-  );
+
+      return body as ClaimResult;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   return { mutate, isLoading };
 }

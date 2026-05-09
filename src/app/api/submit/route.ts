@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
 
 export async function POST(request: NextRequest) {
@@ -40,17 +41,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for authentication
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     let githubUsername: string;
     let source: "oauth" | "cli";
     let verified: boolean;
+    let githubName: string | undefined;
+    let githubAvatar: string | undefined;
 
     if (session?.user?.username) {
       // Authenticated via OAuth
       githubUsername = session.user.username;
       source = "oauth";
       verified = true;
+      githubName = session.user.name || undefined;
+      githubAvatar = session.user.image || undefined;
       console.log("OAuth submission from:", githubUsername);
     } else {
       // CLI submission
@@ -134,6 +139,8 @@ export async function POST(request: NextRequest) {
       const submissionPromise = dataLayer.submissions.submit({
         username: githubUsername,
         githubUsername: githubUsername,
+        githubName,
+        githubAvatar,
         source: source,
         verified: verified,
         ccData: ccData,
