@@ -10,7 +10,13 @@
         "NEXTAUTH_SECRET",
         "GITHUB_ID",
         "GITHUB_SECRET",
-        "CONVEX_DEPLOYMENT"
+        "CONVEX_DEPLOYMENT",
+        "CONVEX_DEPLOY_KEY",
+        "NEXT_PUBLIC_CONVEX_URL",
+        "NEXT_PUBLIC_DATABASE_BACKEND",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
       ]
     },
     "dev": {
