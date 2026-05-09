@@ -241,18 +241,20 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     // Validate date format and daily data
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    // Use UTC to avoid timezone issues - get today's date in UTC
+    // cc.json dates are emitted in the user's *local* timezone (ccusage groups
+    // by local day), so the server's UTC date can lag the user's by up to a
+    // full day at extreme offsets (UTC+14 / UTC-12). Allow tomorrow-UTC as the
+    // cutoff to cover any global timezone.
     const now = new Date();
-    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const cutoffUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 23, 59, 59, 999));
 
     for (const day of ccData.daily) {
       if (!dateRegex.test(day.date)) {
         throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
       }
 
-      // Parse date as UTC to match how we're comparing
       const dayDate = new Date(day.date + "T00:00:00Z");
-      if (dayDate > todayUTC) {
+      if (dayDate > cutoffUTC) {
         throw new Error(`Future date detected: ${day.date}`);
       }
 
@@ -415,7 +417,15 @@ class SupabaseSubmissionsService implements SubmissionsService {
       models_used: day.modelsUsed,
     }));
 
-    await this.client.from("daily_breakdowns").insert(dailyRows);
+    const { error: dailyError } = await this.client
+      .from("daily_breakdowns")
+      .insert(dailyRows);
+
+    if (dailyError) {
+      // Roll back the parent submission so we don't leave a half-written row.
+      await this.client.from("submissions").delete().eq("id", submission.id);
+      throw new Error("Failed to create daily breakdowns: " + dailyError.message);
+    }
 
     return submission.id;
   }
@@ -769,7 +779,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
     );
 
     // Update base submission
-    await this.client
+    const { error: updateError } = await this.client
       .from("submissions")
       .update({
         total_tokens: totals.totalTokens,
@@ -787,13 +797,21 @@ class SupabaseSubmissionsService implements SubmissionsService {
       })
       .eq("id", baseSubmission.id);
 
-    // Delete daily breakdowns for base and re-insert merged
-    await this.client
+    if (updateError) {
+      throw new Error("Failed to update merged submission: " + updateError.message);
+    }
+
+    // Replace daily breakdowns on the base submission with the merged set.
+    const { error: deleteError } = await this.client
       .from("daily_breakdowns")
       .delete()
       .eq("submission_id", baseSubmission.id);
 
-    await this.client.from("daily_breakdowns").insert(
+    if (deleteError) {
+      throw new Error("Failed to clear daily breakdowns: " + deleteError.message);
+    }
+
+    const { error: insertError } = await this.client.from("daily_breakdowns").insert(
       mergedDaily.map((d) => ({
         submission_id: baseSubmission.id,
         date: d.date,
@@ -806,6 +824,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
         models_used: d.models_used,
       }))
     );
+
+    if (insertError) {
+      throw new Error("Failed to insert merged daily breakdowns: " + insertError.message);
+    }
 
     // Delete other submissions (cascade deletes their daily breakdowns)
     const deletedCount = submissions.length - 1;
