@@ -835,31 +835,38 @@ class SupabaseSubmissionsService implements SubmissionsService {
       throw new Error("Failed to insert merged daily breakdowns: " + insertError.message);
     }
 
-    // Delete other submissions (cascade deletes their daily breakdowns)
-    const deletedCount = submissions.length - 1;
+    // Delete other submissions (cascade deletes their daily breakdowns).
+    // Anything that referenced the deleted submissions via FK
+    // (e.g. profiles.best_submission_id ON DELETE SET NULL) will be repaired
+    // by the unconditional profile update below.
     for (const submission of submissions) {
       if (submission.id !== baseSubmission.id) {
         await this.client.from("submissions").delete().eq("id", submission.id);
       }
     }
 
-    // Update profile totalSubmissions to reflect merged count
-    if (deletedCount > 0) {
-      const { data: profile } = await this.client
-        .from("profiles")
-        .select("id, total_submissions")
-        .eq("github_username", githubUsername)
-        .single();
+    // Recompute total_submissions from the source of truth (a count of rows
+    // post-delete), and always repoint best_submission_id at the surviving
+    // base — even if no rows were deleted, this self-heals stale FK state.
+    const { data: profile } = await this.client
+      .from("profiles")
+      .select("id")
+      .eq("github_username", githubUsername)
+      .single();
 
-      if (profile) {
-        await this.client
-          .from("profiles")
-          .update({
-            total_submissions: Math.max(1, profile.total_submissions - deletedCount),
-            best_submission_id: baseSubmission.id,
-          })
-          .eq("id", profile.id);
-      }
+    if (profile) {
+      const { count: liveCount } = await this.client
+        .from("submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("github_username", githubUsername);
+
+      await this.client
+        .from("profiles")
+        .update({
+          total_submissions: Math.max(1, liveCount ?? 1),
+          best_submission_id: baseSubmission.id,
+        })
+        .eq("id", profile.id);
     }
 
     return {
