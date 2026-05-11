@@ -1,155 +1,143 @@
 # Contributing to viberank
 
-First off, thank you for considering contributing to viberank! It's people like you that make viberank such a great tool for the Claude Code community.
+Thanks for helping out. This document covers the dev setup, repo structure, and conventions.
 
-## Code of Conduct
+## Reporting bugs
 
-By participating in this project, you are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md).
+Before filing, check [existing issues](https://github.com/sculptdotfun/viberank/issues). A good bug report includes:
 
-## How Can I Contribute?
+- A clear title
+- Exact reproduction steps
+- Expected vs. actual behavior
+- Any error messages or screenshots
+- Browser / Node version if relevant
 
-### Reporting Bugs
+## Suggesting enhancements
 
-Before creating bug reports, please check existing issues as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
+File a GitHub issue with the motivation, the proposed behavior, and any alternatives you considered.
 
-- **Use a clear and descriptive title**
-- **Describe the exact steps to reproduce the problem**
-- **Provide specific examples to demonstrate the steps**
-- **Describe the behavior you observed after following the steps**
-- **Explain which behavior you expected to see instead and why**
-- **Include screenshots if possible**
+## Pull requests
 
-### Suggesting Enhancements
+1. Fork and branch off `main`
+2. Keep changes focused — atomic commits are easier to review
+3. Update relevant documentation if you change behavior, env vars, or APIs
+4. Make sure `pnpm build` succeeds and `pnpm exec tsc --noEmit` doesn't introduce new errors
+5. Open the PR with a short description of what changed and why
 
-Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please include:
+## Development setup
 
-- **Use a clear and descriptive title**
-- **Provide a step-by-step description of the suggested enhancement**
-- **Provide specific examples to demonstrate the steps**
-- **Describe the current behavior and explain which behavior you expected to see instead**
-- **Explain why this enhancement would be useful**
+### Prerequisites
 
-### Pull Requests
+- Node.js 18+ and pnpm 10+
+- A Supabase project (free tier is fine) — the schema lives in `supabase/migrations/001_initial_schema.sql`
+- A GitHub OAuth app for local sign-in (callback URL: `http://localhost:3001/api/auth/callback/github`)
 
-1. Fork the repo and create your branch from `main`
-2. If you've added code that should be tested, add tests
-3. If you've changed APIs, update the documentation
-4. Ensure the test suite passes
-5. Make sure your code follows the existing code style
-6. Issue that pull request!
+### Install
 
-## Development Setup
+```bash
+git clone https://github.com/sculptdotfun/viberank.git
+cd viberank
+pnpm install
+cp .env.example .env.local
+```
 
-1. Fork and clone the repo:
-   ```bash
-   git clone https://github.com/yourusername/viberank.git
-   cd viberank
-   ```
+Fill in `.env.local` with your Supabase project URL, anon key, service role key, GitHub OAuth credentials, and a generated `NEXTAUTH_SECRET`.
 
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+### Apply the database schema
 
-3. Set up your environment:
-   ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your credentials
-   ```
+Run the SQL in `supabase/migrations/001_initial_schema.sql` against your Supabase project, either via the SQL editor in the dashboard or the `supabase` CLI.
 
-4. Start Convex:
-   ```bash
-   npx convex dev
-   ```
+### Run the dev server
 
-5. Run the development server:
-   ```bash
-   pnpm dev
-   ```
+```bash
+pnpm dev
+```
 
-## Project Structure
+Opens on <http://localhost:3001>.
+
+## Project structure
 
 ```
 viberank/
 ├── src/
-│   ├── app/              # Next.js app directory
-│   │   ├── api/         # API routes
-│   │   └── page.tsx     # Main page component
-│   ├── components/       # React components
-│   │   ├── FileUpload.tsx
-│   │   ├── Leaderboard.tsx
-│   │   └── ShareCard.tsx
-│   ├── lib/             # Utilities and helpers
-│   │   ├── env.ts       # Environment validation
-│   │   └── utils.ts     # Common utilities
-│   └── types/           # TypeScript definitions
-├── convex/              # Backend functions
-│   ├── schema.ts        # Database schema
-│   └── submissions.ts   # Submission handlers
-└── public/              # Static assets
+│   ├── app/                  # Next.js App Router
+│   │   ├── api/
+│   │   │   ├── submit/       # POST /api/submit
+│   │   │   ├── claim/        # POST /api/claim (authenticated merge)
+│   │   │   ├── auth/         # NextAuth handlers
+│   │   │   └── health/       # GET /api/health
+│   │   ├── profile/[username]/
+│   │   ├── admin/
+│   │   └── page.tsx          # Home / leaderboard
+│   ├── components/           # React components
+│   ├── lib/
+│   │   ├── auth.ts           # Shared NextAuth options
+│   │   ├── env.ts            # Server env validation
+│   │   ├── utils.ts
+│   │   └── data/             # Backend-agnostic data layer
+│   │       ├── index.ts      # Feature-flag selector
+│   │       ├── types.ts
+│   │       ├── hooks/        # React hooks (client)
+│   │       ├── supabase/     # Active backend
+│   │       └── convex/       # Dormant fallback
+│   └── types/                # Shared TS types
+├── supabase/
+│   └── migrations/           # SQL migrations
+├── convex/                   # Dormant Convex implementation
+├── packages/
+│   ├── viberank-cli/         # `npx viberank` CLI
+│   └── viberank-mcp-server/  # MCP server (currently unmaintained)
+└── public/                   # Static assets
 ```
 
-## Coding Standards
+The data layer (`src/lib/data/`) abstracts over Supabase and Convex via the `NEXT_PUBLIC_DATABASE_BACKEND` env var. Production runs on Supabase; the Convex code path is present but dormant.
+
+## Conventions
 
 ### TypeScript
 
-- Always use TypeScript, avoid `any` types
-- Define interfaces for all props and data structures
-- Use proper type imports: `import type { ... }`
+- No `any`. Use explicit types or `unknown` and narrow.
+- `import type { ... }` for type-only imports.
+- The build currently has `typescript.ignoreBuildErrors: true` in `next.config.ts` (because of pre-existing implicit-`any`s in admin pages). Don't introduce new errors — run `pnpm exec tsc --noEmit` locally before pushing.
 
 ### React
 
-- Use functional components with hooks
-- Keep components small and focused
-- Use proper prop destructuring
-- Implement proper error boundaries
+- Functional components with hooks
+- Small, focused components — extract when a single component does too much
+- Destructure props at the parameter level
 
 ### Styling
 
-- Use Tailwind CSS classes
-- Follow the existing design system
-- Keep styles consistent with Claude's color scheme
-- Ensure responsive design works on all devices
+- Tailwind CSS 4. Use existing tokens / utilities; check `src/app/globals.css` and `tailwind.config` for theme overrides.
+- Test mobile layouts when you touch anything in `src/components/`
 
-### Git Commit Messages
+### Git commits
 
-- Use the present tense ("Add feature" not "Added feature")
-- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-- Limit the first line to 72 characters or less
-- Reference issues and pull requests liberally after the first line
+We use [Conventional Commits](https://www.conventionalcommits.org/):
 
-Examples:
+- `feat: add time-range filter to leaderboard`
+- `fix: correct token math for merged submissions`
+- `refactor: extract auth options to lib/auth.ts`
+- `chore: update env example`
+- `docs: refresh README`
+
+Keep the subject under ~72 characters. Use the body for the *why*.
+
+## Pre-PR checklist
+
+```bash
+pnpm exec tsc --noEmit   # type-check
+pnpm lint                # next lint
+pnpm build               # full production build
 ```
-feat: Add time range filtering to leaderboard
-fix: Correct GitHub avatar URL construction
-docs: Update README with deployment instructions
-style: Format code with prettier
-refactor: Extract common utilities to lib folder
-```
 
-## Testing
+Manually verify in the browser:
 
-Before submitting a PR:
+- Sign-in flow works
+- A web upload completes
+- The leaderboard renders with and without date filters
+- Mobile layout doesn't break
 
-1. Run the linter:
-   ```bash
-   pnpm lint
-   ```
+## Questions
 
-2. Run type checking:
-   ```bash
-   pnpm type-check
-   ```
-
-3. Test your changes thoroughly:
-   - Sign in/out flow works
-   - File upload works correctly
-   - Leaderboard displays properly
-   - Filters work as expected
-   - Mobile responsiveness is maintained
-
-## Questions?
-
-Feel free to open an issue with your question or reach out to the maintainers.
-
-Thank you for contributing! 🧡
+Open an issue or reach out to a maintainer. Thanks for contributing 🧡.

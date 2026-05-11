@@ -1,128 +1,92 @@
-# Viberank Data Validation System
+# Viberank data validation
 
-This document explains how viberank validates submissions to ensure fair competition and data integrity.
+How submissions are validated. Implemented in `src/lib/data/supabase/client.ts` (`validateSubmitData`) and called from `POST /api/submit`.
 
-## Overview
+## Hard rejection
 
-The validation system has two levels:
-1. **Hard Rejection** - Data that is clearly invalid or tampered with
-2. **Soft Flagging** - Data that is unusual but potentially legitimate
+If any of these fail, the API responds with `400` and the submission is not stored.
 
-## Hard Rejection (Submission Fails)
+### Token math
 
-These validations will cause the submission to be rejected with an error message:
-
-### 1. Token Math Verification
-```javascript
+```
 inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens = totalTokens
 ```
-- Must match within 1 token (floating point tolerance)
-- Prevents manual data tampering
-- Ensures data comes from official ccusage tool
 
-### 2. Negative Values
-- No negative values allowed anywhere in the data
-- Applies to all token counts and costs
+Tolerance: ±1 token (floating point). Mismatch is treated as evidence the JSON was hand-edited and rejected with a hint to regenerate via `ccusage`.
 
-### 3. Date Validation
-- Dates must be in YYYY-MM-DD format
-- No future dates allowed
-- Prevents accidental or intentional date manipulation
+### No negative values
 
-### 4. Extreme Values
-- Total cost > $1,825,000 (365 days × $5,000/day)
-- Total tokens > 18.25 billion (365 days × 50M/day)
-- Cost per token ratio outside 0.000001 to 0.1 range
+Rejected if any token count or cost is negative — applies to totals and to every entry in `daily`.
 
-### 5. Data Consistency
-- Daily token sums must match daily totals
-- Each day's data is validated independently
+### Date format
 
-## Soft Flagging (Hidden from Leaderboard)
+Daily entries must use `YYYY-MM-DD`. Anything else is rejected with the offending value in the error message.
 
-These submissions are accepted but flagged for review:
+### Future-date cutoff
 
-### 1. High Daily Usage
-- Daily cost > $5,000
-- Daily tokens > 250 million (increased 5x from 50M to reduce false positives)
-- These are possible but rare
+A daily entry is rejected if its date is later than **end-of-tomorrow UTC**.
 
-### 2. High Average Usage
-- Average daily cost > $2,500
-- Indicates sustained high usage
+The cutoff is intentionally one day past UTC midnight rather than today, because `cc.json` is emitted in the user's local timezone and `ccusage` groups by local day. Users at UTC+14 (e.g., New Zealand near midnight local time) can otherwise produce entries that look future-dated from the server's UTC perspective. See [#44](https://github.com/sculptdotfun/viberank/issues/44).
 
-### 3. Flagging Behavior
-- Submissions are stored but marked with `flaggedForReview: true`
-- Includes `flagReasons` array explaining why it was flagged
-- Hidden from main leaderboard by default
-- Can be shown with `includeFlagged: true` parameter
+### Realistic total cost
 
-## Multiple Submissions Handling
+`totalCost > $5,000 × 365` (~$1,825,000) is rejected as out of reasonable bounds.
 
-When users submit overlapping date ranges:
+## Soft flagging
 
-1. **Find Overlap**: Check if any existing submission has overlapping dates
-2. **Merge Daily Data**: 
-   - Keep days from old submission that aren't in new one
-   - Update days that exist in both
-   - Add new days from new submission
-3. **Recalculate Totals**: Sum all tokens and costs from merged daily data
-4. **Update Date Range**: Expand to cover all dates
-5. **Preserve History**: No data is lost in the merge
+The schema supports a `flagged_for_review` boolean per submission. Flagged rows are hidden from the leaderboard by default (`includeFlagged: true` reveals them via the admin endpoint).
 
-## Example Validation Flow
+Currently, flagging is **manual only** — admins can toggle the flag through the `/admin` UI. There is no automatic flagging in the submit path. (The original Convex implementation had heuristic auto-flagging for very high daily cost / sustained averages; that logic was not ported to the Supabase backend.)
 
-```javascript
-// 1. Check token math
-if (Math.abs(calculatedTotal - providedTotal) > 1) {
-  throw Error("Token totals don't match");
-}
+## Multiple submissions
 
-// 2. Check each day
-for (const day of dailyData) {
-  if (day.cost < 0) throw Error("Negative values not allowed");
-  if (day.cost > 5000) flag("High daily cost");
-  if (new Date(day.date) > today) throw Error("Future date");
-}
+When a user submits an overlapping date range:
 
-// 3. Check totals
-if (costPerToken < 0.000001) throw Error("Unrealistic cost/token");
+1. The API looks up existing submissions under the same `github_username` and `source`
+2. If one overlaps the new range, it's merged: existing daily entries are kept for dates not in the new submission; entries that exist in both are replaced by the new entry; new entries are added
+3. Totals are recalculated from the merged daily set
+4. `date_range_start` / `date_range_end` are widened to cover everything
+5. Non-overlapping submissions create a new row
 
-// 4. If flagged, still accept but mark
-if (flagged) {
-  submission.flaggedForReview = true;
-  submission.flagReasons = reasons;
-}
-```
+### Known limitation
 
-## Why These Limits?
+Submitting from **two different machines** with overlapping dates causes the second submission's daily entries to overwrite the first's for shared dates — see [#43](https://github.com/sculptdotfun/viberank/issues/43). Until that's resolved, submit from one machine at a time.
 
-- **$5,000/day**: Based on heavy commercial usage patterns
-- **50M tokens/day**: Roughly 100 million words of processing
-- **Cost/token ratios**: Based on Claude's actual pricing
-- **Future dates**: Prevents pre-dating submissions
+## Merge flow (claim and combine)
 
-## Future Improvements
+Separate from the per-submit merge above, signed-in users can consolidate any unverified `cli` submissions under their GitHub username into a single verified record via `POST /api/claim`. The flow:
 
-- Admin dashboard to review flagged submissions
-- Auto-verification for consistent high-usage accounts
-- User appeals process for false positives
-- Dynamic limits based on historical data
+1. Find every submission whose `github_username` matches the session user
+2. Pick a base: prefer OAuth-verified rows, else the most recent
+3. Merge daily breakdowns — OAuth entries win on conflict
+4. Recompute totals, set `verified: true` on the base
+5. Delete duplicate submissions
+6. Recompute `profiles.total_submissions` from a fresh `COUNT(*)` and repoint `best_submission_id` at the surviving base
 
-## For Developers
+The username comes from the authenticated session, never the client request body — anyone can submit under any GitHub handle via the CLI, but only the actual GitHub owner can claim/merge it.
 
-If you're building tools that submit to viberank:
+## Trust signals on the leaderboard
 
-1. Use official ccusage tool for data generation
-2. Don't modify the JSON structure
-3. Submit data promptly (avoid batching months of data)
-4. Contact us if you have legitimate high usage that gets flagged
+- **OAuth-submitted rows** (uploaded via a signed-in session, or claimed by their owner) display a blue verified check
+- **Unverified CLI rows** (raw `curl` / `npx viberank` without OAuth claim) display a muted `cli` pill
 
-## Questions?
+The CLI submission path trusts the `X-GitHub-User` header as the username — by design, since the CLI doesn't authenticate. The badge difference exists so leaderboard viewers can tell the two apart.
 
-If your legitimate submission is being flagged or rejected, please open an issue on GitHub with:
-- The error message you received
-- General description of your usage pattern
-- Date range of your submission
+## For tool authors
 
-We're committed to maintaining a fair and accurate leaderboard for the Claude Code community!
+If you're building something that submits to viberank:
+
+1. Use the official `ccusage` tool to generate the JSON
+2. Don't reshape the data — the validator requires Claude-shaped token fields (`input`, `output`, `cache_creation`, `cache_read`)
+3. Submit promptly rather than batching months
+4. If you have legitimate usage that exceeds the cost cap, open an issue
+
+Non-Claude tools (OpenAI Codex, etc.) are not yet supported — see [#45](https://github.com/sculptdotfun/viberank/issues/45) for the design discussion.
+
+## Questions
+
+If a legitimate submission is rejected or flagged, open an issue with:
+
+- The exact error message
+- The date range
+- A general description of the usage pattern

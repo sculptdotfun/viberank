@@ -1,218 +1,158 @@
 # viberank
 
-A community-driven leaderboard for Claude Code (formerly Claude Engineer) usage. Track your AI-assisted coding progress and compete with developers worldwide.
+A community-driven leaderboard for [Claude Code](https://claude.com/claude-code) usage. Submit your `ccusage` stats and see how you rank.
 
 ![viberank](https://img.shields.io/badge/viberank-Track%20Your%20Claude%20Code%20Usage-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Next.js](https://img.shields.io/badge/Next.js-15.3.4-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 
-## Overview
+Live at **[viberank.app](https://www.viberank.app)**.
 
-viberank is an open-source leaderboard where developers can upload their Claude Code usage statistics and see how they rank globally. Built with Next.js, TypeScript, and Convex, it provides a minimal, sophisticated interface inspired by Claude's design principles.
+## Features
 
-### Features
+- 🏆 **Global leaderboard** by cost or tokens, with 7d / 30d / custom date filters
+- 📊 **Profile pages** at `viberank.app/profile/{username}` with daily charts and model breakdown
+- 🚀 **Three ways to submit**: `npx viberank` CLI, plain `curl`, or signed-in web upload
+- 🔐 **GitHub OAuth** — verified submissions show a blue check; unverified CLI submissions show a `cli` pill
+- 🛡️ **Input validation** — token math, date sanity, daily-cost ceilings
+- 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
 
-- 🏆 **Global Leaderboard** - See how you rank among Claude Code users worldwide
-- 📊 **Profile Pages** - Beautiful profiles at `viberank.app/profile/{username}` with usage charts
-- 🚀 **Multiple Submission Methods** - CLI tool, curl command, or web upload
-- 📈 **Usage Analytics** - Track your token usage and costs over time with interactive charts
-- 🔍 **Advanced Filtering** - View rankings by custom date ranges (7d, 30d, all time)
-- 🔐 **GitHub Authentication** - Secure sign-in with GitHub OAuth
-- 🛡️ **Data Validation** - Automatic validation to ensure fair competition
-- 🔄 **Smart Merging** - Submit multiple times without data loss
-- 📱 **Responsive Design** - Beautiful on desktop and mobile
-- 🎯 **Share Cards** - Share your achievements on social media
+## Submitting your usage data
 
-## Getting Started
-
-### Submitting Your Usage Data
-
-#### Option 1: Using the viberank CLI (Recommended)
-
-The easiest way to submit your usage data:
+### Option 1: `npx viberank` (recommended)
 
 ```bash
 npx viberank
 ```
 
-This will:
-- Automatically detect your GitHub username from git config
-- Generate your usage data using ccusage
-- Submit it to the leaderboard
-- Give you a direct link to your profile
+This generates a fresh `cc.json` via `ccusage` and POSTs it to `/api/submit`. It picks up your GitHub username from `git config user.name`.
 
-#### Option 2: MCP Server (for Claude Desktop)
-
-If you're using Claude Desktop or another MCP-compatible client, you can use our MCP server for seamless integration:
-
-```json
-// Add to ~/Library/Application Support/Claude/claude_desktop_config.json
-{
-  "mcpServers": {
-    "viberank": {
-      "command": "npx",
-      "args": ["viberank-mcp-server"]
-    }
-  }
-}
-```
-
-Then just ask Claude: "Submit my usage stats to Viberank"
-
-#### Option 3: Using curl
-
-If you prefer to use curl directly:
+### Option 2: curl
 
 ```bash
-# Generate usage data
 npx ccusage@latest --json > cc.json
-
-# Get your GitHub username
-GITHUB_USER=$(git config user.name)
-
-# Submit to viberank
 curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
-  -H "X-GitHub-User: $GITHUB_USER" \
+  -H "X-GitHub-User: $(git config user.name)" \
   -d @cc.json
 ```
 
-#### Option 4: Web Upload
+### Option 3: Web upload
 
-1. Visit [viberank.app](https://viberank.app)
-2. Sign in with GitHub
-3. Click "Submit Your Stats"
-4. Upload your `cc.json` file
+1. Sign in to [viberank.app](https://www.viberank.app) with GitHub
+2. Click **Submit Stats** → **Upload cc.json**
+3. Drop your `cc.json` file
 
-### Profile Pages
+Web uploads come back with a verified badge automatically. CLI submissions show as unverified until you sign in and merge them via the prompt on the homepage.
 
-Every user gets a beautiful profile page at `viberank.app/profile/{github-username}` featuring:
+### Option 4: MCP server
 
-- 📊 **Usage Chart** - Interactive area chart showing daily costs over time
-- 📈 **Statistics** - Total cost, tokens, days active, and averages
-- 📝 **Submission History** - Detailed breakdown of all submissions
-- 🏷️ **Model Usage** - See which Claude models you use most
-- 🔗 **GitHub Integration** - Links to your GitHub profile
+If you use a Claude Code MCP-compatible client, the [`viberank-mcp-server`](./packages/viberank-mcp-server) exposes submit and lookup tools. (Note: this package is currently unmaintained — see [issue tracker](https://github.com/sculptdotfun/viberank/issues) for status.)
 
-### Data Validation & Fair Play
+## Data validation
 
-To maintain leaderboard integrity, viberank validates all submissions:
+Submissions are checked at the API level. Anything that fails these rules is rejected:
 
-#### Automatic Validation
-- ✅ **Token math verification** - Ensures input + output + cache tokens = total
-- ✅ **Negative value check** - Rejects any negative values
-- ✅ **Date validation** - No future dates allowed
-- ✅ **Realistic limits** - Flags unusually high usage for review
+- **Token math** — `input + output + cache_creation + cache_read = total` (within 1 token of tolerance)
+- **No negative values** anywhere in totals or daily breakdowns
+- **Valid date format** — `YYYY-MM-DD`
+- **Not too far in the future** — dates after tomorrow-UTC are rejected (covers users at any global timezone offset)
+- **Realistic ranges** — total cost can't exceed `$5,000 × 365 days`
 
-#### Validation Limits
-- Maximum daily cost: $5,000
-- Maximum daily tokens: 250 million
-- Cost per token ratio: 0.000001 to 0.1
+Submissions can also be flagged for review by an admin via `/admin`; flagged rows are hidden from the leaderboard by default.
 
-Submissions exceeding these limits are flagged for review and hidden from the main leaderboard to ensure fair competition.
+See [VALIDATION.md](./VALIDATION.md) for the full ruleset.
 
-### Multiple Submissions
+## Merging multiple submissions
 
-viberank intelligently handles multiple submissions:
-- **Overlapping dates**: Merges data at the daily level, preserving all your usage history
-- **Non-overlapping dates**: Adds to your profile without affecting existing data
-- **Updates**: Submit new data anytime - it will merge with existing data without loss
+If you submit via the CLI before signing in, the row lands on the leaderboard as **unverified** (`cli` pill). Once you sign in with the matching GitHub account, the homepage shows a banner offering to verify or merge. That hits an authenticated `/api/claim` endpoint which:
+
+1. Finds all submissions under your GitHub username
+2. Picks a base submission (OAuth-verified row wins; else most recent)
+3. Merges daily breakdowns — overlapping dates take the OAuth version
+4. Recomputes totals, sets `verified: true`, deletes the duplicates
+
+**Known limitation:** submitting from multiple machines with overlapping dates currently overwrites instead of summing daily data — see [#43](https://github.com/sculptdotfun/viberank/issues/43). Submit from one machine at a time until that's resolved.
 
 ## Development
 
 ### Prerequisites
 
-- Node.js 18+ and pnpm
-- A [Convex](https://convex.dev) account
-- GitHub OAuth App credentials
+- Node.js 18+ and pnpm 10+
+- A [Supabase](https://supabase.com) project (free tier is fine)
+- A GitHub OAuth app
 
-### Installation
+### Setup
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/sculptdotfun/viberank.git
 cd viberank
-```
-
-2. Install dependencies:
-```bash
 pnpm install
-```
-
-3. Set up environment variables:
-```bash
 cp .env.example .env.local
 ```
 
-4. Configure your `.env.local`:
+Fill in `.env.local` (see `.env.example` for the full list). The required keys are:
+
 ```env
-# Convex
-NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+NEXT_PUBLIC_DATABASE_BACKEND=supabase
 
-# NextAuth
 NEXTAUTH_URL=http://localhost:3001
-NEXTAUTH_SECRET=your-secret-here # Generate with: openssl rand -base64 32
+NEXTAUTH_SECRET=<openssl rand -base64 32>
 
-# GitHub OAuth
-GITHUB_ID=your-github-oauth-app-id
-GITHUB_SECRET=your-github-oauth-app-secret
+GITHUB_ID=<github-oauth-client-id>
+GITHUB_SECRET=<github-oauth-client-secret>
 ```
 
-5. Set up Convex:
+Apply the schema:
+
 ```bash
-npx convex dev
+# Run the SQL in supabase/migrations/001_initial_schema.sql against your project,
+# either via the Supabase SQL editor or the supabase CLI.
 ```
 
-6. Run the development server:
+Run the dev server:
+
 ```bash
 pnpm dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) to see the app.
+Open <http://localhost:3001>.
 
-## Tech Stack
+### Useful scripts
 
-- **Frontend**: Next.js 15, TypeScript, Tailwind CSS
-- **Database**: Convex (real-time, serverless)
-- **Authentication**: NextAuth.js with GitHub OAuth
-- **Charts**: Recharts for data visualization
-- **Animations**: Framer Motion
-- **Styling**: Tailwind CSS with custom Claude-inspired theme
-- **CLI Tool**: Node.js with prompts and chalk
-- **Development**: Turbopack, ESLint, Prettier
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Start Next dev server (Turbopack) on port 3001 |
+| `pnpm build` | Production build |
+| `pnpm start` | Serve the production build |
+| `pnpm lint` | Run `next lint` |
+| `pnpm exec tsc --noEmit` | Type-check without emitting |
 
-## Troubleshooting
+## Tech stack
 
-### npx viberank not working?
+- **Frontend**: Next.js 16, React 19, TypeScript 5, Tailwind CSS 4
+- **Backend**: Next.js API routes + Supabase (Postgres)
+- **Auth**: NextAuth.js v4 with GitHub OAuth
+- **Charts**: Recharts
+- **Animation**: Framer Motion
+- **Hosting**: Vercel
 
-If you encounter issues with `npx viberank`, try:
+The repo also contains a dormant Convex implementation behind a feature flag (`NEXT_PUBLIC_DATABASE_BACKEND=convex`); Supabase is the active backend in production.
 
-1. **Clear npx cache**: `npx clear-npx-cache`
-2. **Use the latest version explicitly**: `npx viberank@latest`
-3. **Install globally** (optional): `npm install -g viberank` then run `viberank`
-4. **Check Node version**: Ensure you have Node.js 14 or higher
+## API
 
-### Common Issues
+### `POST /api/submit`
 
-- **"Failed to submit data"**: Check that your cc.json file is valid JSON
-- **"GitHub username not found"**: Run `git config --global user.name "YourGitHubUsername"`
-- **"No usage data found"**: Make sure you've used Claude Code at least once
+Submit usage data. Authenticated submissions (with a NextAuth session cookie) are marked `verified: true`; otherwise the request must include an `X-GitHub-User` header.
 
-## API Documentation
+**Body**: contents of `cc.json` (output of `npx ccusage --json`).
 
-### POST /api/submit
+**Response**:
 
-Submit usage data programmatically:
-
-```bash
-curl -X POST https://www.viberank.app/api/submit \
-  -H "Content-Type: application/json" \
-  -H "X-GitHub-User: YOUR_GITHUB_USERNAME" \
-  -d @cc.json
-```
-
-Response:
 ```json
 {
   "success": true,
@@ -222,62 +162,40 @@ Response:
 }
 ```
 
-## Contributing
+### `POST /api/claim`
 
-We love contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+Authenticated — merges unverified CLI submissions into the caller's verified profile. Username is taken from the session, not the request body. Returns 401 without a session.
 
-### Development Workflow
+### `GET /api/health`
 
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+Returns backend status:
 
-### Code Style
-
-- We use ESLint and Prettier for code formatting
-- Run `pnpm lint` to check for linting errors
-- Run `pnpm format` to format code
+```json
+{ "api": "ok", "backend": "supabase", "backendConnection": "ok", "timestamp": "..." }
+```
 
 ## Deployment
 
-### Deploy on Vercel
+Designed to run on Vercel. Push to `main` to trigger an auto-deploy. The required production env vars are the same as `.env.example`; make sure `SUPABASE_SERVICE_ROLE_KEY` and the `NEXT_PUBLIC_*` Supabase vars are also listed in `turbo.json`'s `build.env` allowlist so Turbo passes them through.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sculptdotfun/viberank)
 
-### Environment Variables for Production
+## Contributing
 
-- `NEXT_PUBLIC_CONVEX_URL`
-- `NEXTAUTH_URL` (your production URL)
-- `NEXTAUTH_SECRET`
-- `GITHUB_ID`
-- `GITHUB_SECRET`
-
-## Security
-
-- All authentication is handled through GitHub OAuth
-- Usage data is validated to ensure it comes from the official ccusage tool
-- No sensitive data is stored - only aggregated usage statistics
-- Suspicious submissions are automatically flagged for review
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[MIT](./LICENSE).
 
 ## Acknowledgments
 
-- [Claude](https://claude.ai) by Anthropic for making AI-assisted coding amazing
-- [ccusage](https://github.com/ryoppippi/ccusage) for the usage tracking tool
-- The Claude Code community for inspiration
+- [Claude Code](https://claude.com/claude-code) by Anthropic
+- [ccusage](https://github.com/ryoppippi/ccusage) — the usage tracker that produces `cc.json`
 
 ## Links
 
-- [Website](https://viberank.app)
+- [Website](https://www.viberank.app)
 - [GitHub](https://github.com/sculptdotfun/viberank)
-- [Report Issues](https://github.com/sculptdotfun/viberank/issues)
-- [NPM Package](https://www.npmjs.com/package/viberank)
-
----
-
-Made with 🧡 by the viberank community
+- [Report issues](https://github.com/sculptdotfun/viberank/issues)
+- [`viberank` on npm](https://www.npmjs.com/package/viberank)

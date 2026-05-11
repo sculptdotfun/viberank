@@ -71,10 +71,12 @@ curl -X POST https://www.viberank.app/api/submit \
 ## Data Validation
 
 Your submissions are automatically validated to ensure data integrity:
-- Token calculations must be correct
+- Token calculations must add up correctly (`input + output + cache_creation + cache_read = total`)
 - No negative values allowed
-- Dates must be valid and not in the future
-- Extremely high usage may be flagged for review
+- Dates must be valid `YYYY-MM-DD` and not far in the future (the server allows up to end-of-tomorrow UTC to cover all timezones)
+- Submissions with implausibly high total cost are rejected; high daily usage may be flagged for review
+
+For full details see [VALIDATION.md](https://github.com/sculptdotfun/viberank/blob/main/VALIDATION.md).
 
 ## About
 
