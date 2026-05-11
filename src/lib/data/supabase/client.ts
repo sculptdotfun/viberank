@@ -531,28 +531,36 @@ class SupabaseSubmissionsService implements SubmissionsService {
     const includeFlagged = params.includeFlagged || false;
     const sortBy = params.sortBy || "cost";
 
-    // This query uses a Postgres function for date-filtered aggregation
-    // For now, we'll do it in the application layer (like Convex does)
-    let query = this.client.from("submissions").select("*");
+    // Date-range totals can't be derived from `submissions.total_cost` (which
+    // covers a submission's full range, not the requested window) so we have
+    // to aggregate `daily_breakdowns`. Push the range filter down to the DB:
+    // only fetch submissions whose date_range overlaps the requested window.
+    // Hard cap of 5000 is a safety belt — viberank has ~hundreds of rows.
+    const SUBMISSION_CAP = 5000;
+    let query = this.client
+      .from("submissions")
+      .select("*")
+      .lte("date_range_start", params.dateTo)
+      .gte("date_range_end", params.dateFrom);
 
     if (!includeFlagged) {
       query = query.or("flagged_for_review.is.null,flagged_for_review.eq.false");
     }
 
-    const { data: submissions } = await query.limit(100);
+    const { data: submissions } = await query.limit(SUBMISSION_CAP);
 
-    if (!submissions) {
+    if (!submissions || submissions.length === 0) {
       return { items: [], hasMore: false };
     }
 
-    // Fetch all daily breakdowns
     const submissionIds = submissions.map((s) => s.id);
     const { data: allDailyBreakdowns } = await this.client
       .from("daily_breakdowns")
       .select("*")
       .in("submission_id", submissionIds)
       .gte("date", params.dateFrom)
-      .lte("date", params.dateTo);
+      .lte("date", params.dateTo)
+      .limit(50000);
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
     (allDailyBreakdowns || []).forEach((db) => {
@@ -561,14 +569,12 @@ class SupabaseSubmissionsService implements SubmissionsService {
       dailyBySubmission.set(db.submission_id, existing);
     });
 
-    // Filter and aggregate
     const processedItems: Submission[] = [];
 
     for (const submission of submissions) {
       const filteredDaily = dailyBySubmission.get(submission.id) || [];
       if (filteredDaily.length === 0) continue;
 
-      // Calculate totals for filtered date range
       const totals = filteredDaily.reduce(
         (acc, day) => ({
           totalCost: acc.totalCost + Number(day.total_cost),
@@ -589,21 +595,21 @@ class SupabaseSubmissionsService implements SubmissionsService {
       );
 
       const converted = convertDbSubmissionToSubmission(submission, filteredDaily);
-      // Override with filtered totals
       processedItems.push({
         ...converted,
         ...totals,
       });
     }
 
-    // Sort
     processedItems.sort((a, b) =>
       sortBy === "cost" ? b.totalCost - a.totalCost : b.totalTokens - a.totalTokens
     );
 
+    const hasMore = processedItems.length > limit;
+
     return {
       items: processedItems.slice(0, limit),
-      hasMore: processedItems.length > limit,
+      hasMore,
       needsMoreData: false,
     };
   }
