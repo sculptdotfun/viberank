@@ -72,6 +72,8 @@ export function clearDatabaseBackendOverride(): void {
 // Cache instances to avoid re-creating clients
 let convexDataLayer: DataLayer | null = null;
 let supabaseDataLayer: DataLayer | null = null;
+let convexServerDataLayer: DataLayer | null = null;
+let supabaseServerDataLayer: DataLayer | null = null;
 
 /**
  * Get the data layer for the current backend (client-side)
@@ -104,12 +106,18 @@ export async function getServerDataLayer(): Promise<DataLayer> {
   const backend = getDatabaseBackend();
 
   if (backend === "supabase") {
-    const { createSupabaseServerDataLayer } = await import("./supabase/client");
-    return createSupabaseServerDataLayer();
+    if (!supabaseServerDataLayer) {
+      const { createSupabaseServerDataLayer } = await import("./supabase/client");
+      supabaseServerDataLayer = createSupabaseServerDataLayer();
+    }
+    return supabaseServerDataLayer;
   }
 
-  const { createConvexServerDataLayer } = await import("./convex/client");
-  return createConvexServerDataLayer();
+  if (!convexServerDataLayer) {
+    const { createConvexServerDataLayer } = await import("./convex/client");
+    convexServerDataLayer = createConvexServerDataLayer();
+  }
+  return convexServerDataLayer;
 }
 
 // ============================================================================
