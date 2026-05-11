@@ -283,8 +283,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (error.message.includes("mutation") || error.message.includes("query")) {
+        // Don't echo the raw DB message — it can leak schema/table names.
+        console.error("Database mutation/query error:", error.message);
         return NextResponse.json(
-          { error: `Database error: ${error.message}` },
+          { error: "Database operation failed. Please try again later." },
           { status: 500 }
         );
       }
@@ -308,19 +310,8 @@ export async function POST(request: NextRequest) {
       message: (error as any)?.message || (error as any)?.toString(),
     });
 
-    // Provide more detailed error message for unknown errors
-    const errorMessage = error instanceof Error
-      ? error.message
-      : (typeof error === 'string' ? error : 'Unknown error occurred');
-
-    // If the error message contains useful information, include it
-    if (errorMessage && !errorMessage.includes('undefined') && errorMessage.length < 200) {
-      return NextResponse.json(
-        { error: `Submission failed: ${errorMessage}. Please try again or contact support if the issue persists.` },
-        { status: 500 }
-      );
-    }
-
+    // Don't forward the raw error string to the client — it may include
+    // database schema details or internal stack info.
     return NextResponse.json(
       { error: "Failed to submit data. Please check your cc.json file format and try again. If this issue persists, please contact support." },
       { status: 500 }
