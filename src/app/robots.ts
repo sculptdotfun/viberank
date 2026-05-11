@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/private/'],
     },
-    sitemap: 'https://viberank.com/sitemap.xml',
+    sitemap: 'https://www.viberank.app/sitemap.xml',
   }
 }

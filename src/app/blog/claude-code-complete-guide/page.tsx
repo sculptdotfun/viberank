@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Claude Code Complete Guide 2025: Installation, Commands & Best Practices",
     description: "Master Claude Code with this comprehensive guide covering installation, commands, MCP servers, and advanced workflows.",
-    url: "https://viberank.com/blog/claude-code-complete-guide",
+    url: "https://www.viberank.app/blog/claude-code-complete-guide",
     type: "article",
     publishedTime: "2025-10-12T00:00:00.000Z",
     authors: ["Viberank Team"],
@@ -36,21 +36,21 @@ export default function ClaudeCodeCompleteGuide() {
     "@type": "BlogPosting",
     "headline": "Claude Code Complete Guide 2025: Installation, Commands & Best Practices",
     "description": "Master Claude Code in 2025 with this comprehensive guide covering installation, essential commands, MCP servers, and advanced workflows.",
-    "image": "https://viberank.com/api/og?title=Claude%20Code%20Complete%20Guide%202025",
+    "image": "https://www.viberank.app/api/og?title=Claude%20Code%20Complete%20Guide%202025",
     "datePublished": "2025-10-12T00:00:00.000Z",
     "dateModified": "2025-10-12T00:00:00.000Z",
     "author": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com"
+      "url": "https://www.viberank.app"
     },
     "publisher": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com",
+      "url": "https://www.viberank.app",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://viberank.com/icon.svg"
+        "url": "https://www.viberank.app/icon.svg"
       }
     }
   };
@@ -436,7 +436,7 @@ export default function ClaudeCodeCompleteGuide() {
               <h3 className="text-accent font-semibold text-lg mb-2">3. Track Your Usage</h3>
               <p className="text-foreground m-0">
                 Claude Code saves usage data in <code className="bg-stone-800 px-2 py-1 rounded text-accent">~/.claude/cc.json</code>.
-                Upload it to <a href="https://viberank.com" className="text-accent hover:underline">Viberank</a> to
+                Upload it to <a href="https://www.viberank.app" className="text-accent hover:underline">Viberank</a> to
                 track your stats and see how you compare to other developers.
               </p>
             </div>

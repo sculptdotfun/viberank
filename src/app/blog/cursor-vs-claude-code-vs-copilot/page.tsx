@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Cursor vs Claude Code vs GitHub Copilot: AI Coding Tools Compared (2025)",
     description: "In-depth comparison of the top AI coding assistants. Features, pricing, and which one fits your workflow.",
-    url: "https://viberank.com/blog/cursor-vs-claude-code-vs-copilot",
+    url: "https://www.viberank.app/blog/cursor-vs-claude-code-vs-copilot",
     type: "article",
     publishedTime: "2025-11-28T00:00:00.000Z",
     authors: ["Viberank Team"],
@@ -36,21 +36,21 @@ export default function CursorVsClaudeCodeVsCopilot() {
     "@type": "BlogPosting",
     "headline": "Cursor vs Claude Code vs GitHub Copilot: AI Coding Tools Compared (2025)",
     "description": "In-depth comparison of the top AI coding assistants for developers in 2025.",
-    "image": "https://viberank.com/api/og?title=Cursor%20vs%20Claude%20Code%20vs%20Copilot",
+    "image": "https://www.viberank.app/api/og?title=Cursor%20vs%20Claude%20Code%20vs%20Copilot",
     "datePublished": "2025-11-28T00:00:00.000Z",
     "dateModified": "2025-11-28T00:00:00.000Z",
     "author": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com"
+      "url": "https://www.viberank.app"
     },
     "publisher": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com",
+      "url": "https://www.viberank.app",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://viberank.com/icon.svg"
+        "url": "https://www.viberank.app/icon.svg"
       }
     }
   };

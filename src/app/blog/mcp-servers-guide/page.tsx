@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
     description: "Extend Claude Code with MCP servers. Connect to GitHub, databases, Slack, and more.",
-    url: "https://viberank.com/blog/mcp-servers-guide",
+    url: "https://www.viberank.app/blog/mcp-servers-guide",
     type: "article",
     publishedTime: "2025-12-15T00:00:00.000Z",
     authors: ["Viberank Team"],
@@ -36,21 +36,21 @@ export default function MCPServersGuide() {
     "@type": "BlogPosting",
     "headline": "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
     "description": "Learn how to extend Claude Code with MCP servers for powerful AI integrations.",
-    "image": "https://viberank.com/api/og?title=MCP%20Servers%20Guide",
+    "image": "https://www.viberank.app/api/og?title=MCP%20Servers%20Guide",
     "datePublished": "2025-12-15T00:00:00.000Z",
     "dateModified": "2025-12-15T00:00:00.000Z",
     "author": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com"
+      "url": "https://www.viberank.app"
     },
     "publisher": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com",
+      "url": "https://www.viberank.app",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://viberank.com/icon.svg"
+        "url": "https://www.viberank.app/icon.svg"
       }
     }
   };

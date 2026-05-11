@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Vibe Coding Explained: What Karpathy's Viral Term Really Means",
     description: "From Karpathy's viral tweet to Claude Code and Cursor—understand what vibe coding really means for developers.",
-    url: "https://viberank.com/blog/vibe-coding-revolution",
+    url: "https://www.viberank.app/blog/vibe-coding-revolution",
     type: "article",
     publishedTime: "2025-09-05T00:00:00.000Z",
     authors: ["Viberank Team"],
@@ -35,21 +35,21 @@ export default function VibeCodingRevolution() {
     "@type": "BlogPosting",
     "headline": "Vibe Coding Explained: What Karpathy's Viral Term Really Means",
     "description": "Understand vibe coding—from Andrej Karpathy's viral tweet to how developers use Claude Code, Cursor, and Conductor.",
-    "image": "https://viberank.com/api/og?title=Vibe%20Coding%20Explained",
+    "image": "https://www.viberank.app/api/og?title=Vibe%20Coding%20Explained",
     "datePublished": "2025-09-05T00:00:00.000Z",
     "dateModified": "2025-09-05T00:00:00.000Z",
     "author": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com"
+      "url": "https://www.viberank.app"
     },
     "publisher": {
       "@type": "Organization",
       "name": "Viberank",
-      "url": "https://viberank.com",
+      "url": "https://www.viberank.app",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://viberank.com/icon.svg"
+        "url": "https://www.viberank.app/icon.svg"
       }
     }
   };

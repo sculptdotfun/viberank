@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Viberank - Claude Code Usage Leaderboard",
     description: "Track and compare your Claude Code usage with developers worldwide. View detailed analytics and climb the AI development leaderboard.",
-    url: "https://viberank.com",
+    url: "https://www.viberank.app",
     siteName: "Viberank",
     images: [
       {
@@ -60,14 +60,9 @@ export const metadata: Metadata = {
     icon: "/icon.svg",
     apple: "/apple-icon",
   },
-  metadataBase: new URL("https://viberank.com"),
+  metadataBase: new URL("https://www.viberank.app"),
   alternates: {
-    canonical: "https://viberank.com",
-  },
-  verification: {
-    google: "",
-    yandex: "",
-    yahoo: "",
+    canonical: "https://www.viberank.app",
   },
 };
 
@@ -76,30 +71,38 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Viberank",
-    "description": "Track and compare Claude Code usage across developers. View detailed analytics and climb the AI development leaderboard.",
-    "url": "https://viberank.com",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "Any",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "author": {
-      "@type": "Organization",
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
       "name": "Viberank",
-      "url": "https://viberank.com"
+      "description": "Track and compare Claude Code usage across developers. View detailed analytics and climb the AI development leaderboard.",
+      "url": "https://www.viberank.app",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Viberank",
+        "url": "https://www.viberank.app"
+      }
     },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "ratingCount": "1000"
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Viberank",
+      "url": "https://www.viberank.app",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.viberank.app/profile/{search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
     }
-  };
+  ];
 
   return (
     <html lang="en">
