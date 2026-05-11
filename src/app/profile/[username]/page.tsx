@@ -12,6 +12,23 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useState } from "react";
 import { useProfile } from "@/lib/data/hooks/useProfiles";
 
+// Parse a ccusage model id like "claude-opus-4-7-20260201" into a display
+// label ("Opus 4.7"). Falls back to "Claude" on unrecognized strings.
+function formatModelLabel(modelId: string): string {
+  const family = modelId.includes("opus")
+    ? "Opus"
+    : modelId.includes("sonnet")
+    ? "Sonnet"
+    : modelId.includes("haiku")
+    ? "Haiku"
+    : null;
+
+  if (!family) return "Claude";
+
+  const version = modelId.match(/-(\d+)-(\d+)(?:-|$)/);
+  return version ? `${family} ${version[1]}.${version[2]}` : family;
+}
+
 export default function ProfilePage() {
   const params = useParams();
   const username = decodeURIComponent(params.username as string);
@@ -150,11 +167,7 @@ export default function ProfilePage() {
                   {primaryModel && (
                     <span className="flex items-center gap-1">
                       <Code2 className="w-4 h-4" />
-                      {primaryModel.includes("opus-4-5") ? "Opus 4.5" :
-                       primaryModel.includes("opus") ? "Opus 4" :
-                       primaryModel.includes("sonnet-4-5") ? "Sonnet 4.5" :
-                       primaryModel.includes("sonnet") ? "Sonnet 4" :
-                       primaryModel.includes("haiku") ? "Haiku 4.5" : "Claude"} user
+                      {formatModelLabel(primaryModel)} user
                     </span>
                   )}
                 </div>
