@@ -300,11 +300,20 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
                           <span className="text-sm font-medium group-hover:text-accent transition-colors truncate">
                             {submission.githubUsername || submission.username}
                           </span>
-                          {submission.verified && (
+                          {submission.verified ? (
                             <div className="relative group/badge">
                               <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-card border border-border rounded text-[10px] text-muted whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
                                 GitHub verified
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="relative group/badge">
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1 py-px rounded bg-muted/15 text-muted flex-shrink-0">
+                                cli
+                              </span>
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-card border border-border rounded text-[10px] text-muted whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
+                                Unverified CLI submission
                               </div>
                             </div>
                           )}
