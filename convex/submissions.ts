@@ -23,7 +23,13 @@ export const submit = mutation({
       }),
       daily: v.array(
         v.object({
-          date: v.string(),
+          // ccusage <19 emitted `date`; ccusage >=19 default `--json` emits
+          // `period` (plus `agent`/`metadata`). Accept either; the handler
+          // normalizes `period` -> `date` before validating/storing.
+          date: v.optional(v.string()),
+          period: v.optional(v.string()),
+          agent: v.optional(v.string()),
+          metadata: v.optional(v.any()),
           inputTokens: v.number(),
           outputTokens: v.number(),
           cacheCreationTokens: v.number(),
@@ -121,9 +127,14 @@ export const submit = mutation({
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     
     for (const day of ccData.daily) {
-      if (!dateRegex.test(day.date)) {
-        throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
+      // ccusage >=19 default `--json` renamed the per-day key `date` -> `period`.
+      // Coalesce into a guaranteed string so the regex and every downstream
+      // read/write sees a valid date; assign it back for the in-loop reads.
+      const date = day.date ?? day.period;
+      if (!date || !dateRegex.test(date)) {
+        throw new Error(`Invalid date format: ${date}. Expected YYYY-MM-DD`);
       }
+      day.date = date;
       
       // Check for negative values
       if (day.totalCost < 0 || day.totalTokens < 0 || 
@@ -157,7 +168,7 @@ export const submit = mutation({
     );
     
     // 5. Sort dates to ensure consistent range
-    const dates = ccData.daily.map((d) => d.date).sort();
+    const dates = ccData.daily.map((d) => (d.date ?? d.period)!).sort();
     dateRange = {
       start: dates[0] || "",
       end: dates[dates.length - 1] || "",
@@ -242,8 +253,9 @@ export const submit = mutation({
       
       // Update with new daily data (overwrites for same dates, adds new dates)
       ccData.daily.forEach(day => {
-        existingDailyMap.set(day.date, {
-          date: day.date,
+        const date = (day.date ?? day.period)!;
+        existingDailyMap.set(date, {
+          date,
           inputTokens: day.inputTokens,
           outputTokens: day.outputTokens,
           cacheCreationTokens: day.cacheCreationTokens,
@@ -335,7 +347,7 @@ export const submit = mutation({
           dateRange,
           modelsUsed,
           dailyBreakdown: ccData.daily.map((day) => ({
-            date: day.date,
+            date: (day.date ?? day.period)!,
             inputTokens: day.inputTokens,
             outputTokens: day.outputTokens,
             cacheCreationTokens: day.cacheCreationTokens,
