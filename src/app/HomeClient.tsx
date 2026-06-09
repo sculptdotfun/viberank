@@ -4,7 +4,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Merge, X, Terminal, Copy, Check, Github } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
-import SubmitModal from "@/components/SubmitModal";
+import dynamic from "next/dynamic";
+
+const SubmitModal = dynamic(() => import("@/components/SubmitModal"), { ssr: false });
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import { useSession, signIn } from "next-auth/react";
@@ -289,7 +291,7 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
 
       <Footer />
 
-      <SubmitModal open={showUploadModal} onClose={() => setShowUploadModal(false)} />
+      {showUploadModal && <SubmitModal open onClose={() => setShowUploadModal(false)} />}
     </div>
   );
 }

@@ -110,6 +110,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Avatars come from the GitHub CDN on every page — start the TLS
+            handshake before the first <img> is discovered. */}
+        <link rel="preconnect" href="https://avatars.githubusercontent.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://avatars.githubusercontent.com" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

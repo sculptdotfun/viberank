@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import ShareCard from "./ShareCard";
+import dynamic from "next/dynamic";
+
+const ShareCard = dynamic(() => import("./ShareCard"), { ssr: false });
 import Avatar from "./Avatar";
 import TierBadge from "./TierBadge";
 import { TIERS } from "@/lib/tiers";
@@ -318,6 +320,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                           githubUsername={submission.githubUsername}
                           name={submission.githubName || submission.username}
                           size="sm"
+                          priority={rank <= 10}
                         />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">

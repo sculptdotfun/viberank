@@ -6,9 +6,13 @@ import { Upload, Github, Sparkles, Menu, X } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import Avatar from "./Avatar";
-import SubmitModal from "./SubmitModal";
-import UpdatesModal from "./UpdatesModal";
+
+// Modals only matter on interaction — split them out of the shell bundle
+// (SubmitModal drags in react-dropzone via FileUpload).
+const SubmitModal = dynamic(() => import("./SubmitModal"), { ssr: false });
+const UpdatesModal = dynamic(() => import("./UpdatesModal"), { ssr: false });
 import { isAdmin as checkIsAdmin } from "@/lib/admin";
 
 function Wordmark({ size = 20 }: { size?: number }) {
@@ -217,8 +221,8 @@ export default function NavBar() {
         </AnimatePresence>
       </header>
 
-      <SubmitModal open={showSubmit} onClose={() => setShowSubmit(false)} />
-      <UpdatesModal isOpen={showUpdates} onClose={() => setShowUpdates(false)} />
+      {showSubmit && <SubmitModal open onClose={() => setShowSubmit(false)} />}
+      {showUpdates && <UpdatesModal isOpen onClose={() => setShowUpdates(false)} />}
     </>
   );
 }
