@@ -20,28 +20,27 @@ export default async function Image() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#1a1918',
-          backgroundImage: 'radial-gradient(circle at 25% 25%, #dc885020 0%, transparent 50%), radial-gradient(circle at 75% 75%, #dc885020 0%, transparent 50%)',
+          backgroundColor: '#0a0a0b',
         }}
       >
         {/* Logo and Title */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <svg width="80" height="80" viewBox="0 0 32 32" fill="none" style={{ marginRight: 20 }}>
-            <rect width="32" height="32" rx="6" fill="#1a1918"/>
-            <path d="M6 16L6 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-            <path d="M12 11L12 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-            <path d="M18 6L18 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-            <path d="M24 18L24 26" stroke="#dc8850" strokeWidth="3" strokeLinecap="round"/>
-            <circle cx="6" cy="13" r="2.5" fill="#dc8850"/>
-            <circle cx="12" cy="8" r="2.5" fill="#dc8850"/>
-            <circle cx="18" cy="3" r="2.5" fill="#dc8850"/>
-            <circle cx="24" cy="15" r="2.5" fill="#dc8850"/>
+            <rect width="32" height="32" rx="6" fill="#0a0a0b"/>
+            <path d="M6 16L6 26" stroke="#f97316" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M12 11L12 26" stroke="#f97316" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M18 6L18 26" stroke="#f97316" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M24 18L24 26" stroke="#f97316" strokeWidth="3" strokeLinecap="round"/>
+            <circle cx="6" cy="13" r="2.5" fill="#f97316"/>
+            <circle cx="12" cy="8" r="2.5" fill="#f97316"/>
+            <circle cx="18" cy="3" r="2.5" fill="#f97316"/>
+            <circle cx="24" cy="15" r="2.5" fill="#f97316"/>
           </svg>
           <h1
             style={{
               fontSize: 72,
               fontWeight: 'bold',
-              color: '#f5f3f0',
+              color: '#fafafa',
               margin: 0,
             }}
           >
@@ -89,7 +88,7 @@ export default async function Image() {
           }}
         >
           <span style={{ fontSize: 28, color: '#a8a29e' }}>$</span>
-          <span style={{ fontSize: 28, color: '#dc8850', fontFamily: 'monospace' }}>npx viberank-cli</span>
+          <span style={{ fontSize: 28, color: '#f97316', fontFamily: 'monospace' }}>npx viberank-cli</span>
         </div>
       </div>
     ),

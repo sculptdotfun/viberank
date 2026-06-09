@@ -54,6 +54,7 @@ const blogPosts = [
 ];
 
 export default function BlogPage() {
+  const [featured, ...rest] = blogPosts;
   return (
     <>
       <Link
@@ -64,26 +65,47 @@ export default function BlogPage() {
         Back to Leaderboard
       </Link>
 
-      <h1 className="text-3xl font-semibold text-foreground mb-3">Blog</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground mb-3">Blog</h1>
       <p className="text-muted mb-10">
         Insights on AI-powered development, Claude Code, and the future of programming.
       </p>
 
-      <div className="space-y-6">
-        {blogPosts.map((post) => (
-          <article key={post.slug} className="border-b border-border pb-6">
-            <Link href={`/blog/${post.slug}`} className="group block">
-              <h2 className="text-xl font-medium text-foreground group-hover:text-accent transition-colors mb-2">
-                {post.title}
-              </h2>
-              <p className="text-muted text-sm mb-3 leading-relaxed">{post.excerpt}</p>
-              <div className="flex items-center gap-3 text-xs text-muted">
-                <span>{post.date}</span>
-                <span>·</span>
-                <span>{post.readTime}</span>
-              </div>
-            </Link>
-          </article>
+      {/* Featured (latest) post */}
+      <Link
+        href={`/blog/${featured.slug}`}
+        className="group block rounded-2xl border border-accent/40 bg-surface-1 p-6 mb-6 hover:bg-surface-2 transition-colors"
+      >
+        <span className="inline-block text-[10px] font-semibold uppercase tracking-wider text-accent mb-3">
+          Latest
+        </span>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-accent transition-colors mb-2">
+          {featured.title}
+        </h2>
+        <p className="text-muted text-sm mb-4 leading-relaxed">{featured.excerpt}</p>
+        <div className="flex items-center gap-3 text-xs text-muted">
+          <span>{featured.date}</span>
+          <span>·</span>
+          <span>{featured.readTime}</span>
+        </div>
+      </Link>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {rest.map((post) => (
+          <Link
+            key={post.slug}
+            href={`/blog/${post.slug}`}
+            className="group flex flex-col rounded-2xl border border-border bg-surface-1 p-5 hover:bg-surface-2 transition-colors"
+          >
+            <h2 className="text-base font-semibold text-foreground group-hover:text-accent transition-colors mb-2">
+              {post.title}
+            </h2>
+            <p className="text-muted text-sm mb-4 leading-relaxed line-clamp-3">{post.excerpt}</p>
+            <div className="mt-auto flex items-center gap-3 text-xs text-muted">
+              <span>{post.date}</span>
+              <span>·</span>
+              <span>{post.readTime}</span>
+            </div>
+          </Link>
         ))}
       </div>
     </>
