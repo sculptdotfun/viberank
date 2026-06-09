@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import NavBar from "@/components/NavBar";
+import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: {
@@ -14,10 +16,12 @@ export default function BlogLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-background flex flex-col">
+      <NavBar />
+      <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-12">
         {children}
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 }

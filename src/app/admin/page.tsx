@@ -50,10 +50,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <NavBar 
-        onUploadClick={() => {}}
-        onUpdatesClick={() => {}}
-      />
+      <NavBar />
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold mb-1">Admin Dashboard</h1>

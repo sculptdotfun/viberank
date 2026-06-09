@@ -22,7 +22,7 @@ export default function UsageChart({ daily }: { daily: DailyPoint[] }) {
     .slice(range === "7d" ? -7 : range === "30d" ? -30 : 0);
 
   return (
-    <div className="bg-surface-1 border border-border rounded-2xl p-5 mb-6">
+    <div className="bg-surface-1 border border-border rounded-lg p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-medium flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-accent" />

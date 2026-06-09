@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowLeft, BadgeCheck } from "lucide-react";
 import { getServerDataLayer } from "@/lib/data";
 import Footer from "@/components/Footer";
+import NavBar from "@/components/NavBar";
+import TierBadge from "@/components/TierBadge";
 import { formatNumber, formatCurrency, toolLabel, toolBlurb, FEATURED_TOOLS } from "@/lib/utils";
 
 interface ToolParams {
@@ -85,19 +87,16 @@ export default async function ToolPage({ params }: ToolParams) {
     <div className="min-h-screen bg-background">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([breadcrumbLd, faqLd]) }} />
 
-      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="flex items-center h-14">
-            <Link href="/" className="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors text-sm">
-              <ArrowLeft className="w-4 h-4" />
-              Back to leaderboard
-            </Link>
-          </div>
-        </div>
-      </header>
+      <NavBar />
 
-      <div className="max-w-4xl mx-auto px-6 py-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">{label} Usage Leaderboard</h1>
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <Link href="/" className="inline-flex items-center gap-1.5 micro-label hover:text-foreground transition-colors mb-6">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Leaderboard
+        </Link>
+
+        <p className="micro-label mb-3">Per-tool leaderboard</p>
+        <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight mb-2">{label} Usage Leaderboard</h1>
         <p className="text-muted mb-6 max-w-2xl">
           Developers ranked by their {label} usage ({toolBlurb(tool)}) — by cost and tokens, from real{" "}
           <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ccusage</a>{" "}
@@ -106,7 +105,7 @@ export default async function ToolPage({ params }: ToolParams) {
 
         {/* Browse other tools */}
         <div className="flex flex-wrap items-center gap-2 mb-8 text-sm">
-          <span className="text-muted">Browse:</span>
+          <span className="micro-label">Browse</span>
           {FEATURED_TOOLS.map((t) => (
             <Link
               key={t.key}
@@ -121,10 +120,11 @@ export default async function ToolPage({ params }: ToolParams) {
         </div>
 
         {items.length > 0 ? (
-          <div className="rounded-2xl border border-border overflow-hidden mb-12">
-            <div className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted bg-surface-1 border-b border-border">
+          <div className="rounded-lg border border-border overflow-hidden mb-12">
+            <div className="flex items-center gap-3 px-4 py-2.5 micro-label bg-surface-1 border-b border-border">
               <div className="w-8 text-center">#</div>
               <div className="flex-1">User</div>
+              <div className="hidden sm:block w-24">Tier</div>
               <div className="w-28 text-right">Cost</div>
               <div className="w-24 text-right hidden sm:block">Tokens</div>
             </div>
@@ -135,12 +135,15 @@ export default async function ToolPage({ params }: ToolParams) {
                   href={`/profile/${encodeURIComponent(s.githubUsername || s.username)}`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors group"
                 >
-                  <div className="w-8 text-center text-sm text-muted font-mono">{i + 1}</div>
+                  <div className={`w-8 text-center text-sm font-mono ${i === 0 ? "text-[#f5b008] font-bold" : i === 1 ? "text-[#b8bcc4] font-bold" : i === 2 ? "text-[#c2703f] font-bold" : "text-muted"}`}>{i + 1}</div>
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     <span className="text-sm font-medium truncate group-hover:text-accent transition-colors">
                       {s.githubUsername || s.username}
                     </span>
                     {s.verified && <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />}
+                  </div>
+                  <div className="hidden sm:block w-24 flex-shrink-0">
+                    <TierBadge totalCost={s.totalCost} size="xs" bare />
                   </div>
                   <div className="w-28 text-right text-sm font-mono font-semibold text-accent">${formatCurrency(s.totalCost)}</div>
                   <div className="w-24 text-right text-sm font-mono text-muted hidden sm:block">{formatNumber(s.totalTokens)}</div>
@@ -149,7 +152,7 @@ export default async function ToolPage({ params }: ToolParams) {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-border p-10 text-center mb-12">
+          <div className="rounded-lg border border-border p-10 text-center mb-12">
             <p className="font-medium mb-1">No {label} submissions yet</p>
             <p className="text-sm text-muted">Be the first — run <code className="font-mono text-accent">npx viberank-cli</code></p>
           </div>
@@ -157,10 +160,10 @@ export default async function ToolPage({ params }: ToolParams) {
 
         {/* FAQ */}
         <section>
-          <h2 className="text-xl font-bold tracking-tight mb-4">{label} leaderboard FAQ</h2>
+          <h2 className="font-mono text-xl font-bold tracking-tight mb-4">{label} leaderboard FAQ</h2>
           <div className="space-y-3">
             {faqs.map((f) => (
-              <div key={f.q} className="rounded-xl border border-border bg-surface-1 p-4">
+              <div key={f.q} className="rounded-lg border border-border bg-surface-1 p-4">
                 <h3 className="font-medium mb-1.5">{f.q}</h3>
                 <p className="text-sm text-muted">{f.a}</p>
               </div>

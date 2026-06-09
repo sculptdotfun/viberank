@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { User } from "lucide-react";
-import { getGitHubAvatarUrl } from "@/lib/utils";
+import { getGitHubAvatarUrl, sizedAvatarUrl } from "@/lib/utils";
 
 interface AvatarProps {
   src?: string | null;
@@ -78,11 +78,13 @@ export default function Avatar({
   const initials = getInitials(displayName);
   const gradient = generateGradient(displayName);
 
-  // Determine the image source
-  let imageSrc = src;
+  // Determine the image source. Request 2x the display size for retina, and
+  // never the full-res original — stored avatar URLs have no size param.
+  const sizePixels = size === "sm" ? 32 : size === "md" ? 40 : 48;
+  const fetchSize = sizePixels * 2;
+  let imageSrc = src ? sizedAvatarUrl(src, fetchSize) : undefined;
   if (!imageSrc && githubUsername) {
-    const sizePixels = size === "sm" ? 32 : size === "md" ? 40 : 48;
-    imageSrc = getGitHubAvatarUrl(githubUsername, sizePixels);
+    imageSrc = getGitHubAvatarUrl(githubUsername, fetchSize);
   }
 
   const ringClass = showRing ? "ring-2 ring-border/20" : "";
@@ -117,6 +119,10 @@ export default function Avatar({
       <img
         src={imageSrc}
         alt={displayName}
+        width={sizePixels}
+        height={sizePixels}
+        loading="lazy"
+        decoding="async"
         className={`${sizeClasses[size]} rounded-full ${ringClass} object-cover ${
           isLoading ? "opacity-0" : "opacity-100"
         } transition-opacity duration-200`}
