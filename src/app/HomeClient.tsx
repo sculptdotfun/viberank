@@ -14,9 +14,10 @@ import type { Submission, GlobalStats } from "@/lib/data/types";
 interface HomeClientProps {
   initialItems: Submission[];
   initialStats?: GlobalStats;
+  initialHasMore?: boolean;
 }
 
-export default function HomeClient({ initialItems, initialStats }: HomeClientProps) {
+export default function HomeClient({ initialItems, initialStats, initialHasMore }: HomeClientProps) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUpdatesModal, setShowUpdatesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
@@ -98,6 +99,7 @@ export default function HomeClient({ initialItems, initialStats }: HomeClientPro
             copiedToClipboard={copiedToClipboard}
             initialItems={initialItems}
             initialStats={initialStats}
+            initialHasMore={initialHasMore}
           />
         </div>
       </main>
@@ -116,7 +118,7 @@ export default function HomeClient({ initialItems, initialStats }: HomeClientPro
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative bg-card border border-border rounded-lg shadow-xl max-w-sm w-full"
+              className="relative bg-surface-1 border border-border rounded-2xl shadow-xl max-w-sm w-full"
             >
               <div className="px-4 py-3 flex items-center justify-between border-b border-border">
                 <h3 className="font-medium">Submit Stats</h3>

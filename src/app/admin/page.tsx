@@ -15,11 +15,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null);
 
-  const { data: flaggedSubmissions } = useFlaggedSubmissions();
-  const { mutate: updateFlagStatus } = useUpdateFlagStatus();
-
   // Check if user is admin (shared allowlist, also enforced server-side)
   const isAdmin = checkIsAdmin(session?.user?.username);
+
+  const { data: flaggedSubmissions } = useFlaggedSubmissions(undefined, isAdmin);
+  const { mutate: updateFlagStatus } = useUpdateFlagStatus();
 
   if (status === "loading") {
     return (
