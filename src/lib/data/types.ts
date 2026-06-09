@@ -71,6 +71,8 @@ export interface LeaderboardParams {
   page?: number;
   pageSize?: number;
   includeFlagged?: boolean;
+  /** Filter to submissions that used this tool/agent (e.g. "codex"). */
+  tool?: string;
 }
 
 export interface DateRangeLeaderboardParams {
@@ -80,6 +82,8 @@ export interface DateRangeLeaderboardParams {
   limit?: number;
   cursor?: string;
   includeFlagged?: boolean;
+  /** Filter to submissions that used this tool/agent (e.g. "codex"). */
+  tool?: string;
 }
 
 export interface SubmitData {

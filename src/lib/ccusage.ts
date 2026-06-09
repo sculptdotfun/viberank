@@ -75,7 +75,7 @@ export interface NormalizedCcData {
  * reliable tool signal (e.g. codex reports bare `gpt-5`, openclaw reports
  * `gemini` models), so this stays deliberately conservative.
  */
-function inferToolFromModel(modelName: string): string {
+export function inferToolFromModel(modelName: string): string {
   // Some tools prefix the model, e.g. "[openclaw] google/gemini-3-pro".
   const prefixed = modelName.match(/^\[([a-z0-9_-]+)\]/i);
   if (prefixed) return prefixed[1].toLowerCase();
