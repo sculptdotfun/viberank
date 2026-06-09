@@ -704,7 +704,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
     // Merge submissions
     const baseSubmission =
       oauthSubmissions[0] ||
-      submissions.sort((a, b) =>
+      [...submissions].sort((a, b) =>
         new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
       )[0];
 
@@ -761,8 +761,14 @@ class SupabaseSubmissionsService implements SubmissionsService {
     const allModels = Array.from(
       new Set(mergedDaily.flatMap((d) => d.models_used || []))
     );
+    // Union tools from the submission rows AND the merged daily agents, so
+    // tools set by an earlier normalized submission survive a claim/merge even
+    // when older daily_breakdowns rows have empty `agents`.
     const allTools = Array.from(
-      new Set(mergedDaily.flatMap((d) => d.agents || []))
+      new Set([
+        ...submissions.flatMap((s) => s.tools || []),
+        ...mergedDaily.flatMap((d) => d.agents || []),
+      ])
     ).sort();
 
     // Update base submission

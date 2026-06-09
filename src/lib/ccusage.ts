@@ -113,8 +113,21 @@ function resolveAgents(entry: RawDailyEntry): string[] {
 function selectAuthoritativeRows(rows: RawDailyEntry[]): RawDailyEntry[] {
   const hasAgentField = rows.some((r) => r.agent !== undefined);
   if (!hasAgentField) return rows;
-  const allRows = rows.filter((r) => r.agent === "all");
-  return allRows.length > 0 ? allRows : rows;
+
+  // Decide per-date: if a date has an `agent: "all"` aggregate row, use only
+  // that (avoids double-counting against its per-agent siblings); otherwise
+  // keep every row for that date (they get summed downstream). Deciding
+  // per-date — not globally — means a payload that mixes aggregate dates with
+  // per-agent-only dates never silently drops the per-agent-only days.
+  const byDate = new Map<string, RawDailyEntry[]>();
+  for (const row of rows) {
+    const key = row.date ?? row.period ?? "__unknown__";
+    byDate.set(key, [...(byDate.get(key) ?? []), row]);
+  }
+  return Array.from(byDate.values()).flatMap((dateRows) => {
+    const allRow = dateRows.find((r) => r.agent === "all");
+    return allRow ? [allRow] : dateRows;
+  });
 }
 
 /**

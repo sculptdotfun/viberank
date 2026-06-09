@@ -211,6 +211,26 @@ console.log("\n[5] Double-count guard: 'all' row preferred over per-agent rows")
 }
 
 // ---------------------------------------------------------------------------
+console.log("\n[5b] Mixed payload: per-date strategy keeps per-agent-only days");
+{
+  const raw = {
+    totals: { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 0, totalCost: 0 },
+    daily: [
+      // date A has an aggregate "all" row + per-agent siblings -> use "all" only
+      { period: "2025-05-01", agent: "all", inputTokens: 100, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 100, totalCost: 0.1, modelsUsed: ["claude-opus-4-8"], metadata: { agents: ["claude"] } },
+      { period: "2025-05-01", agent: "claude", inputTokens: 100, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 100, totalCost: 0.1, modelsUsed: ["claude-opus-4-8"] },
+      // date B has ONLY a per-agent row, no "all" -> must NOT be dropped
+      { period: "2025-05-02", agent: "codex", inputTokens: 40, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 40, totalCost: 0.04, modelsUsed: ["gpt-5-codex"] },
+    ],
+  };
+  const n = normalizeCcData(raw);
+  ok("both dates kept", n.daily.length === 2, `got ${n.daily.length}`);
+  ok("date A uses 'all' (100, not 200)", n.daily[0].totalTokens === 100, `got ${n.daily[0].totalTokens}`);
+  ok("date B (per-agent only) preserved", n.daily[1]?.totalTokens === 40, `got ${n.daily[1]?.totalTokens}`);
+  ok("tools union [claude, codex]", JSON.stringify(n.tools) === '["claude","codex"]');
+}
+
+// ---------------------------------------------------------------------------
 console.log("\n[6] Bad input rejected");
 {
   throws("empty daily", () => normalizeCcData({ totals: {} as any, daily: [] }), "non-empty array");
