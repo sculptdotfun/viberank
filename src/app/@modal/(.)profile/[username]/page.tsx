@@ -6,6 +6,14 @@ interface Params {
   params: Promise<{ username: string }>;
 }
 
+// ISR: cache the rendered sheet per username so repeat opens skip the
+// 4 sequential DB queries entirely. Stats are at most a minute stale.
+export const revalidate = 60;
+
+export function generateStaticParams(): { username: string }[] {
+  return [];
+}
+
 // Intercepted /profile/[username] — client-side navigations from the board
 // get this pull-up sheet over the leaderboard; direct loads, refreshes and
 // crawlers still get the full SSR profile page (SEO unaffected).

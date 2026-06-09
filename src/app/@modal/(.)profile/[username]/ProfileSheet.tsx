@@ -45,17 +45,14 @@ export default function ProfileSheet(props: ProfileSheetProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={close}
-      />
+      {/* The loading skeleton already played the big slide-up — real content
+          swaps in with a quick fade so the sheet doesn't animate twice. */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={close} />
 
       <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", damping: 30, stiffness: 360 }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
         className="relative w-full max-w-2xl bg-surface-1 border border-border border-b-0 rounded-t-xl shadow-2xl max-h-[85vh] overflow-y-auto"
       >
         {/* Grab handle + close */}

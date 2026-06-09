@@ -177,6 +177,25 @@ body {
   animation-play-state: paused;
 }
 
+/* Bottom-sheet entrance — used by the profile sheet skeleton */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-up {
+  animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.backdrop-in {
+  animation: backdrop-in 0.2s ease-out;
+}
+
 /* Blinking block cursor used after headings */
 @keyframes cursor-blink {
   0%, 55% { opacity: 1; }

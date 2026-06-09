@@ -19,6 +19,16 @@ import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
 
+// ISR the full profile page too — direct loads and sheet "view full profile"
+// both get cached HTML; data is at most 2 minutes stale.
+export const revalidate = 120;
+
+// No pre-built paths — profiles are rendered on first hit, then served from
+// the ISR cache. Without this, Next treats the route as fully dynamic.
+export function generateStaticParams(): { username: string }[] {
+  return [];
+}
+
 interface ProfileParams {
   params: Promise<{ username: string }>;
 }
