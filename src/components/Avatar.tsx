@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { User } from "lucide-react";
 import { getGitHubAvatarUrl, sizedAvatarUrl } from "@/lib/utils";
 
@@ -11,6 +11,8 @@ interface AvatarProps {
   size?: "sm" | "md" | "lg";
   className?: string;
   showRing?: boolean;
+  /** Above-the-fold avatars: fetch eagerly at high priority instead of lazy. */
+  priority?: boolean;
 }
 
 const sizeClasses = {
@@ -70,27 +72,47 @@ export default function Avatar({
   size = "md",
   className = "",
   showRing = true,
+  priority = false,
 }: AvatarProps) {
-  const [imageError, setImageError] = useState(false);
+  // Determine the image sources. Request 2x the display size for retina, and
+  // never the full-res original — stored avatar URLs have no size param. If
+  // the stored URL 404s (renamed/deleted account), fall back to the
+  // username-derived CDN URL before giving up and showing initials.
+  const sizePixels = size === "sm" ? 32 : size === "md" ? 40 : 48;
+  const fetchSize = sizePixels * 2;
+  const candidates: string[] = [];
+  if (src) candidates.push(sizedAvatarUrl(src, fetchSize));
+  if (githubUsername) {
+    const fromUsername = getGitHubAvatarUrl(githubUsername, fetchSize);
+    if (!candidates.includes(fromUsername)) candidates.push(fromUsername);
+  }
+
+  const [srcIndex, setSrcIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   const displayName = name || githubUsername || "User";
   const initials = getInitials(displayName);
   const gradient = generateGradient(displayName);
+  const imageSrc = candidates[srcIndex];
 
-  // Determine the image source. Request 2x the display size for retina, and
-  // never the full-res original — stored avatar URLs have no size param.
-  const sizePixels = size === "sm" ? 32 : size === "md" ? 40 : 48;
-  const fetchSize = sizePixels * 2;
-  let imageSrc = src ? sizedAvatarUrl(src, fetchSize) : undefined;
-  if (!imageSrc && githubUsername) {
-    imageSrc = getGitHubAvatarUrl(githubUsername, fetchSize);
-  }
+  // If the image finished (or failed) before React hydrated, the onLoad /
+  // onError handlers never fire and the img would stay at opacity-0 forever.
+  // Re-check the element's actual state after mount.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img || !img.complete) return;
+    if (img.naturalWidth > 0) {
+      setIsLoading(false);
+    } else {
+      setSrcIndex((i) => i + 1);
+    }
+  }, [imageSrc]);
 
   const ringClass = showRing ? "ring-2 ring-border/20" : "";
 
-  // Show fallback if no image or image failed to load
-  if (!imageSrc || imageError) {
+  // Show fallback if no image or every candidate failed to load
+  if (!imageSrc) {
     return (
       <div
         className={`${sizeClasses[size]} rounded-full flex items-center justify-center ${ringClass} ${className} ${
@@ -117,20 +139,20 @@ export default function Avatar({
         <div className={`absolute inset-0 rounded-full bg-card ${ringClass} animate-pulse`} />
       )}
       <img
+        ref={imgRef}
+        key={imageSrc}
         src={imageSrc}
         alt={displayName}
         width={sizePixels}
         height={sizePixels}
-        loading="lazy"
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         className={`${sizeClasses[size]} rounded-full ${ringClass} object-cover ${
           isLoading ? "opacity-0" : "opacity-100"
-        } transition-opacity duration-200`}
+        } transition-opacity duration-150`}
         onLoad={() => setIsLoading(false)}
-        onError={() => {
-          setImageError(true);
-          setIsLoading(false);
-        }}
+        onError={() => setSrcIndex((i) => i + 1)}
       />
     </div>
   );

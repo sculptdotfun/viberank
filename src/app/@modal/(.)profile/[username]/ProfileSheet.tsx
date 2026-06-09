@@ -77,10 +77,13 @@ export default function ProfileSheet(props: ProfileSheetProps) {
             {props.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={sizedAvatarUrl(props.avatar, 96)}
+                src={sizedAvatarUrl(props.avatar, 128)}
                 alt={props.displayName}
                 width={48}
                 height={48}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="w-12 h-12 rounded-full ring-2 ring-border/40"
               />
             ) : (

@@ -14,7 +14,7 @@ import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl } from "@/lib/u
 import { getTierProgress } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
-import UsageChart from "./UsageChart";
+import UsageChart from "./UsageChartLazy";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
@@ -122,6 +122,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
                 alt={displayName}
                 width={64}
                 height={64}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="w-16 h-16 rounded-full ring-2 ring-border/40"
               />
             )}
