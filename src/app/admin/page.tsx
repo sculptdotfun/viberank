@@ -54,7 +54,7 @@ export default function AdminPage() {
         onUploadClick={() => {}}
         onUpdatesClick={() => {}}
       />
-      <div className="max-w-5xl mx-auto px-6 py-8 pt-20">
+      <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold mb-1">Admin Dashboard</h1>
           <p className="text-sm text-muted">Review and manage flagged submissions</p>

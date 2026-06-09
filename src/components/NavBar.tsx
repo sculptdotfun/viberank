@@ -29,8 +29,8 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
   return (
     <>
       {/* Desktop Nav */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border hidden md:flex items-center">
-        <div className="w-full px-6 flex items-center justify-between">
+      <header className="sticky top-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border hidden md:flex items-center">
+        <div className="w-full max-w-6xl mx-auto px-6 flex items-center justify-between">
           {/* Left: Logo + Nav Items */}
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -117,7 +117,7 @@ export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
       </header>
 
       {/* Mobile Nav */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border">
+      <header className="md:hidden sticky top-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border">
         <div className="h-full px-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-accent">

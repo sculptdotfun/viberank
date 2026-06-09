@@ -1,5 +1,6 @@
 import { getServerDataLayer } from "@/lib/data";
 import HomeClient from "./HomeClient";
+import { HOME_FAQS } from "@/lib/home-faqs";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 
 // Refresh the server-rendered snapshot every 5 min; the client hooks fetch
@@ -27,5 +28,21 @@ export default async function Home() {
     // Fall back to client-side fetch if the server read fails.
   }
 
-  return <HomeClient initialItems={initialItems} initialStats={initialStats} initialHasMore={initialHasMore} />;
+  // FAQPage schema for the homepage FAQ section (content shared via lib/home-faqs).
+  const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: HOME_FAQS.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
+      <HomeClient initialItems={initialItems} initialStats={initialStats} initialHasMore={initialHasMore} />
+    </>
+  );
 }

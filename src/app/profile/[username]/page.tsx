@@ -14,6 +14,7 @@ import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChart";
+import Footer from "@/components/Footer";
 
 interface ProfileParams {
   params: Promise<{ username: string }>;
@@ -237,6 +238,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
