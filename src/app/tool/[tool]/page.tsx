@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck } from "lucide-react";
 import { getServerDataLayer } from "@/lib/data";
+import Footer from "@/components/Footer";
 import { formatNumber, formatCurrency, toolLabel, toolBlurb, FEATURED_TOOLS } from "@/lib/utils";
 
 interface ToolParams {
@@ -167,6 +168,7 @@ export default async function ToolPage({ params }: ToolParams) {
           </div>
         </section>
       </div>
+      <Footer />
     </div>
   );
 }

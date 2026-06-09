@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2, Terminal, Copy, Check, Users } from "lucide-react";
+import { Trophy, Medal, Award, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import ShareCard from "./ShareCard";
 import Avatar from "./Avatar";
-import { formatNumber, formatCurrency, toolLabel, FEATURED_TOOLS } from "@/lib/utils";
+import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
@@ -15,30 +15,10 @@ import type { Submission, GlobalStats } from "@/lib/data/types";
 type SortBy = "cost" | "tokens";
 
 interface LeaderboardProps {
-  onCopyCommand?: () => void;
-  copiedToClipboard?: boolean;
-  // Server-fetched first page + stats, so the leaderboard renders in the SSR
-  // HTML (SEO + no first-paint spinner) before the client hooks take over.
+  // Server-fetched first page + stats so the board renders in the SSR HTML.
   initialItems?: Submission[];
   initialStats?: GlobalStats;
   initialHasMore?: boolean;
-}
-
-// Flat placeholder rows shown while a filter/sort change is fetching.
-function SkeletonRows({ count = 8 }: { count?: number }) {
-  return (
-    <div className="px-6 py-5 space-y-3" aria-hidden>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-1 px-4 py-3 animate-pulse">
-          <div className="w-8 h-4 rounded bg-surface-3" />
-          <div className="w-8 h-8 rounded-full bg-surface-3" />
-          <div className="flex-1 h-4 rounded bg-surface-3 max-w-[180px]" />
-          <div className="w-24 h-4 rounded bg-surface-3" />
-          <div className="w-20 h-4 rounded bg-surface-3 hidden sm:block" />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // Small flat pills showing which tools a submission used.
@@ -126,19 +106,24 @@ function PodiumCard({
   );
 }
 
-function StatCard({ icon: Icon, label, value, accent = false }: { icon: typeof Users; label: string; value: string; accent?: boolean }) {
+// Flat placeholder rows shown while a filter/sort change is fetching.
+function SkeletonRows({ count = 8 }: { count?: number }) {
   return (
-    <div className="bg-surface-1 rounded-xl px-4 py-3.5 border border-border">
-      <div className="flex items-center gap-1.5 text-xs text-muted mb-1.5">
-        <Icon className="w-3.5 h-3.5" />
-        {label}
-      </div>
-      <div className={`text-xl font-bold font-mono truncate ${accent ? "text-accent" : ""}`}>{value}</div>
+    <div className="py-5 space-y-3" aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-1 px-4 py-3 animate-pulse">
+          <div className="w-8 h-4 rounded bg-surface-3" />
+          <div className="w-8 h-8 rounded-full bg-surface-3" />
+          <div className="flex-1 h-4 rounded bg-surface-3 max-w-[180px]" />
+          <div className="w-24 h-4 rounded bg-surface-3" />
+          <div className="w-20 h-4 rounded bg-surface-3 hidden sm:block" />
+        </div>
+      ))}
     </div>
   );
 }
 
-export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialItems, initialStats, initialHasMore }: LeaderboardProps) {
+export default function Leaderboard({ initialItems, initialStats, initialHasMore }: LeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortBy>("cost");
   const [tool, setTool] = useState<string | null>(null);
   const [showShareCard, setShowShareCard] = useState<string | null>(null);
@@ -254,52 +239,9 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
   const rest = allItems.slice(podiumCount);
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 px-6 py-5 border-b border-border">
-        <div className="flex items-center justify-between gap-4 mb-5">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Claude Code, Codex &amp; AI Coding Leaderboard</h1>
-            <p className="text-sm text-muted mt-1">Who's spending the most across AI coding tools?</p>
-            <div className="hidden sm:flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs text-muted">
-              <span>Per-tool boards:</span>
-              {FEATURED_TOOLS.map((t, i) => (
-                <span key={t.key} className="flex items-center gap-2">
-                  <Link href={`/tool/${t.key}`} className="hover:text-accent transition-colors">{toolLabel(t.key)}</Link>
-                  {i < FEATURED_TOOLS.length - 1 && <span className="text-border">·</span>}
-                </span>
-              ))}
-            </div>
-          </div>
-          {onCopyCommand && (
-            <button
-              onClick={onCopyCommand}
-              className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-sm bg-surface-1 hover:bg-surface-2 border border-border rounded-lg transition-colors"
-            >
-              <Terminal className="w-4 h-4 text-muted" />
-              <code className="font-mono text-accent font-medium">npx viberank-cli</code>
-              {copiedToClipboard ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Copy className="w-4 h-4 text-muted" />
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Aggregated Stats */}
-        {globalStats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard icon={Users} label="Users" value={formatNumber(globalStats.totalUsers)} />
-            <StatCard icon={DollarSign} label="Total Spent" value={`$${formatNumber(globalStats.totalCost)}`} accent />
-            <StatCard icon={Zap} label="Total Tokens" value={formatNumber(globalStats.totalTokens)} />
-            <StatCard icon={Trophy} label="Top Spender" value={`$${formatNumber(globalStats.topCost)}`} />
-          </div>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div className="flex-shrink-0 px-6 py-3 border-b border-border bg-surface-1">
+    <div>
+      {/* Filter bar — sticky under the nav while scrolling the board */}
+      <div className="sticky top-14 z-40 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-y border-border mb-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
             {[
@@ -400,121 +342,119 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
         </AnimatePresence>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-auto">
-        {allItems.length > 0 ? (
-          <div className="px-6 py-5">
-            {/* Podium */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-end mb-6">
-              {podium.map((submission, i) => {
-                const rank = i + 1;
-                const order = rank === 1 ? "order-1 sm:order-2" : rank === 2 ? "order-2 sm:order-1" : "order-3";
-                return (
-                  <div key={submission.id} className={order}>
-                    <PodiumCard
-                      submission={submission}
-                      rank={rank}
-                      isCurrentUser={session?.user?.username === submission.githubUsername}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Full table */}
-            {rest.length > 0 && (
-              <div className="rounded-2xl border border-border overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted bg-surface-1 border-b border-border">
-                  <div className="w-8 text-center">#</div>
-                  <div className="flex-1">User</div>
-                  <div className="hidden md:block w-44">Tools</div>
-                  <div className="w-28 text-right">Cost</div>
-                  <div className="w-24 text-right hidden sm:block">Tokens</div>
-                  <div className="w-8" />
+      {/* Board */}
+      {allItems.length > 0 ? (
+        <div>
+          {/* Podium */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-end mb-6">
+            {podium.map((submission, i) => {
+              const rank = i + 1;
+              const order = rank === 1 ? "order-1 sm:order-2" : rank === 2 ? "order-2 sm:order-1" : "order-3";
+              return (
+                <div key={submission.id} className={order}>
+                  <PodiumCard
+                    submission={submission}
+                    rank={rank}
+                    isCurrentUser={session?.user?.username === submission.githubUsername}
+                  />
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="divide-y divide-border-subtle">
-                  {rest.map((submission, i) => {
-                    const rank = podiumCount + i + 1;
-                    const isCurrentUser = session?.user?.username === submission.githubUsername;
-                    return (
-                      <Link
-                        key={submission.id}
-                        href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
-                        className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors cursor-pointer group ${isCurrentUser ? "bg-accent/10 border-l-2 border-l-accent" : ""}`}
-                      >
-                        <div className="w-8 flex-shrink-0 text-center text-sm text-muted font-mono">{rank}</div>
+          {/* Full table */}
+          {rest.length > 0 && (
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted bg-surface-1 border-b border-border">
+                <div className="w-8 text-center">#</div>
+                <div className="flex-1">User</div>
+                <div className="hidden md:block w-44">Tools</div>
+                <div className="w-28 text-right">Cost</div>
+                <div className="w-24 text-right hidden sm:block">Tokens</div>
+                <div className="w-8" />
+              </div>
 
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Avatar
-                            src={submission.githubAvatar}
-                            githubUsername={submission.githubUsername}
-                            name={submission.githubName || submission.username}
-                            size="sm"
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-medium group-hover:text-accent transition-colors truncate">
-                                {submission.githubUsername || submission.username}
-                              </span>
-                              {submission.verified ? (
-                                <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                              ) : (
-                                <span className="text-[9px] font-mono uppercase tracking-wider px-1 py-px rounded bg-muted/15 text-muted flex-shrink-0">cli</span>
-                              )}
-                            </div>
-                            {submission.githubName && submission.githubName !== submission.githubUsername && (
-                              <div className="text-xs text-muted truncate">{submission.githubName}</div>
+              <div className="divide-y divide-border-subtle">
+                {rest.map((submission, i) => {
+                  const rank = podiumCount + i + 1;
+                  const isCurrentUser = session?.user?.username === submission.githubUsername;
+                  return (
+                    <Link
+                      key={submission.id}
+                      href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
+                      className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors cursor-pointer group ${isCurrentUser ? "bg-accent/10 border-l-2 border-l-accent" : ""}`}
+                    >
+                      <div className="w-8 flex-shrink-0 text-center text-sm text-muted font-mono">{rank}</div>
+
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar
+                          src={submission.githubAvatar}
+                          githubUsername={submission.githubUsername}
+                          name={submission.githubName || submission.username}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium group-hover:text-accent transition-colors truncate">
+                              {submission.githubUsername || submission.username}
+                            </span>
+                            {submission.verified ? (
+                              <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            ) : (
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1 py-px rounded bg-muted/15 text-muted flex-shrink-0">cli</span>
                             )}
                           </div>
-                        </div>
-
-                        <div className="hidden md:block w-44">
-                          <ToolChips tools={submission.tools} max={3} />
-                        </div>
-
-                        <div className="w-28 text-right flex-shrink-0">
-                          <div className="text-sm font-mono font-semibold text-accent">${formatCurrency(submission.totalCost)}</div>
-                        </div>
-
-                        <div className="w-24 text-right flex-shrink-0 hidden sm:block">
-                          <div className="text-sm font-mono text-muted">{formatNumber(submission.totalTokens)}</div>
-                        </div>
-
-                        <div className="w-8 flex-shrink-0 flex justify-end">
-                          {isCurrentUser && (
-                            <button
-                              onClick={(e) => { e.preventDefault(); setShowShareCard(submission.id); }}
-                              className="p-1.5 text-muted hover:text-foreground hover:bg-surface-2 rounded transition-colors"
-                            >
-                              <Share2 className="w-4 h-4" />
-                            </button>
+                          {submission.githubName && submission.githubName !== submission.githubUsername && (
+                            <div className="text-xs text-muted truncate">{submission.githubName}</div>
                           )}
                         </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                      </div>
 
-            {!isDateFiltered && hasMore && (
-              <div ref={loadMoreRef} className="py-6 text-center">
-                <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted" />
+                      <div className="hidden md:block w-44">
+                        <ToolChips tools={submission.tools} max={3} />
+                      </div>
+
+                      <div className="w-28 text-right flex-shrink-0">
+                        <div className="text-sm font-mono font-semibold text-accent">${formatCurrency(submission.totalCost)}</div>
+                      </div>
+
+                      <div className="w-24 text-right flex-shrink-0 hidden sm:block">
+                        <div className="text-sm font-mono text-muted">{formatNumber(submission.totalTokens)}</div>
+                      </div>
+
+                      <div className="w-8 flex-shrink-0 flex justify-end">
+                        {isCurrentUser && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); setShowShareCard(submission.id); }}
+                            className="p-1.5 text-muted hover:text-foreground hover:bg-surface-2 rounded transition-colors"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        ) : isLoading ? (
-          <SkeletonRows />
-        ) : (
-          <div className="text-center py-16">
-            <Trophy className="w-10 h-10 text-muted mx-auto mb-3" />
-            <p className="text-base font-medium mb-1">No submissions yet</p>
-            <p className="text-sm text-muted mb-4">Be the first on the leaderboard</p>
-            <code className="text-sm font-mono text-accent">npx viberank-cli</code>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+
+          {!isDateFiltered && hasMore && (
+            <div ref={loadMoreRef} className="py-6 text-center">
+              <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted" />
+            </div>
+          )}
+        </div>
+      ) : isLoading ? (
+        <SkeletonRows />
+      ) : (
+        <div className="text-center py-16">
+          <Trophy className="w-10 h-10 text-muted mx-auto mb-3" />
+          <p className="text-base font-medium mb-1">No submissions yet</p>
+          <p className="text-sm text-muted mb-4">Be the first on the leaderboard</p>
+          <code className="text-sm font-mono text-accent">npx viberank-cli</code>
+        </div>
+      )}
 
       {/* Share Modal */}
       {showShareCard && allItems.find(s => s.id === showShareCard) && (
