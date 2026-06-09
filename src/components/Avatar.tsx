@@ -41,16 +41,16 @@ function getInitials(name?: string): string {
 }
 
 function generateGradient(name?: string): string {
-  // Generate a consistent gradient based on the name
+  // Generate a consistent solid color based on the name (flat — no gradient)
   const colors = [
-    "from-orange-500 to-amber-500",
-    "from-blue-500 to-cyan-500",
-    "from-purple-500 to-pink-500",
-    "from-green-500 to-emerald-500",
-    "from-red-500 to-rose-500",
-    "from-indigo-500 to-violet-500",
-    "from-teal-500 to-cyan-500",
-    "from-yellow-500 to-orange-500",
+    "bg-orange-500",
+    "bg-blue-500",
+    "bg-purple-500",
+    "bg-emerald-500",
+    "bg-rose-500",
+    "bg-indigo-500",
+    "bg-teal-500",
+    "bg-amber-500",
   ];
 
   if (!name) return colors[0];
@@ -93,7 +93,7 @@ export default function Avatar({
       <div
         className={`${sizeClasses[size]} rounded-full flex items-center justify-center ${ringClass} ${className} ${
           initials
-            ? `bg-gradient-to-br ${gradient}`
+            ? gradient
             : "bg-card"
         }`}
       >

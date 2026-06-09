@@ -1,25 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  /* Dark theme with subtle warmth */
-  --background: #121212;
-  --background-secondary: #1a1a1a;
-  --foreground: #efefef;
-  --muted: #888888;
+  /* Modern flat dark — higher contrast, no gradients */
+  --background: #0a0a0b;
+  --background-secondary: #101012;
+  --foreground: #fafafa;
+  --muted: #9a9aa5;
   --accent: #f97316;
-  --accent-hover: #ea580c;
-  --card: #1e1e1e;
-  --card-hover: #262626;
-  --border: #2e2e2e;
-  --border-subtle: #242424;
+  --accent-hover: #fb8a3c;
+  --accent-soft: rgba(249, 115, 22, 0.12);
+  --card: #131316;
+  --card-hover: #1a1a1f;
+  --border: #26262d;
+  --border-subtle: #1b1b21;
   --success: #22c55e;
   --error: #ef4444;
 
-  /* Surface colors */
-  --surface-1: #161616;
-  --surface-2: #1e1e1e;
-  --surface-3: #262626;
-  --surface-4: #2e2e2e;
+  /* Surface colors (flat, stepped) */
+  --surface-1: #0f0f12;
+  --surface-2: #16161a;
+  --surface-3: #1e1e23;
+  --surface-4: #26262d;
 }
 
 @theme inline {
@@ -27,8 +28,17 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
   --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -49,11 +59,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Very subtle background gradient */
+/* Flat background (gradients intentionally removed) */
 .gradient-mesh {
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(249, 115, 22, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(249, 115, 22, 0.03) 0%, transparent 40%);
+  background: var(--background);
 }
 
 /* Simple fade animation */
@@ -88,32 +96,26 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* Rank badges - solid colors, no excessive glow */
+/* Rank badges - flat solid colors */
 .rank-gold {
-  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  background: #f5b008;
 }
 
 .rank-silver {
-  background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+  background: #b8bcc4;
 }
 
 .rank-bronze {
-  background: linear-gradient(135deg, #fdba74 0%, #ea580c 100%);
+  background: #c2703f;
 }
 
-/* Text gradient for headers only */
+/* Header text helpers (flat — no gradient fill) */
 .text-gradient {
-  background: linear-gradient(135deg, var(--foreground) 0%, var(--muted) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--foreground);
 }
 
 .text-gradient-accent {
-  background: linear-gradient(135deg, var(--accent) 0%, #fb923c 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--accent);
 }
 
 /* Scrollbar */
@@ -156,14 +158,9 @@ body {
   background: var(--surface-2);
 }
 
-/* Stat shimmer - subtle */
+/* Stat shimmer removed (flat) */
 .stat-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.02) 50%,
-    transparent 100%
-  );
+  background: transparent;
 }
 
 /* Button glow - minimal */
