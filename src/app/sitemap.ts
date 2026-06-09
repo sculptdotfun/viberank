@@ -1,10 +1,19 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
+import { FEATURED_TOOLS } from "@/lib/utils";
 
 const SITE = "https://www.viberank.app";
 
+const toolEntries: MetadataRoute.Sitemap = FEATURED_TOOLS.map((t) => ({
+  url: `${SITE}/tool/${t.key}`,
+  lastModified: new Date(),
+  changeFrequency: "daily" as const,
+  priority: 0.8,
+}));
+
 const staticEntries: MetadataRoute.Sitemap = [
   { url: SITE, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
+  ...toolEntries,
   { url: `${SITE}/blog`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
   { url: `${SITE}/blog/mcp-servers-guide`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE}/blog/cursor-vs-claude-code-vs-copilot`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },

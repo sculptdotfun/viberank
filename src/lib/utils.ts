@@ -36,6 +36,20 @@ export function toolLabel(tool: string): string {
   return TOOL_LABELS[tool.toLowerCase()] ?? tool.charAt(0).toUpperCase() + tool.slice(1);
 }
 
+// Tools that get their own SEO landing page (/tool/<key>). One-liners are used
+// in page copy + meta descriptions.
+export const FEATURED_TOOLS: { key: string; blurb: string }[] = [
+  { key: "claude", blurb: "Anthropic's Claude Code CLI" },
+  { key: "codex", blurb: "OpenAI's Codex CLI" },
+  { key: "gemini", blurb: "Google's Gemini CLI" },
+  { key: "copilot", blurb: "GitHub Copilot CLI" },
+  { key: "opencode", blurb: "the OpenCode agent" },
+];
+
+export function toolBlurb(tool: string): string {
+  return FEATURED_TOOLS.find((t) => t.key === tool.toLowerCase())?.blurb ?? `the ${toolLabel(tool)} CLI`;
+}
+
 export function formatCurrency(num: number): string {
   return num.toLocaleString('en-US', {
     minimumFractionDigits: 2,
