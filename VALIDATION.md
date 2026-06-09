@@ -1,18 +1,22 @@
 # Viberank data validation
 
-How submissions are validated. Implemented in `src/lib/data/supabase/client.ts` (`validateSubmitData`) and called from `POST /api/submit`.
+How submissions are validated. Implemented in `src/lib/ccusage.ts` (`normalizeCcData` + `validateCcData`) and called from `POST /api/submit`. ccusage output is normalized first (period→date, the aggregate `agent:"all"` rows deduped, per-day tools resolved) and then validated.
 
 ## Hard rejection
 
 If any of these fail, the API responds with `400` and the submission is not stored.
 
-### Token math
+### Token math (one-sided)
 
 ```
-inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens = totalTokens
+totalTokens >= inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens
 ```
 
-Tolerance: ±1 token (floating point). Mismatch is treated as evidence the JSON was hand-edited and rejected with a hint to regenerate via `ccusage`.
+`totalTokens` may legitimately **exceed** the four components: reasoning/thinking tokens (Gemini 2.5/3, Codex, Claude extended thinking) are counted in `totalTokens` but `ccusage` does not serialize them as a separate field. So we reject only when the total is *less* than its known parts (tolerance ±1 token), which still catches hand-edited/garbage data. Upward inflation is bounded by the cost/token ratio check below. (See [#48](https://github.com/sculptdotfun/viberank/issues/48).)
+
+### Cost per token ratio
+
+`totalCost / totalTokens` must fall within a realistic band (`1e-7` … `0.1` USD/token). This is the primary anti-inflation guard now that the token-sum check is one-sided: inflating tokens pushes the ratio below the floor, inflating cost pushes it above the ceiling.
 
 ### No negative values
 
@@ -36,7 +40,7 @@ The cutoff is intentionally one day past UTC midnight rather than today, because
 
 The schema supports a `flagged_for_review` boolean per submission. Flagged rows are hidden from the leaderboard by default (`includeFlagged: true` reveals them via the admin endpoint).
 
-Currently, flagging is **manual only** — admins can toggle the flag through the `/admin` UI. There is no automatic flagging in the submit path. (The original Convex implementation had heuristic auto-flagging for very high daily cost / sustained averages; that logic was not ported to the Supabase backend.)
+Currently, flagging is **manual only** — admins toggle the flag through the `/admin` UI (which writes via the authenticated `/api/admin/flag` route). There is no automatic flagging in the submit path.
 
 ## Multiple submissions
 

@@ -1,21 +1,24 @@
 # viberank
 
-A community-driven leaderboard for [Claude Code](https://claude.com/claude-code) usage. Submit your `ccusage` stats and see how you rank.
+A community-driven leaderboard for AI coding usage — [Claude Code](https://claude.com/claude-code), [Codex](https://ccusage.com/guide/codex/), Gemini CLI and every other tool [`ccusage`](https://github.com/ryoppippi/ccusage) tracks. Submit your stats and see how you rank.
 
-![viberank](https://img.shields.io/badge/viberank-Track%20Your%20Claude%20Code%20Usage-orange)
+![viberank](https://img.shields.io/badge/viberank-Track%20Your%20AI%20Coding%20Usage-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 
 Live at **[viberank.app](https://www.viberank.app)**.
 
+> **v2 — multi-tool support.** viberank started as a Claude Code leaderboard. As `ccusage` grew to track Codex, Gemini CLI, Copilot, OpenCode and more, viberank evolved with it: submissions from any supported tool are now accepted, recorded per tool, and filterable on the leaderboard. Claude Code remains a first-class citizen — you can now just see how it stacks up against the rest of your stack.
+
 ## Features
 
 - 🏆 **Global leaderboard** by cost or tokens, with 7d / 30d / custom date filters
+- 🧰 **Multi-tool** — usage from Claude Code, Codex, Gemini CLI, Copilot, OpenCode and other `ccusage`-supported agents, with an **"All tools / Claude / Codex / …" filter**
 - 📊 **Profile pages** at `viberank.app/profile/{username}` with daily charts and model breakdown
 - 🚀 **Three ways to submit**: `npx viberank` CLI, plain `curl`, or signed-in web upload
 - 🔐 **GitHub OAuth** — verified submissions show a blue check; unverified CLI submissions show a `cli` pill
-- 🛡️ **Input validation** — token math, date sanity, daily-cost ceilings
+- 🛡️ **Input validation** — token math, date sanity, daily-cost ceilings, cost/token ratio
 - 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
 
 ## Submitting your usage data
@@ -26,17 +29,19 @@ Live at **[viberank.app](https://www.viberank.app)**.
 npx viberank
 ```
 
-This generates a fresh `cc.json` via `ccusage` and POSTs it to `/api/submit`. It picks up your GitHub username from `git config user.name`.
+This generates a fresh `cc.json` via `ccusage daily --json` (the aggregate report across **all** your detected tools) and POSTs it to `/api/submit`. It picks up your GitHub username from your git remote / `git config user.name`.
 
 ### Option 2: curl
 
 ```bash
-npx ccusage@latest --json > cc.json
+npx ccusage@latest daily --json > cc.json
 curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $(git config user.name)" \
   -d @cc.json
 ```
+
+> `ccusage` v20 keys daily entries by `period` and reports an `agent` per day; viberank normalizes this server-side, so either the new or older `ccusage` output works.
 
 ### Option 3: Web upload
 
@@ -54,7 +59,8 @@ If you use a Claude Code MCP-compatible client, the [`viberank-mcp-server`](./pa
 
 Submissions are checked at the API level. Anything that fails these rules is rejected:
 
-- **Token math** — `input + output + cache_creation + cache_read = total` (within 1 token of tolerance)
+- **Token math** — `total >= input + output + cache_creation + cache_read`. The total may legitimately *exceed* the four components because reasoning/thinking tokens (Gemini, Codex, Claude extended thinking) are counted in `totalTokens` but not broken out by `ccusage`. We only reject a total that is *less* than its known parts.
+- **Cost/token ratio** — must fall within a realistic band; this is the primary guard against inflated token counts now that the token-sum check is one-sided
 - **No negative values** anywhere in totals or daily breakdowns
 - **Valid date format** — `YYYY-MM-DD`
 - **Not too far in the future** — dates after tomorrow-UTC are rejected (covers users at any global timezone offset)
@@ -98,7 +104,6 @@ Fill in `.env.local` (see `.env.example` for the full list). The required keys a
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
-NEXT_PUBLIC_DATABASE_BACKEND=supabase
 
 NEXTAUTH_URL=http://localhost:3001
 NEXTAUTH_SECRET=<openssl rand -base64 32>
@@ -110,9 +115,13 @@ GITHUB_SECRET=<github-oauth-client-secret>
 Apply the schema:
 
 ```bash
-# Run the SQL in supabase/migrations/001_initial_schema.sql against your project,
-# either via the Supabase SQL editor or the supabase CLI.
+# Run the SQL in supabase/migrations/ in order against your project,
+# either via the Supabase SQL editor or the supabase CLI:
+#   001_initial_schema.sql
+#   002_multi_tool.sql      # adds submissions.tools[] + daily_breakdowns.agents[]
 ```
+
+> **Deploying v2 to an existing instance:** apply `002_multi_tool.sql` **before** deploying the app code. The migration is additive (new columns default to `'{}'`), so it's safe to run ahead of the deploy.
 
 Run the dev server:
 
@@ -130,6 +139,7 @@ Open <http://localhost:3001>.
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | Run `next lint` |
+| `pnpm test` | Run the ccusage normalization/validation tests (`node test/ccusage.test.mts`; pass a `cc.json` path to also test real data) |
 | `pnpm exec tsc --noEmit` | Type-check without emitting |
 
 ## Tech stack
@@ -140,8 +150,6 @@ Open <http://localhost:3001>.
 - **Charts**: Recharts
 - **Animation**: Framer Motion
 - **Hosting**: Vercel
-
-The repo also contains a dormant Convex implementation behind a feature flag (`NEXT_PUBLIC_DATABASE_BACKEND=convex`); Supabase is the active backend in production.
 
 ## API
 
