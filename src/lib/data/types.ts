@@ -16,6 +16,7 @@ export interface DailyBreakdown {
   totalTokens: number;
   totalCost: number;
   modelsUsed: string[];
+  agents?: string[]; // tools that contributed to this day
 }
 
 export interface Submission {
@@ -35,6 +36,7 @@ export interface Submission {
     end: string;
   };
   modelsUsed: string[];
+  tools?: string[]; // tools/agents used across the submission (e.g. ["claude", "codex"])
   dailyBreakdown: DailyBreakdown[];
   submittedAt: number; // Unix timestamp in ms
   verified: boolean;
@@ -105,6 +107,9 @@ export interface SubmitData {
       totalTokens: number;
       totalCost: number;
       modelsUsed: string[];
+      // Tools/agents that contributed to this day (e.g. ["claude", "codex"]).
+      // Populated by normalizeCcData from ccusage's metadata.agents.
+      agents?: string[];
       modelBreakdowns?: Array<{
         modelName: string;
         inputTokens: number;
@@ -114,6 +119,8 @@ export interface SubmitData {
         cost: number;
       }>;
     }>;
+    // Union of all tools/agents across the submission.
+    tools?: string[];
   };
 }
 

@@ -27,6 +27,7 @@ import type {
   PatternSearchOptions,
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
+import { validateCcData } from "@/lib/ccusage";
 
 // ============================================================================
 // DATABASE TYPES (matching Supabase schema)
@@ -212,61 +213,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
   }
 
   private validateSubmitData(data: SubmitData): void {
-    const { ccData } = data;
-
-    // Verify total tokens match sum of components
-    const calculatedTotalTokens =
-      ccData.totals.inputTokens +
-      ccData.totals.outputTokens +
-      ccData.totals.cacheCreationTokens +
-      ccData.totals.cacheReadTokens;
-
-    if (Math.abs(calculatedTotalTokens - ccData.totals.totalTokens) > 1) {
-      throw new Error(
-        "Token totals don't match. Please use official ccusage tool."
-      );
-    }
-
-    // Validate realistic ranges
-    const MAX_DAILY_COST = 5000;
-    const MAX_DAILY_TOKENS = 250_000_000;
-
-    if (ccData.totals.totalCost < 0 || ccData.totals.totalTokens < 0) {
-      throw new Error("Negative values are not allowed.");
-    }
-
-    if (ccData.totals.totalCost > MAX_DAILY_COST * 365) {
-      throw new Error("Total cost exceeds realistic limits.");
-    }
-
-    // Validate date format and daily data
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    // cc.json dates are emitted in the user's *local* timezone (ccusage groups
-    // by local day), so the server's UTC date can lag the user's by up to a
-    // full day at extreme offsets (UTC+14 / UTC-12). Allow tomorrow-UTC as the
-    // cutoff to cover any global timezone.
-    const now = new Date();
-    const cutoffUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 23, 59, 59, 999));
-
-    for (const day of ccData.daily) {
-      if (!dateRegex.test(day.date)) {
-        throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
-      }
-
-      const dayDate = new Date(day.date + "T00:00:00Z");
-      if (dayDate > cutoffUTC) {
-        throw new Error(`Future date detected: ${day.date}`);
-      }
-
-      if (
-        day.totalCost < 0 ||
-        day.totalTokens < 0 ||
-        day.inputTokens < 0 ||
-        day.outputTokens < 0
-      ) {
-        throw new Error("Negative values are not allowed in daily data.");
-      }
-    }
+    // All validation lives in the shared, unit-tested validator so every
+    // ingestion path enforces the same rules. Data arrives already normalized
+    // (period→date, deduped) from src/lib/ccusage.normalizeCcData.
+    validateCcData(data.ccData as Parameters<typeof validateCcData>[0]);
   }
 
   private async mergeWithExisting(

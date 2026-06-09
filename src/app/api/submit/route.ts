@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
+import { normalizeCcData } from "@/lib/ccusage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -120,6 +121,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize across ccusage report shapes (period→date, dedupe the
+    // aggregate "all" rows, resolve per-day tools, recompute totals). This is
+    // the single chokepoint every submission path funnels through.
+    let normalized;
+    try {
+      normalized = normalizeCcData(ccData);
+    } catch (normalizeError) {
+      const message =
+        normalizeError instanceof Error
+          ? normalizeError.message
+          : "Invalid cc.json format. Please regenerate with: npx ccusage@latest --json > cc.json";
+      console.error("Normalization error:", message);
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    // Hand the data layer the canonical shape from here on.
+    ccData = {
+      totals: normalized.totals,
+      daily: normalized.daily,
+      tools: normalized.tools,
+    };
+
     // Log submission details before sending to database
     console.log("Submitting to database:", {
       username: githubUsername,
@@ -127,6 +150,7 @@ export async function POST(request: NextRequest) {
       verified: verified,
       dataSize: JSON.stringify(ccData).length,
       dailyCount: ccData.daily?.length || 0,
+      tools: normalized.tools,
       totals: ccData.totals,
       backend,
     });
