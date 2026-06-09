@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         ...checks,
         backendConnection: "failed",
         error: error?.message || "Failed to connect to database",
-        hint: `Check ${backend === "convex" ? "Convex" : "Supabase"} dashboard for service status`,
+        hint: `Check Supabase dashboard for service status`,
       },
       { status: 503 }
     );

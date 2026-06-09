@@ -74,23 +74,22 @@ viberank/
 │   │   ├── auth.ts           # Shared NextAuth options
 │   │   ├── env.ts            # Server env validation
 │   │   ├── utils.ts
-│   │   └── data/             # Backend-agnostic data layer
-│   │       ├── index.ts      # Feature-flag selector
+│   │   └── data/             # Data layer (Supabase)
+│   │       ├── index.ts      # Data-layer factory
 │   │       ├── types.ts
 │   │       ├── hooks/        # React hooks (client)
-│   │       ├── supabase/     # Active backend
-│   │       └── convex/       # Dormant fallback
+│   │       └── supabase/     # Supabase client + services
+│   │   └── ccusage.ts        # ccusage normalization + validation
 │   └── types/                # Shared TS types
 ├── supabase/
 │   └── migrations/           # SQL migrations
-├── convex/                   # Dormant Convex implementation
 ├── packages/
 │   ├── viberank-cli/         # `npx viberank` CLI
 │   └── viberank-mcp-server/  # MCP server (currently unmaintained)
 └── public/                   # Static assets
 ```
 
-The data layer (`src/lib/data/`) abstracts over Supabase and Convex via the `NEXT_PUBLIC_DATABASE_BACKEND` env var. Production runs on Supabase; the Convex code path is present but dormant.
+The data layer (`src/lib/data/`) is backed by Supabase (Postgres). ccusage input is normalized and validated in `src/lib/data/../ccusage.ts` before it reaches the data layer.
 
 ## Conventions
 

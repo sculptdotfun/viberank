@@ -27,6 +27,7 @@ import type {
   PatternSearchOptions,
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
+import { validateCcData, inferToolFromModel } from "@/lib/ccusage";
 
 // ============================================================================
 // DATABASE TYPES (matching Supabase schema)
@@ -48,6 +49,7 @@ interface DbSubmission {
   date_range_start: string;
   date_range_end: string;
   models_used: string[];
+  tools: string[] | null;
   submitted_at: string;
   verified: boolean;
   source: "cli" | "oauth" | null;
@@ -69,6 +71,7 @@ interface DbDailyBreakdown {
   total_tokens: number;
   total_cost: number;
   models_used: string[];
+  agents: string[] | null;
 }
 
 interface DbProfile {
@@ -110,6 +113,7 @@ function convertDbSubmissionToSubmission(
       end: dbSubmission.date_range_end,
     },
     modelsUsed: dbSubmission.models_used || [],
+    tools: dbSubmission.tools || [],
     dailyBreakdown: dailyBreakdowns.map(convertDbDailyBreakdown),
     submittedAt: new Date(dbSubmission.submitted_at).getTime(),
     verified: dbSubmission.verified,
@@ -130,6 +134,7 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
     totalTokens: db.total_tokens,
     totalCost: Number(db.total_cost),
     modelsUsed: db.models_used || [],
+    agents: db.agents || [],
   };
 }
 
@@ -171,6 +176,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
     const modelsUsed = Array.from(
       new Set(data.ccData.daily.flatMap((day) => day.modelsUsed))
     );
+    // Tools/agents contributing to this submission (claude, codex, …).
+    const tools =
+      data.ccData.tools ??
+      Array.from(new Set(data.ccData.daily.flatMap((day) => day.agents ?? [])));
 
     // Check for existing submission with overlapping date range
     // Use ilike for case-insensitive username matching
@@ -193,7 +202,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
         data,
         dateRangeStart,
         dateRangeEnd,
-        modelsUsed
+        modelsUsed,
+        tools
       );
     } else {
       // Create new submission
@@ -201,7 +211,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
         data,
         dateRangeStart,
         dateRangeEnd,
-        modelsUsed
+        modelsUsed,
+        tools
       );
     }
 
@@ -212,61 +223,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
   }
 
   private validateSubmitData(data: SubmitData): void {
-    const { ccData } = data;
-
-    // Verify total tokens match sum of components
-    const calculatedTotalTokens =
-      ccData.totals.inputTokens +
-      ccData.totals.outputTokens +
-      ccData.totals.cacheCreationTokens +
-      ccData.totals.cacheReadTokens;
-
-    if (Math.abs(calculatedTotalTokens - ccData.totals.totalTokens) > 1) {
-      throw new Error(
-        "Token totals don't match. Please use official ccusage tool."
-      );
-    }
-
-    // Validate realistic ranges
-    const MAX_DAILY_COST = 5000;
-    const MAX_DAILY_TOKENS = 250_000_000;
-
-    if (ccData.totals.totalCost < 0 || ccData.totals.totalTokens < 0) {
-      throw new Error("Negative values are not allowed.");
-    }
-
-    if (ccData.totals.totalCost > MAX_DAILY_COST * 365) {
-      throw new Error("Total cost exceeds realistic limits.");
-    }
-
-    // Validate date format and daily data
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    // cc.json dates are emitted in the user's *local* timezone (ccusage groups
-    // by local day), so the server's UTC date can lag the user's by up to a
-    // full day at extreme offsets (UTC+14 / UTC-12). Allow tomorrow-UTC as the
-    // cutoff to cover any global timezone.
-    const now = new Date();
-    const cutoffUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 23, 59, 59, 999));
-
-    for (const day of ccData.daily) {
-      if (!dateRegex.test(day.date)) {
-        throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
-      }
-
-      const dayDate = new Date(day.date + "T00:00:00Z");
-      if (dayDate > cutoffUTC) {
-        throw new Error(`Future date detected: ${day.date}`);
-      }
-
-      if (
-        day.totalCost < 0 ||
-        day.totalTokens < 0 ||
-        day.inputTokens < 0 ||
-        day.outputTokens < 0
-      ) {
-        throw new Error("Negative values are not allowed in daily data.");
-      }
-    }
+    // All validation lives in the shared, unit-tested validator so every
+    // ingestion path enforces the same rules. Data arrives already normalized
+    // (period→date, deduped) from src/lib/ccusage.normalizeCcData.
+    validateCcData(data.ccData as Parameters<typeof validateCcData>[0]);
   }
 
   private async mergeWithExisting(
@@ -274,7 +234,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
     data: SubmitData,
     dateRangeStart: string,
     dateRangeEnd: string,
-    modelsUsed: string[]
+    modelsUsed: string[],
+    tools: string[]
   ): Promise<string> {
     // Get existing daily breakdowns
     const { data: existingDaily } = await this.client
@@ -298,6 +259,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         total_tokens: day.totalTokens,
         total_cost: day.totalCost,
         models_used: day.modelsUsed,
+        agents: day.agents ?? [],
       };
 
       if (dailyMap.has(day.date)) {
@@ -340,10 +302,13 @@ class SupabaseSubmissionsService implements SubmissionsService {
     const newDateRangeStart = allDates[0] || dateRangeStart;
     const newDateRangeEnd = allDates[allDates.length - 1] || dateRangeEnd;
 
-    // Merge models
+    // Merge models and tools
     const allModels = Array.from(
       new Set([...(existing.models_used || []), ...modelsUsed])
     );
+    const allTools = Array.from(
+      new Set([...(existing.tools || []), ...tools])
+    ).sort();
 
     // Update submission
     await this.client
@@ -361,6 +326,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         date_range_start: newDateRangeStart,
         date_range_end: newDateRangeEnd,
         models_used: allModels,
+        tools: allTools,
         submitted_at: new Date().toISOString(),
         verified: data.verified,
         source: data.source,
@@ -374,7 +340,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
     data: SubmitData,
     dateRangeStart: string,
     dateRangeEnd: string,
-    modelsUsed: string[]
+    modelsUsed: string[],
+    tools: string[]
   ): Promise<string> {
     // Insert submission
     const { data: submission, error } = await this.client
@@ -393,6 +360,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         date_range_start: dateRangeStart,
         date_range_end: dateRangeEnd,
         models_used: modelsUsed,
+        tools: tools,
         submitted_at: new Date().toISOString(),
         verified: data.verified,
         source: data.source,
@@ -415,6 +383,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
       total_tokens: day.totalTokens,
       total_cost: day.totalCost,
       models_used: day.modelsUsed,
+      agents: day.agents ?? [],
     }));
 
     const { error: dailyError } = await this.client
@@ -488,6 +457,11 @@ class SupabaseSubmissionsService implements SubmissionsService {
       query = query.or("flagged_for_review.is.null,flagged_for_review.eq.false");
     }
 
+    // Filter to submissions that used a given tool (GIN-indexed array contains).
+    if (params.tool) {
+      query = query.contains("tools", [params.tool]);
+    }
+
     const { data: submissions, count, error } = await query;
 
     if (error) {
@@ -545,6 +519,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     if (!includeFlagged) {
       query = query.or("flagged_for_review.is.null,flagged_for_review.eq.false");
+    }
+
+    if (params.tool) {
+      query = query.contains("tools", [params.tool]);
     }
 
     const { data: submissions } = await query.limit(SUBMISSION_CAP);
@@ -726,7 +704,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
     // Merge submissions
     const baseSubmission =
       oauthSubmissions[0] ||
-      submissions.sort((a, b) =>
+      [...submissions].sort((a, b) =>
         new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
       )[0];
 
@@ -783,6 +761,15 @@ class SupabaseSubmissionsService implements SubmissionsService {
     const allModels = Array.from(
       new Set(mergedDaily.flatMap((d) => d.models_used || []))
     );
+    // Union tools from the submission rows AND the merged daily agents, so
+    // tools set by an earlier normalized submission survive a claim/merge even
+    // when older daily_breakdowns rows have empty `agents`.
+    const allTools = Array.from(
+      new Set([
+        ...submissions.flatMap((s) => s.tools || []),
+        ...mergedDaily.flatMap((d) => d.agents || []),
+      ])
+    ).sort();
 
     // Update base submission
     const { error: updateError } = await this.client
@@ -797,6 +784,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         date_range_start: dateRange.start,
         date_range_end: dateRange.end,
         models_used: allModels,
+        tools: allTools,
         submitted_at: new Date().toISOString(),
         verified: true,
         source: oauthSubmissions.length > 0 ? "oauth" : baseSubmission.source,
@@ -828,6 +816,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         total_tokens: d.total_tokens,
         total_cost: d.total_cost,
         models_used: d.models_used,
+        agents: d.agents || [],
       }))
     );
 
@@ -1146,9 +1135,16 @@ class SupabaseStatsService implements StatsService {
         topSubmission = submission;
       }
 
-      (submission.models_used || []).forEach((model: string) => {
-        const key = model.includes("opus") ? "opus" : "sonnet";
-        modelUsage[key] = (modelUsage[key] || 0) + 1;
+      // Count submissions per tool (claude, codex, gemini, …). Prefer the
+      // stored `tools`; fall back to classifying models for legacy rows.
+      const submissionTools =
+        submission.tools && submission.tools.length > 0
+          ? submission.tools
+          : Array.from(
+              new Set((submission.models_used || []).map(inferToolFromModel))
+            );
+      submissionTools.forEach((tool: string) => {
+        modelUsage[tool] = (modelUsage[tool] || 0) + 1;
       });
     }
 

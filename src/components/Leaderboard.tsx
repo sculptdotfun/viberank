@@ -21,6 +21,7 @@ interface LeaderboardProps {
 
 export default function Leaderboard({ onCopyCommand, copiedToClipboard }: LeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortBy>("cost");
+  const [tool, setTool] = useState<string | null>(null);
   const [showShareCard, setShowShareCard] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -35,17 +36,26 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
   const isDateFiltered = dateFrom && dateTo;
 
   const { data: regularResult, isLoading } = useLeaderboard(
-    !isDateFiltered ? { sortBy, page, pageSize: ITEMS_PER_PAGE } : "skip"
+    !isDateFiltered
+      ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined }
+      : "skip"
   );
 
   const { data: dateFilteredResult } = useLeaderboardByDateRange(
-    isDateFiltered ? { dateFrom, dateTo, sortBy, limit: 100 } : "skip"
+    isDateFiltered
+      ? { dateFrom, dateTo, sortBy, limit: 100, tool: tool ?? undefined }
+      : "skip"
   );
+
+  // Tools available to filter by, sourced from the global per-tool stats.
+  const availableTools = globalStats?.modelUsage
+    ? Object.keys(globalStats.modelUsage).sort()
+    : [];
 
   useEffect(() => {
     setAllItems([]);
     setPage(0);
-  }, [sortBy, dateFrom, dateTo]);
+  }, [sortBy, dateFrom, dateTo, tool]);
 
   useEffect(() => {
     if (isDateFiltered && dateFilteredResult?.items) {
@@ -119,7 +129,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
       <div className="flex-shrink-0 px-6 py-5 border-b border-border">
         <div className="flex items-center justify-between gap-4 mb-5">
           <div>
-            <h1 className="text-2xl font-bold">Claude Code Leaderboard</h1>
+            <h1 className="text-2xl font-bold">Claude Code, Codex &amp; AI Coding Leaderboard</h1>
             <p className="text-sm text-muted mt-1">Who's spending the most on AI coding?</p>
           </div>
           {onCopyCommand && (
@@ -200,6 +210,24 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
             >
               <Calendar className="w-4 h-4" />
             </button>
+
+            {availableTools.length > 1 && (
+              <select
+                value={tool ?? ""}
+                onChange={(e) => setTool(e.target.value || null)}
+                aria-label="Filter by tool"
+                className={`px-2.5 py-1.5 text-sm font-medium rounded-md bg-surface-2 border border-border transition-colors focus:outline-none focus:ring-1 focus:ring-accent ${
+                  tool ? "text-accent" : "text-muted hover:text-foreground"
+                }`}
+              >
+                <option value="">All tools</option>
+                {availableTools.map((t) => (
+                  <option key={t} value={t}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

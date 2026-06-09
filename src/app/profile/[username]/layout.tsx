@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     if (!profile) {
       return {
         title: `${username} | Viberank`,
-        description: `Claude Code usage stats for ${username}.`,
+        description: `AI coding usage stats (Claude Code, Codex & more) for ${username}.`,
         alternates: { canonical: `https://www.viberank.app/profile/${encodeURIComponent(username)}` },
       };
     }
@@ -27,8 +27,23 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     const tokensB = totalTokens >= 1e9 ? `${(totalTokens / 1e9).toFixed(1)}B` : `${(totalTokens / 1e6).toFixed(0)}M`;
     const cost = `$${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-    const title = `${display} — ${cost} on Claude Code | Viberank`;
-    const description = `${display} has spent ${cost} across ${tokensB} tokens on Claude Code. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
+    // Build the tool list from the profile's actual usage (Claude sorts first),
+    // so metadata is accurate per user and still keyword-rich for Claude users.
+    const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+    const tools = Array.from(
+      new Set(profile.submissions.flatMap((s) => s.tools ?? []))
+    ).sort();
+    const toolsShort =
+      tools.length === 0
+        ? "AI coding tools"
+        : tools.length <= 2
+          ? tools.map(cap).join(" & ")
+          : `${tools.slice(0, 2).map(cap).join(" & ")} & more`;
+    const toolsLong =
+      tools.length === 0 ? "AI coding tools" : tools.map(cap).join(", ");
+
+    const title = `${display} — ${cost} on ${toolsShort} | Viberank`;
+    const description = `${display} has spent ${cost} across ${tokensB} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
     const canonical = `https://www.viberank.app/profile/${encodeURIComponent(profile.username)}`;
     const ogImage = `/api/og?title=${encodeURIComponent(display)}&description=${encodeURIComponent(`${cost} • ${tokensB} tokens`)}`;
 
@@ -54,7 +69,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
   } catch {
     return {
       title: `${username} | Viberank`,
-      description: `Claude Code usage stats for ${username}.`,
+      description: `AI coding usage stats (Claude Code, Codex & more) for ${username}.`,
     };
   }
 }
@@ -93,7 +108,7 @@ export default async function ProfileLayout({
           "sameAs": profile.githubUsername
             ? [`https://github.com/${profile.githubUsername}`]
             : undefined,
-          "description": `Claude Code user, ${profile.totalSubmissions} submission${profile.totalSubmissions === 1 ? "" : "s"} totaling $${totalCost.toFixed(0)} on Viberank.`,
+          "description": `AI coding user, ${profile.totalSubmissions} submission${profile.totalSubmissions === 1 ? "" : "s"} totaling $${totalCost.toFixed(0)} on Viberank.`,
         },
       }
     : null;

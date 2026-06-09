@@ -34,7 +34,7 @@ echo ""
 
 # Generate ccusage data
 echo -e "${YELLOW}Generating usage data...${NC}"
-npx ccusage@latest --json > cc.json
+npx ccusage@latest daily --json > cc.json
 
 if [ ! -f "cc.json" ]; then
     echo -e "${RED}Error: Failed to generate cc.json${NC}"

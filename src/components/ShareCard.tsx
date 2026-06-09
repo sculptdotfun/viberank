@@ -18,7 +18,7 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
   const [copied, setCopied] = useState(false);
   
   const shareUrl = `viberank.app`;
-  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens used\n\nJoin the Claude Code leaderboard:`;
+  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens used\n\nJoin the AI coding leaderboard:`;
   
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);

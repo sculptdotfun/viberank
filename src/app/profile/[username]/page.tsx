@@ -12,21 +12,40 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useState } from "react";
 import { useProfile } from "@/lib/data/hooks/useProfiles";
 
-// Parse a ccusage model id like "claude-opus-4-7-20260201" into a display
-// label ("Opus 4.7"). Falls back to "Claude" on unrecognized strings.
+// Parse a ccusage model id into a friendly display label across tools, e.g.
+// "claude-opus-4-7-20260201" -> "Opus 4.7", "gpt-5-codex" -> "GPT-5 Codex",
+// "gemini-3-pro-preview" -> "Gemini 3 Pro". Unknown ids are returned cleaned
+// (stripping a "[tool] " or "vendor/" prefix) rather than mislabeled.
 function formatModelLabel(modelId: string): string {
-  const family = modelId.includes("opus")
+  const id = modelId.toLowerCase();
+
+  // Claude families carry a -<major>-<minor> version we can prettify.
+  const claudeFamily = id.includes("opus")
     ? "Opus"
-    : modelId.includes("sonnet")
+    : id.includes("sonnet")
     ? "Sonnet"
-    : modelId.includes("haiku")
+    : id.includes("haiku")
     ? "Haiku"
     : null;
+  if (claudeFamily) {
+    const v = modelId.match(/-(\d+)-(\d+)(?:-|$)/);
+    return v ? `${claudeFamily} ${v[1]}.${v[2]}` : claudeFamily;
+  }
 
-  if (!family) return "Claude";
+  if (id.includes("gemini")) {
+    const v = modelId.match(/gemini-(\d+(?:\.\d+)?)/);
+    const variant = id.includes("flash") ? " Flash" : id.includes("pro") ? " Pro" : "";
+    return v ? `Gemini ${v[1]}${variant}` : "Gemini";
+  }
 
-  const version = modelId.match(/-(\d+)-(\d+)(?:-|$)/);
-  return version ? `${family} ${version[1]}.${version[2]}` : family;
+  if (id.includes("codex") || id.includes("gpt")) {
+    const v = modelId.match(/gpt-(\d+(?:\.\d+)?)/);
+    const codex = id.includes("codex") ? " Codex" : "";
+    return v ? `GPT-${v[1]}${codex}` : id.includes("codex") ? "Codex" : "GPT";
+  }
+
+  // Unknown model: strip a "[tool] " prefix and any "vendor/" prefix.
+  return modelId.replace(/^\[[^\]]+\]\s*/, "").replace(/^[\w.-]+\//, "");
 }
 
 export default function ProfilePage() {

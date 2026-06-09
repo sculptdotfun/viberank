@@ -177,7 +177,7 @@ class ViberankMCPServer {
       const tempFile = path.join(os.tmpdir(), `cc-usage-${Date.now()}.json`);
       
       try {
-        execSync(`npx ccusage@latest --json > ${tempFile}`, {
+        execSync(`npx ccusage@latest daily --json > ${tempFile}`, {
           encoding: 'utf8',
           stdio: 'pipe',
         });

@@ -1,6 +1,6 @@
 /**
  * Shared types for data layer abstraction
- * These types work with both Convex and Supabase backends
+ * These types describe the Supabase-backed data layer
  */
 
 // ============================================================================
@@ -16,6 +16,7 @@ export interface DailyBreakdown {
   totalTokens: number;
   totalCost: number;
   modelsUsed: string[];
+  agents?: string[]; // tools that contributed to this day
 }
 
 export interface Submission {
@@ -35,6 +36,7 @@ export interface Submission {
     end: string;
   };
   modelsUsed: string[];
+  tools?: string[]; // tools/agents used across the submission (e.g. ["claude", "codex"])
   dailyBreakdown: DailyBreakdown[];
   submittedAt: number; // Unix timestamp in ms
   verified: boolean;
@@ -69,6 +71,8 @@ export interface LeaderboardParams {
   page?: number;
   pageSize?: number;
   includeFlagged?: boolean;
+  /** Filter to submissions that used this tool/agent (e.g. "codex"). */
+  tool?: string;
 }
 
 export interface DateRangeLeaderboardParams {
@@ -78,6 +82,8 @@ export interface DateRangeLeaderboardParams {
   limit?: number;
   cursor?: string;
   includeFlagged?: boolean;
+  /** Filter to submissions that used this tool/agent (e.g. "codex"). */
+  tool?: string;
 }
 
 export interface SubmitData {
@@ -105,6 +111,9 @@ export interface SubmitData {
       totalTokens: number;
       totalCost: number;
       modelsUsed: string[];
+      // Tools/agents that contributed to this day (e.g. ["claude", "codex"]).
+      // Populated by normalizeCcData from ccusage's metadata.agents.
+      agents?: string[];
       modelBreakdowns?: Array<{
         modelName: string;
         inputTokens: number;
@@ -114,6 +123,8 @@ export interface SubmitData {
         cost: number;
       }>;
     }>;
+    // Union of all tools/agents across the submission.
+    tools?: string[];
   };
 }
 
@@ -251,4 +262,4 @@ export interface DataLayer {
 // DATABASE BACKEND TYPE
 // ============================================================================
 
-export type DatabaseBackend = "convex" | "supabase";
+export type DatabaseBackend = "supabase";
