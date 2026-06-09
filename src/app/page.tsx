@@ -12,6 +12,7 @@ export const revalidate = 300;
 export default async function Home() {
   let initialItems: Submission[] = [];
   let initialStats: GlobalStats | undefined;
+  let initialHasMore = false;
 
   try {
     const dataLayer = await getServerDataLayer();
@@ -20,10 +21,11 @@ export default async function Home() {
       dataLayer.stats.getGlobalStats().catch(() => null),
     ]);
     initialItems = lb?.items ?? [];
+    initialHasMore = lb?.hasMore ?? false;
     initialStats = stats ?? undefined;
   } catch {
     // Fall back to client-side fetch if the server read fails.
   }
 
-  return <HomeClient initialItems={initialItems} initialStats={initialStats} />;
+  return <HomeClient initialItems={initialItems} initialStats={initialStats} initialHasMore={initialHasMore} />;
 }

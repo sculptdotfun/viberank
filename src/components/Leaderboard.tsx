@@ -21,6 +21,24 @@ interface LeaderboardProps {
   // HTML (SEO + no first-paint spinner) before the client hooks take over.
   initialItems?: Submission[];
   initialStats?: GlobalStats;
+  initialHasMore?: boolean;
+}
+
+// Flat placeholder rows shown while a filter/sort change is fetching.
+function SkeletonRows({ count = 8 }: { count?: number }) {
+  return (
+    <div className="px-6 py-5 space-y-3" aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-1 px-4 py-3 animate-pulse">
+          <div className="w-8 h-4 rounded bg-surface-3" />
+          <div className="w-8 h-8 rounded-full bg-surface-3" />
+          <div className="flex-1 h-4 rounded bg-surface-3 max-w-[180px]" />
+          <div className="w-24 h-4 rounded bg-surface-3" />
+          <div className="w-20 h-4 rounded bg-surface-3 hidden sm:block" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // Small flat pills showing which tools a submission used.
@@ -120,7 +138,7 @@ function StatCard({ icon: Icon, label, value, accent = false }: { icon: typeof U
   );
 }
 
-export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialItems, initialStats }: LeaderboardProps) {
+export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialItems, initialStats, initialHasMore }: LeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortBy>("cost");
   const [tool, setTool] = useState<string | null>(null);
   const [showShareCard, setShowShareCard] = useState<string | null>(null);
@@ -138,11 +156,22 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
   const ITEMS_PER_PAGE = 25;
   const isDateFiltered = dateFrom && dateTo;
 
+  // The server already rendered page 0 of the default view — don't re-fetch
+  // it on mount. The hook only runs for non-default filters or later pages.
+  const isSeededDefaultView =
+    (initialItems?.length ?? 0) > 0 &&
+    page === 0 &&
+    sortBy === "cost" &&
+    !tool &&
+    !isDateFiltered;
+
   const { data: regularResult, isLoading } = useLeaderboard(
-    !isDateFiltered
+    !isDateFiltered && !isSeededDefaultView
       ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined }
       : "skip"
   );
+
+  const hasMore = regularResult?.hasMore ?? (isSeededDefaultView ? initialHasMore ?? false : false);
 
   const { data: dateFilteredResult } = useLeaderboardByDateRange(
     isDateFiltered
@@ -183,7 +212,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
   }, [regularResult, dateFilteredResult, page, isDateFiltered]);
 
   useEffect(() => {
-    if (isDateFiltered || !regularResult?.hasMore) return;
+    if (isDateFiltered || !hasMore) return;
 
     const currentRef = loadMoreRef.current;
     if (!currentRef) return;
@@ -199,7 +228,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
 
     observer.observe(currentRef);
     return () => observer.disconnect();
-  }, [regularResult?.hasMore, isLoading, isDateFiltered, allItems.length]);
+  }, [hasMore, isLoading, isDateFiltered, allItems.length]);
 
   const setQuickFilter = (days: number | null) => {
     if (days === null) {
@@ -469,16 +498,14 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
               </div>
             )}
 
-            {!isDateFiltered && regularResult?.hasMore && (
+            {!isDateFiltered && hasMore && (
               <div ref={loadMoreRef} className="py-6 text-center">
                 <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted" />
               </div>
             )}
           </div>
         ) : isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 animate-spin text-muted" />
-          </div>
+          <SkeletonRows />
         ) : (
           <div className="text-center py-16">
             <Trophy className="w-10 h-10 text-muted mx-auto mb-3" />
@@ -504,6 +531,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialI
               totalCost={allItems.find(s => s.id === showShareCard)!.totalCost}
               totalTokens={allItems.find(s => s.id === showShareCard)!.totalTokens}
               dateRange={allItems.find(s => s.id === showShareCard)!.dateRange}
+              tools={allItems.find(s => s.id === showShareCard)!.tools}
               onClose={() => setShowShareCard(null)}
             />
           </div>

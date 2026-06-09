@@ -8,9 +8,10 @@ import {
   Github,
   DollarSign,
   CalendarDays,
-  Wrench,
+  Trophy,
 } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
+import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChart";
 
@@ -74,6 +75,18 @@ export default async function ProfilePage({ params }: ProfileParams) {
 
   const displayName = profileData.githubName || profileData.githubUsername || username;
   const handle = profileData.githubUsername || username;
+
+  // Global leaderboard position, based on the profile's best submission.
+  let globalRank: number | null = null;
+  try {
+    const bestCost = Math.max(...submissions.map((s) => s.totalCost));
+    if (Number.isFinite(bestCost)) {
+      const dataLayer = await getServerDataLayer();
+      globalRank = await dataLayer.submissions.getGlobalRank(bestCost);
+    }
+  } catch {
+    // rank is nice-to-have; render without it on failure
+  }
 
   const tokenRows = [
     { label: "Input", value: tokenAgg.input, color: "bg-accent" },
@@ -159,9 +172,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submission{profileData.totalSubmissions === 1 ? "" : "s"}</p>
             </div>
             <div className="bg-surface-1 border border-border rounded-2xl p-4">
-              <p className="flex items-center gap-1.5 text-xs text-muted mb-1"><Wrench className="w-3.5 h-3.5" />Tools</p>
-              <p className="text-xl font-bold">{tools.length || 1}</p>
-              <p className="text-xs text-muted mt-1 truncate">{tools.length ? toolLabel(tools[0]) : "Claude"}{tools.length > 1 ? ` +${tools.length - 1}` : ""}</p>
+              <p className="flex items-center gap-1.5 text-xs text-muted mb-1"><Trophy className="w-3.5 h-3.5" />Global rank</p>
+              <p className="text-xl font-bold">{globalRank ? `#${globalRank}` : "—"}</p>
+              <p className="text-xs text-muted mt-1 truncate">{tools.length ? `${tools.map(toolLabel).slice(0, 2).join(", ")}${tools.length > 2 ? " +" + (tools.length - 2) : ""}` : "by cost"}</p>
             </div>
           </div>
         </div>

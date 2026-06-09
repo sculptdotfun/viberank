@@ -468,22 +468,12 @@ class SupabaseSubmissionsService implements SubmissionsService {
       throw new Error("Failed to fetch leaderboard: " + error.message);
     }
 
-    // Fetch daily breakdowns for all submissions
-    const submissionIds = (submissions || []).map((s) => s.id);
-    const { data: allDailyBreakdowns } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .in("submission_id", submissionIds);
-
-    const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    (allDailyBreakdowns || []).forEach((db) => {
-      const existing = dailyBySubmission.get(db.submission_id) || [];
-      existing.push(db);
-      dailyBySubmission.set(db.submission_id, existing);
-    });
-
+    // The list view only renders submission-level fields (cost, tokens, tools,
+    // date range), so skip fetching daily_breakdowns entirely — that was
+    // thousands of rows per page for data the UI never showed. Callers that
+    // need daily data use getSubmission/getProfile/date-range queries.
     const items = (submissions || []).map((s) =>
-      convertDbSubmissionToSubmission(s, dailyBySubmission.get(s.id) || [])
+      convertDbSubmissionToSubmission(s, [])
     );
 
     const totalItems = count || 0;
@@ -909,6 +899,21 @@ class SupabaseSubmissionsService implements SubmissionsService {
       totalSubmissions: submissions.length,
       unverifiedCount,
     };
+  }
+
+  async getGlobalRank(totalCost: number): Promise<number> {
+    // Rank = how many unflagged submissions beat this cost, plus one. Uses a
+    // head-only count so no rows are transferred.
+    const { count, error } = await this.client
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .gt("total_cost", totalCost)
+      .or("flagged_for_review.is.null,flagged_for_review.eq.false");
+
+    if (error) {
+      throw new Error("Failed to compute rank: " + error.message);
+    }
+    return (count ?? 0) + 1;
   }
 }
 

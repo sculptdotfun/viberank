@@ -7,20 +7,19 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Avatar from "./Avatar";
+import { isAdmin as checkIsAdmin } from "@/lib/admin";
 
 interface NavBarProps {
   onUploadClick: () => void;
   onUpdatesClick: () => void;
 }
 
-const ADMIN_USERS = ["nikshepsvn"];
-
 export default function NavBar({ onUploadClick, onUpdatesClick }: NavBarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  const isAdmin = session?.user?.username && ADMIN_USERS.includes(session.user.username);
+  const isAdmin = checkIsAdmin(session?.user?.username);
 
   const navItems = [
     { name: "Blog", href: "/blog", icon: BookOpen },

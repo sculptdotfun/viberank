@@ -161,11 +161,17 @@ export function useSubmission(id: string | undefined) {
 /**
  * Hook for getting flagged submissions (admin)
  */
-export function useFlaggedSubmissions(limit?: number) {
+export function useFlaggedSubmissions(limit?: number, enabled: boolean = true) {
   const [supabaseData, setSupabaseData] = useState<Submission[] | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
 
   useEffect(() => {
+    // Don't fetch for non-admin visitors — the data is public-readable but
+    // there's no reason to pull it for everyone who lands on /admin.
+    if (!enabled) {
+      setSupabaseData(undefined);
+      return;
+    }
     setSupabaseLoading(true);
 
     import("../supabase/client")
@@ -175,7 +181,7 @@ export function useFlaggedSubmissions(limit?: number) {
       })
       .then(setSupabaseData)
       .finally(() => setSupabaseLoading(false));
-  }, [limit]);
+  }, [limit, enabled]);
 
   return {
     data: supabaseData,
