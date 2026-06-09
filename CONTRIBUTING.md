@@ -29,8 +29,8 @@ File a GitHub issue with the motivation, the proposed behavior, and any alternat
 ### Prerequisites
 
 - Node.js 18+ and pnpm 10+
-- A Supabase project (free tier is fine) — the schema lives in `supabase/migrations/001_initial_schema.sql`
-- A GitHub OAuth app for local sign-in (callback URL: `http://localhost:3001/api/auth/callback/github`)
+- A Supabase project (free tier is fine) — the schema lives in `supabase/migrations/` (apply in order)
+- A GitHub OAuth app for local sign-in (callback URL: `http://localhost:3000/api/auth/callback/github`)
 
 ### Install
 
@@ -45,7 +45,7 @@ Fill in `.env.local` with your Supabase project URL, anon key, service role key,
 
 ### Apply the database schema
 
-Run the SQL in `supabase/migrations/001_initial_schema.sql` against your Supabase project, either via the SQL editor in the dashboard or the `supabase` CLI.
+Run the SQL files in `supabase/migrations/` (in order: `001_initial_schema.sql`, then `002_multi_tool.sql`) against your Supabase project, either via the SQL editor in the dashboard or the `supabase` CLI.
 
 ### Run the dev server
 
@@ -53,7 +53,7 @@ Run the SQL in `supabase/migrations/001_initial_schema.sql` against your Supabas
 pnpm dev
 ```
 
-Opens on <http://localhost:3001>.
+Opens on <http://localhost:3000>.
 
 ## Project structure
 
@@ -62,34 +62,41 @@ viberank/
 ├── src/
 │   ├── app/                  # Next.js App Router
 │   │   ├── api/
-│   │   │   ├── submit/       # POST /api/submit
+│   │   │   ├── submit/       # POST /api/submit (normalize + validate + store)
 │   │   │   ├── claim/        # POST /api/claim (authenticated merge)
+│   │   │   ├── admin/flag/   # POST /api/admin/flag (admin-only)
 │   │   │   ├── auth/         # NextAuth handlers
 │   │   │   └── health/       # GET /api/health
-│   │   ├── profile/[username]/
-│   │   ├── admin/
-│   │   └── page.tsx          # Home / leaderboard
-│   ├── components/           # React components
+│   │   ├── page.tsx          # Home (server: SSR first page + FAQ schema)
+│   │   ├── HomeClient.tsx    # Home interactivity (hero, board, modals)
+│   │   ├── tool/[tool]/      # Per-tool leaderboards (SSR, ISR hourly)
+│   │   ├── profile/[username]/ # SSR profile (+ getProfile cache, UsageChart)
+│   │   ├── blog/             # Blog posts (static)
+│   │   └── admin/            # Flag-review dashboard
+│   ├── components/           # Leaderboard, NavBar, Footer, ShareCard, …
 │   ├── lib/
+│   │   ├── ccusage.ts        # ccusage normalization + validation (unit-tested)
+│   │   ├── admin.ts          # Admin allowlist (client gate + server enforcement)
+│   │   ├── home-faqs.ts      # Homepage FAQ content (visible copy + JSON-LD)
 │   │   ├── auth.ts           # Shared NextAuth options
 │   │   ├── env.ts            # Server env validation
-│   │   ├── utils.ts
+│   │   ├── utils.ts          # Formatters, tool labels, FEATURED_TOOLS
 │   │   └── data/             # Data layer (Supabase)
 │   │       ├── index.ts      # Data-layer factory
 │   │       ├── types.ts
 │   │       ├── hooks/        # React hooks (client)
 │   │       └── supabase/     # Supabase client + services
-│   │   └── ccusage.ts        # ccusage normalization + validation
 │   └── types/                # Shared TS types
 ├── supabase/
-│   └── migrations/           # SQL migrations
+│   └── migrations/           # SQL migrations (apply in order)
+├── test/                     # ccusage tests (`pnpm test`)
 ├── packages/
-│   ├── viberank-cli/         # `npx viberank-cli` CLI
-│   └── viberank-mcp-server/  # MCP server (currently unmaintained)
+│   ├── viberank-cli/         # `npx viberank-cli` (npm: viberank-cli)
+│   └── viberank-mcp-server/  # MCP server (npm: viberank-mcp)
 └── public/                   # Static assets
 ```
 
-The data layer (`src/lib/data/`) is backed by Supabase (Postgres). ccusage input is normalized and validated in `src/lib/data/../ccusage.ts` before it reaches the data layer.
+The data layer (`src/lib/data/`) is backed by Supabase (Postgres). ccusage input is normalized and validated in `src/lib/ccusage.ts` before it reaches the data layer — run `pnpm test` after touching it.
 
 ## Conventions
 
@@ -127,6 +134,7 @@ Keep the subject under ~72 characters. Use the body for the *why*.
 ```bash
 pnpm exec tsc --noEmit   # type-check
 pnpm lint                # next lint
+pnpm test                # ccusage normalization/validation tests
 pnpm build               # full production build
 ```
 
