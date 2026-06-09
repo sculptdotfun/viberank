@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { Copy, X, Trophy, Check } from "lucide-react";
 import { useState } from "react";
 import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
+import { getTier } from "@/lib/tiers";
+import TierBadge from "./TierBadge";
 
 interface ShareCardProps {
   rank: number;
@@ -19,8 +21,9 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
   const [copied, setCopied] = useState(false);
 
   const shareUrl = `https://viberank.app/profile/${encodeURIComponent(username)}`;
+  const tier = getTier(totalCost);
   const toolsLine = tools && tools.length > 0 ? `\n🧰 ${tools.map(toolLabel).join(" · ")}` : "";
-  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens${toolsLine}\n\nJoin the AI coding leaderboard:`;
+  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n${tier.glyph} ${tier.name.toUpperCase()} tier\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens${toolsLine}\n\nJoin the AI coding leaderboard:`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -52,8 +55,11 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
       <div className="bg-background border border-border rounded-xl p-5 mb-4">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-xs text-muted font-mono mb-1">viberank.app</p>
-            <h4 className="text-lg font-bold">{username}</h4>
+            <p className="micro-label mb-1">viberank.app</p>
+            <div className="flex items-center gap-2">
+              <h4 className="text-lg font-bold">{username}</h4>
+              <TierBadge totalCost={totalCost} size="xs" />
+            </div>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent text-white">
             <Trophy className="w-4 h-4" />

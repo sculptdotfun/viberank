@@ -150,6 +150,48 @@ body {
   outline-offset: 2px;
 }
 
+/* Uppercase mono micro-label — section eyebrows, stat labels, table headers */
+.micro-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Ticker tape — continuous marquee, pauses on hover */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ticker-scroll 60s linear infinite;
+  will-change: transform;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Blinking block cursor used after headings */
+@keyframes cursor-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+
+.cursor-block {
+  display: inline-block;
+  width: 0.45em;
+  height: 0.85em;
+  margin-left: 0.12em;
+  background: var(--accent);
+  animation: cursor-blink 1.1s steps(1) infinite;
+}
+
 /* Simple table row hover */
 .table-row-hover {
   transition: background 0.15s ease;

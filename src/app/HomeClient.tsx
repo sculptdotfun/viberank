@@ -2,16 +2,15 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Merge, X, Terminal, Copy, Check, Users, DollarSign, Zap, Trophy } from "lucide-react";
-import Link from "next/link";
-import FileUpload from "@/components/FileUpload";
+import { Upload, Merge, X, Terminal, Copy, Check, Github } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
-import UpdatesModal from "@/components/UpdatesModal";
+import SubmitModal from "@/components/SubmitModal";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useCheckClaimableSubmissions, useClaimAndMergeSubmissions } from "@/lib/data/hooks/useSubmissions";
-import { formatNumber, toolLabel, FEATURED_TOOLS } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
+import { TIERS } from "@/lib/tiers";
 import { HOME_FAQS } from "@/lib/home-faqs";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 
@@ -21,9 +20,45 @@ interface HomeClientProps {
   initialHasMore?: boolean;
 }
 
+// "$5K+" style tier thresholds (formatNumber gives "5.0K").
+function tierMin(min: number): string {
+  if (min === 0) return "$0+";
+  return `$${formatNumber(min).replace(".0", "")}+`;
+}
+
+function Ticker({ stats }: { stats: GlobalStats }) {
+  const entries = [
+    `${formatNumber(stats.totalUsers)} developers on the board`,
+    `$${formatNumber(stats.totalCost)} tracked`,
+    `${formatNumber(stats.totalTokens)} tokens burned`,
+    stats.topUser ? `${stats.topUser} leads at $${formatNumber(stats.topCost)}` : null,
+    `run npx viberank-cli to join`,
+  ].filter(Boolean) as string[];
+
+  // Track is duplicated so the -50% translate loops seamlessly.
+  const half = (
+    <span className="inline-flex items-center">
+      {entries.map((e, i) => (
+        <span key={i} className="inline-flex items-center">
+          <span className="px-5">{e}</span>
+          <span className="text-accent">·</span>
+        </span>
+      ))}
+    </span>
+  );
+
+  return (
+    <div className="border-b border-border bg-surface-1 overflow-hidden" aria-hidden>
+      <div className="ticker-track font-mono text-[10px] uppercase tracking-[0.14em] text-muted py-1.5">
+        {half}
+        {half}
+      </div>
+    </div>
+  );
+}
+
 export default function HomeClient({ initialItems, initialStats, initialHasMore }: HomeClientProps) {
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showUpdatesModal, setShowUpdatesModal] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [showMergeBanner, setShowMergeBanner] = useState(true);
   const [merging, setMerging] = useState(false);
@@ -60,10 +95,9 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <NavBar
-        onUploadClick={() => setShowUploadModal(true)}
-        onUpdatesClick={() => setShowUpdatesModal(true)}
-      />
+      {stats && <Ticker stats={stats} />}
+
+      <NavBar />
 
       {/* Claim/Merge Banner */}
       <AnimatePresence>
@@ -97,95 +131,154 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
       </AnimatePresence>
 
       <main className="flex-1">
-        {/* Hero */}
-        <section className="border-b border-border">
-          <div className="max-w-6xl mx-auto px-6 pt-14 pb-10">
-            <h1 className="text-3xl sm:text-5xl font-bold tracking-tight max-w-3xl leading-[1.1]">
-              Claude Code, Codex &amp; AI Coding <span className="text-accent">Leaderboard</span>
-            </h1>
-            <p className="text-muted text-base sm:text-lg mt-4 max-w-2xl">
-              Real usage, real costs. Developers ranked by what they actually spend across AI coding
-              tools — measured from ccusage data, not vibes.
-            </p>
+        {/* Headline + board + sidebar */}
+        <section className="max-w-6xl mx-auto px-6 pt-12 pb-16 w-full lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-10 lg:items-start">
+          <div>
+            <div className="pb-8">
+              <p className="micro-label mb-3">The AI coding usage leaderboard</p>
+              <h1 className="font-mono text-2xl sm:text-4xl font-bold tracking-tight max-w-3xl leading-[1.15]">
+                Claude Code &amp; AI coding spend,{" "}
+                <span className="text-accent whitespace-nowrap">
+                  ranked
+                  <span className="cursor-block" aria-hidden />
+                </span>
+              </h1>
+              <p className="text-muted text-base sm:text-lg mt-4 max-w-2xl">
+                Developers ranked by API spend and token usage across Claude Code, OpenAI Codex,
+                Gemini CLI, Copilot and every coding agent ccusage tracks.
+              </p>
 
-            {/* Terminal CTA */}
-            <div className="flex flex-wrap items-center gap-3 mt-7">
+              {/* CTA — mobile/tablet only; the sidebar card covers desktop */}
+              <div className="flex flex-wrap items-center gap-3 mt-6 lg:hidden">
+                <button
+                  onClick={copyCommand}
+                  className="group flex items-center gap-3 rounded-lg bg-surface-1 border border-border hover:border-accent/50 px-4 py-3 transition-colors"
+                >
+                  <Terminal className="w-4 h-4 text-muted" />
+                  <code className="font-mono text-accent font-medium">npx viberank-cli</code>
+                  {copiedToClipboard ? (
+                    <Check className="w-4 h-4 text-success" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-muted group-hover:text-foreground transition-colors" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="flex items-center gap-2 px-4 py-3 text-sm text-muted hover:text-foreground transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  or upload cc.json
+                </button>
+              </div>
+            </div>
+
+            <Leaderboard
+              initialItems={initialItems}
+              initialStats={initialStats}
+              initialHasMore={initialHasMore}
+            />
+          </div>
+
+          <aside className="hidden lg:block sticky top-20 space-y-4">
+            {/* Enlist card */}
+            <div className="rounded-lg border border-border bg-surface-1 p-4">
+              <div className="micro-label mb-3">Get on the board</div>
               <button
                 onClick={copyCommand}
-                className="group flex items-center gap-3 rounded-xl bg-surface-1 border border-border hover:border-accent/50 px-4 py-3 transition-colors"
+                className="group w-full flex items-center justify-between gap-2 rounded-md bg-background border border-border hover:border-accent/50 px-3 py-2.5 transition-colors"
               >
-                <Terminal className="w-4 h-4 text-muted" />
-                <code className="font-mono text-accent font-medium">npx viberank-cli</code>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="text-accent font-mono text-sm">$</span>
+                  <code className="font-mono text-sm truncate">npx viberank-cli</code>
+                </span>
                 {copiedToClipboard ? (
-                  <Check className="w-4 h-4 text-success" />
+                  <Check className="w-4 h-4 text-success flex-shrink-0" />
                 ) : (
-                  <Copy className="w-4 h-4 text-muted group-hover:text-foreground transition-colors" />
+                  <Copy className="w-4 h-4 text-muted group-hover:text-foreground transition-colors flex-shrink-0" />
                 )}
               </button>
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 px-4 py-3 text-sm text-muted hover:text-foreground transition-colors"
+                className="w-full flex items-center gap-2 mt-2 px-3 py-2 text-sm text-muted hover:text-foreground transition-colors"
               >
                 <Upload className="w-4 h-4" />
                 or upload cc.json
               </button>
+              {!session && (
+                <button
+                  onClick={() => signIn("github")}
+                  className="w-full flex items-center justify-center gap-2 mt-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-surface-2 transition-colors"
+                >
+                  <Github className="w-4 h-4" />
+                  Sign in to get verified
+                </button>
+              )}
             </div>
 
-            {/* Stat strip */}
-            {stats && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-9">
-                <div className="rounded-2xl bg-surface-1 border border-border px-4 py-3.5">
-                  <div className="flex items-center gap-1.5 text-xs text-muted mb-1.5"><Users className="w-3.5 h-3.5" />Developers</div>
-                  <div className="text-xl font-bold font-mono">{formatNumber(stats.totalUsers)}</div>
-                </div>
-                <div className="rounded-2xl bg-surface-1 border border-border px-4 py-3.5">
-                  <div className="flex items-center gap-1.5 text-xs text-muted mb-1.5"><DollarSign className="w-3.5 h-3.5" />Total spent</div>
-                  <div className="text-xl font-bold font-mono text-accent">${formatNumber(stats.totalCost)}</div>
-                </div>
-                <div className="rounded-2xl bg-surface-1 border border-border px-4 py-3.5">
-                  <div className="flex items-center gap-1.5 text-xs text-muted mb-1.5"><Zap className="w-3.5 h-3.5" />Tokens</div>
-                  <div className="text-xl font-bold font-mono">{formatNumber(stats.totalTokens)}</div>
-                </div>
-                <div className="rounded-2xl bg-surface-1 border border-border px-4 py-3.5">
-                  <div className="flex items-center gap-1.5 text-xs text-muted mb-1.5"><Trophy className="w-3.5 h-3.5" />Top spender</div>
-                  <div className="text-xl font-bold font-mono">${formatNumber(stats.topCost)}</div>
-                </div>
+            {/* Tier ladder */}
+            <div className="rounded-lg border border-border bg-surface-1 p-4">
+              <div className="micro-label mb-2">Tier ladder</div>
+              <div className="divide-y divide-border-subtle">
+                {[...TIERS].reverse().map((t) => (
+                  <div key={t.key} className="flex items-center justify-between py-2 font-mono text-xs uppercase tracking-[0.1em]">
+                    <span style={{ color: t.color }}>
+                      {t.glyph} {t.name}
+                    </span>
+                    <span className="text-muted">{tierMin(t.min)}</span>
+                  </div>
+                ))}
               </div>
-            )}
+              <p className="text-[11px] text-muted leading-relaxed mt-3">
+                Based on your best submission&apos;s total cost.
+              </p>
+            </div>
+          </aside>
+        </section>
 
-            {/* Per-tool boards */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-6 text-sm text-muted">
-              <span>Per-tool boards:</span>
-              {FEATURED_TOOLS.map((t) => (
-                <Link
-                  key={t.key}
-                  href={`/tool/${t.key}`}
-                  className="px-2.5 py-1 rounded-md bg-surface-1 border border-border hover:text-accent hover:border-accent/40 transition-colors"
-                >
-                  {toolLabel(t.key)}
-                </Link>
+        {/* How it works */}
+        <section className="border-t border-border">
+          <div className="max-w-6xl mx-auto px-6 py-12">
+            <div className="micro-label mb-6">How it works</div>
+            <div className="grid sm:grid-cols-3 gap-x-10 gap-y-6">
+              {[
+                {
+                  title: "Run the CLI",
+                  body: (
+                    <>
+                      <code className="font-mono text-accent">npx viberank-cli</code> reads your local usage
+                      logs with ccusage. Your code and prompts never leave your machine.
+                    </>
+                  ),
+                },
+                {
+                  title: "Every agent counts",
+                  body: "Claude Code, OpenAI Codex, Gemini CLI, Copilot, OpenCode and every other coding agent ccusage tracks — summed into one number.",
+                },
+                {
+                  title: "Climb the tiers",
+                  body: "Your total spend earns a tier, from Spark to Supernova. Sign in with GitHub for a verified badge and a shareable rank card.",
+                },
+              ].map((step, i) => (
+                <div key={step.title} className="flex gap-4">
+                  <span className="font-mono text-sm text-accent pt-0.5">0{i + 1}</span>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1.5">{step.title}</h3>
+                    <p className="text-sm text-muted leading-relaxed">{step.body}</p>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Leaderboard */}
-        <section className="max-w-6xl mx-auto px-6 pb-16">
-          <Leaderboard
-            initialItems={initialItems}
-            initialStats={initialStats}
-            initialHasMore={initialHasMore}
-          />
-        </section>
-
         {/* FAQ */}
-        <section className="border-t border-border bg-surface-1/50">
-          <div className="max-w-6xl mx-auto px-6 py-14">
-            <h2 className="text-2xl font-bold tracking-tight mb-6">Frequently asked questions</h2>
-            <div className="grid gap-4 md:grid-cols-2">
+        <section className="border-t border-border">
+          <div className="max-w-6xl mx-auto px-6 py-12">
+            <div className="micro-label mb-6">FAQ</div>
+            <div className="grid md:grid-cols-2 gap-x-12 gap-y-7">
               {HOME_FAQS.map((f) => (
-                <div key={f.q} className="rounded-2xl border border-border bg-surface-1 p-5">
-                  <h3 className="font-semibold mb-2">{f.q}</h3>
+                <div key={f.q} className="border-t border-border-subtle pt-4">
+                  <h3 className="text-sm font-semibold mb-1.5">{f.q}</h3>
                   <p className="text-sm text-muted leading-relaxed">{f.a}</p>
                 </div>
               ))}
@@ -196,73 +289,7 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
 
       <Footer />
 
-      {/* Upload Modal */}
-      <AnimatePresence>
-        {showUploadModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative bg-surface-1 border border-border rounded-2xl shadow-xl max-w-sm w-full"
-            >
-              <div className="px-4 py-3 flex items-center justify-between border-b border-border">
-                <h3 className="font-medium">Submit Stats</h3>
-                <button onClick={() => setShowUploadModal(false)} className="p-1 text-muted hover:text-foreground rounded hover:bg-surface-2">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-4 space-y-4">
-                {/* CLI option */}
-                <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Terminal className="w-4 h-4 text-accent" />
-                      <span className="font-medium">CLI</span>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-accent/20 text-accent rounded">Recommended</span>
-                  </div>
-                  <button
-                    onClick={copyCommand}
-                    className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 border border-border hover:border-accent/50 transition-colors"
-                  >
-                    <code className="text-sm font-mono text-accent">npx viberank-cli</code>
-                    {copiedToClipboard ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-muted" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted">or</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-
-                {/* Upload option */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2 text-sm">
-                    <Upload className="w-4 h-4 text-muted" />
-                    <span className="font-medium">Upload cc.json</span>
-                  </div>
-                  <FileUpload onSuccess={() => setShowUploadModal(false)} />
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <UpdatesModal isOpen={showUpdatesModal} onClose={() => setShowUpdatesModal(false)} />
+      <SubmitModal open={showUploadModal} onClose={() => setShowUploadModal(false)} />
     </div>
   );
 }

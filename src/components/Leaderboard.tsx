@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Award, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
+import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import ShareCard from "./ShareCard";
 import Avatar from "./Avatar";
+import TierBadge from "./TierBadge";
+import { TIERS } from "@/lib/tiers";
 import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
@@ -21,90 +23,12 @@ interface LeaderboardProps {
   initialHasMore?: boolean;
 }
 
-// Small flat pills showing which tools a submission used.
-function ToolChips({ tools, max = 3, className = "" }: { tools?: string[]; max?: number; className?: string }) {
-  if (!tools || tools.length === 0) return null;
-  const shown = tools.slice(0, max);
-  const extra = tools.length - shown.length;
-  return (
-    <div className={`flex items-center gap-1 flex-wrap ${className}`}>
-      {shown.map((t) => (
-        <span
-          key={t}
-          className="text-[10px] font-medium leading-none px-1.5 py-1 rounded-md bg-surface-3 text-muted border border-border-subtle"
-        >
-          {toolLabel(t)}
-        </span>
-      ))}
-      {extra > 0 && <span className="text-[10px] text-muted leading-none">+{extra}</span>}
-    </div>
-  );
-}
-
-const RANK_META = [
-  { label: "1st", Icon: Trophy, color: "text-[#f5b008]" },
-  { label: "2nd", Icon: Medal, color: "text-[#b8bcc4]" },
-  { label: "3rd", Icon: Award, color: "text-[#c2703f]" },
-];
-
-function PodiumCard({
-  submission,
-  rank,
-  isCurrentUser,
-}: {
-  submission: Submission;
-  rank: number;
-  isCurrentUser: boolean;
-}) {
-  const meta = RANK_META[rank - 1];
-  const { Icon } = meta;
-  const featured = rank === 1;
-  return (
-    <Link
-      href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
-      className={`group flex flex-col rounded-2xl border bg-surface-1 p-4 transition-colors hover:bg-surface-2 ${
-        featured ? "border-accent/40 sm:p-5" : "border-border"
-      } ${isCurrentUser ? "ring-1 ring-accent" : ""}`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5">
-          <Icon className={`w-4 h-4 ${meta.color}`} />
-          <span className="text-xs font-semibold text-muted">{meta.label}</span>
-        </div>
-        {submission.verified ? (
-          <BadgeCheck className="w-4 h-4 text-blue-500" />
-        ) : (
-          <span className="text-[9px] font-mono uppercase tracking-wider px-1 py-px rounded bg-muted/15 text-muted">cli</span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3 mb-4">
-        <Avatar
-          src={submission.githubAvatar}
-          githubUsername={submission.githubUsername}
-          name={submission.githubName || submission.username}
-          size={featured ? "lg" : "md"}
-        />
-        <div className="min-w-0">
-          <div className="font-semibold truncate group-hover:text-accent transition-colors">
-            {submission.githubUsername || submission.username}
-          </div>
-          {submission.githubName && submission.githubName !== submission.githubUsername && (
-            <div className="text-xs text-muted truncate">{submission.githubName}</div>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-auto">
-        <div className={`font-mono font-bold text-accent ${featured ? "text-2xl" : "text-xl"}`}>
-          ${formatCurrency(submission.totalCost)}
-        </div>
-        <div className="text-xs text-muted font-mono mt-0.5">{formatNumber(submission.totalTokens)} tokens</div>
-        <ToolChips tools={submission.tools} className="mt-3" />
-      </div>
-    </Link>
-  );
-}
+// Medal colors for the top three rank numbers.
+const RANK_COLORS: Record<number, string> = {
+  1: "text-[#f5b008]",
+  2: "text-[#b8bcc4]",
+  3: "text-[#c2703f]",
+};
 
 // Flat placeholder rows shown while a filter/sort change is fetching.
 function SkeletonRows({ count = 8 }: { count?: number }) {
@@ -234,16 +158,13 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     return diff === days;
   };
 
-  const podiumCount = Math.min(3, allItems.length);
-  const podium = allItems.slice(0, podiumCount);
-  const rest = allItems.slice(podiumCount);
-
   return (
     <div>
       {/* Filter bar — sticky under the nav while scrolling the board */}
-      <div className="sticky top-14 z-40 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-y border-border mb-6">
+      <div className="sticky top-14 z-40 py-2.5 bg-background/95 backdrop-blur border-b border-border mb-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
+            <span className="micro-label mr-2 hidden lg:block">Leaderboard</span>
             {[
               { label: "All", days: null },
               { label: "7d", days: 7 },
@@ -252,7 +173,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
               <button
                 key={label}
                 onClick={() => setQuickFilter(days)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-2.5 py-1 text-xs font-mono font-medium rounded transition-colors ${
                   days === null
                     ? (!dateFrom && !dateTo ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2")
                     : (isQuickFilterActive(days) ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2")
@@ -263,9 +184,10 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
             ))}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-1.5 rounded-md transition-colors ${showFilters ? "text-accent" : "text-muted hover:text-foreground"}`}
+              aria-label="Custom date range"
+              className={`p-1.5 rounded transition-colors ${showFilters ? "text-accent" : "text-muted hover:text-foreground"}`}
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="w-3.5 h-3.5" />
             </button>
 
             {availableTools.length > 1 && (
@@ -273,7 +195,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                 value={tool ?? ""}
                 onChange={(e) => setTool(e.target.value || null)}
                 aria-label="Filter by tool"
-                className={`px-2.5 py-1.5 text-sm font-medium rounded-md bg-surface-2 border border-border transition-colors focus:outline-none focus:ring-1 focus:ring-accent ${
+                className={`px-2 py-1 text-xs font-mono font-medium rounded bg-surface-2 border border-border transition-colors focus:outline-none focus:ring-1 focus:ring-accent ${
                   tool ? "text-accent" : "text-muted hover:text-foreground"
                 }`}
               >
@@ -287,23 +209,23 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
             )}
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setSortBy("cost")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-1.5 transition-colors ${
+              className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
                 sortBy === "cost" ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2"
               }`}
             >
-              <DollarSign className="w-4 h-4" />
+              <DollarSign className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Cost</span>
             </button>
             <button
               onClick={() => setSortBy("tokens")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-1.5 transition-colors ${
+              className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
                 sortBy === "tokens" ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2"
               }`}
             >
-              <Zap className="w-4 h-4" />
+              <Zap className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Tokens</span>
             </button>
           </div>
@@ -342,41 +264,39 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
         </AnimatePresence>
       </div>
 
+      {/* Tier ladder key — desktop gets the sidebar ladder instead */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-5 px-0.5 lg:hidden">
+        <span className="micro-label">Tiers</span>
+        {TIERS.map((t) => (
+          <span key={t.key} className="inline-flex items-baseline gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
+            <span style={{ color: t.color }}>
+              {t.glyph} {t.name}
+            </span>
+            <span className="text-muted/70 normal-case tracking-normal">
+              {t.min === 0 ? "$0" : `$${formatNumber(t.min).replace(".0", "")}`}+
+            </span>
+          </span>
+        ))}
+      </div>
+
       {/* Board */}
       {allItems.length > 0 ? (
         <div>
-          {/* Podium */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-end mb-6">
-            {podium.map((submission, i) => {
-              const rank = i + 1;
-              const order = rank === 1 ? "order-1 sm:order-2" : rank === 2 ? "order-2 sm:order-1" : "order-3";
-              return (
-                <div key={submission.id} className={order}>
-                  <PodiumCard
-                    submission={submission}
-                    rank={rank}
-                    isCurrentUser={session?.user?.username === submission.githubUsername}
-                  />
-                </div>
-              );
-            })}
-          </div>
-
           {/* Full table */}
-          {rest.length > 0 && (
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted bg-surface-1 border-b border-border">
+          {allItems.length > 0 && (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-2.5 micro-label bg-surface-1 border-b border-border">
                 <div className="w-8 text-center">#</div>
                 <div className="flex-1">User</div>
-                <div className="hidden md:block w-44">Tools</div>
+                <div className="hidden sm:block w-28">Tier</div>
                 <div className="w-28 text-right">Cost</div>
                 <div className="w-24 text-right hidden sm:block">Tokens</div>
                 <div className="w-8" />
               </div>
 
               <div className="divide-y divide-border-subtle">
-                {rest.map((submission, i) => {
-                  const rank = podiumCount + i + 1;
+                {allItems.map((submission, i) => {
+                  const rank = i + 1;
                   const isCurrentUser = session?.user?.username === submission.githubUsername;
                   return (
                     <Link
@@ -384,7 +304,13 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                       href={`/profile/${encodeURIComponent(submission.githubUsername || submission.username)}`}
                       className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors cursor-pointer group ${isCurrentUser ? "bg-accent/10 border-l-2 border-l-accent" : ""}`}
                     >
-                      <div className="w-8 flex-shrink-0 text-center text-sm text-muted font-mono">{rank}</div>
+                      <div
+                        className={`w-8 flex-shrink-0 text-center text-sm font-mono ${
+                          RANK_COLORS[rank] ? `${RANK_COLORS[rank]} font-bold` : "text-muted"
+                        }`}
+                      >
+                        {rank}
+                      </div>
 
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <Avatar
@@ -410,11 +336,11 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                         </div>
                       </div>
 
-                      <div className="hidden md:block w-44">
-                        <ToolChips tools={submission.tools} max={3} />
+                      <div className="hidden sm:block w-28 flex-shrink-0">
+                        <TierBadge totalCost={submission.totalCost} size="xs" bare />
                       </div>
 
-                      <div className="w-28 text-right flex-shrink-0">
+                      <div className="w-24 sm:w-28 text-right flex-shrink-0">
                         <div className="text-sm font-mono font-semibold text-accent">${formatCurrency(submission.totalCost)}</div>
                       </div>
 
@@ -422,7 +348,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                         <div className="text-sm font-mono text-muted">{formatNumber(submission.totalTokens)}</div>
                       </div>
 
-                      <div className="w-8 flex-shrink-0 flex justify-end">
+                      <div className="w-8 flex-shrink-0 justify-end hidden sm:flex">
                         {isCurrentUser && (
                           <button
                             onClick={(e) => { e.preventDefault(); setShowShareCard(submission.id); }}

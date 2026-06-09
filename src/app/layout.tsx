@@ -68,8 +68,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  // Parallel slot for the intercepted profile sheet (see app/@modal).
+  modal: React.ReactNode;
 }>) {
   const jsonLd = [
     {
@@ -115,7 +118,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          {modal}
+        </Providers>
         <Analytics />
       </body>
     </html>

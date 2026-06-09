@@ -75,5 +75,13 @@ export function formatDateRange(start: string, end: string): string {
 }
 
 export function getGitHubAvatarUrl(username: string, size: number = 40): string {
-  return `https://github.com/${username}.png?size=${size}`;
+  // Hit the avatar CDN directly — github.com/<user>.png 302s to it, which
+  // costs an extra round trip per avatar.
+  return `https://avatars.githubusercontent.com/${username}?s=${size}`;
+}
+
+/** Append a size param to a GitHub avatar URL so we don't download full-res images. */
+export function sizedAvatarUrl(url: string, size: number): string {
+  if (!/githubusercontent\.com/.test(url) || /[?&]s=/.test(url)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}s=${size}`;
 }

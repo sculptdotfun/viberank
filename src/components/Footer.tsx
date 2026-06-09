@@ -10,7 +10,7 @@ const RESOURCES = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border bg-surface-1">
+    <footer className="border-t border-border">
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1">
@@ -20,7 +20,7 @@ export default function Footer() {
                 <rect x="9.5" y="8" width="5" height="13" rx="1" fill="currentColor" opacity="0.75" />
                 <rect x="16" y="3" width="5" height="18" rx="1" fill="currentColor" />
               </svg>
-              <span className="font-semibold">viberank</span>
+              <span className="font-mono font-semibold tracking-tight">viberank</span>
             </Link>
             <p className="text-sm text-muted leading-relaxed">
               The leaderboard for AI coding usage. Real costs, real tokens, from real ccusage data.
@@ -28,7 +28,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Leaderboards</h3>
+            <h3 className="micro-label mb-3">Leaderboards</h3>
             <ul className="space-y-2 text-sm">
               <li><Link href="/" className="text-foreground/80 hover:text-accent transition-colors">All tools</Link></li>
               {FEATURED_TOOLS.map((t) => (
@@ -42,7 +42,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Resources</h3>
+            <h3 className="micro-label mb-3">Resources</h3>
             <ul className="space-y-2 text-sm">
               {RESOURCES.map((r) => (
                 <li key={r.href}>
@@ -55,7 +55,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Community</h3>
+            <h3 className="micro-label mb-3">Community</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <a href="https://github.com/sculptdotfun/viberank" target="_blank" rel="noopener noreferrer" className="text-foreground/80 hover:text-accent transition-colors">

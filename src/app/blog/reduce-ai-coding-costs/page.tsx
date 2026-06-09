@@ -44,7 +44,7 @@ export default function Post() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <article className="prose prose-invert prose-neutral max-w-none">
+      <article className="prose prose-invert prose-neutral max-w-3xl mx-auto">
         <Link href="/blog" className="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors mb-8 no-underline">
           <ArrowLeft className="w-4 h-4" />
           Back to Blog

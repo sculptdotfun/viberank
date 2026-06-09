@@ -17,4 +17,8 @@ export const HOME_FAQS = [
     q: "Is the data verified?",
     a: "Submissions are validated server-side (token math, cost/token ratio, date sanity). Signing in with GitHub marks your submission verified with a blue check; unverified CLI rows show a 'cli' badge.",
   },
+  {
+    q: "What are viberank tiers?",
+    a: "Every developer holds a spend tier based on their best submission: Spark ($0+), Ember ($100+), Flame ($1K+), Blaze ($5K+), Inferno ($15K+) and Supernova ($50K+). Tier badges appear on the leaderboard, your profile and your share card — and your profile shows exactly how far you are from the next tier.",
+  },
 ];
