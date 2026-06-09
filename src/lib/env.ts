@@ -1,8 +1,3 @@
-// Client-side environment variables
-export const clientEnv = {
-  NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL!,
-} as const;
-
 // Server-side environment variables (only available in server components/API routes)
 export const serverEnv = {
   GITHUB_ID: process.env.GITHUB_ID!,

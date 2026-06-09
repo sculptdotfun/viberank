@@ -12,12 +12,10 @@
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
-    "@convex-dev/rate-limiter": "^0.2.12",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@vercel/analytics": "^1.5.0",
     "clsx": "^2.1.1",
-    "convex": "^1.25.2",
     "framer-motion": "^12.23.0",
     "lucide-react": "^0.525.0",
     "next": "16.1.1",

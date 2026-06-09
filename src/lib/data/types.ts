@@ -1,6 +1,6 @@
 /**
  * Shared types for data layer abstraction
- * These types work with both Convex and Supabase backends
+ * These types describe the Supabase-backed data layer
  */
 
 // ============================================================================
@@ -262,4 +262,4 @@ export interface DataLayer {
 // DATABASE BACKEND TYPE
 // ============================================================================
 
-export type DatabaseBackend = "convex" | "supabase";
+export type DatabaseBackend = "supabase";
