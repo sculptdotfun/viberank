@@ -231,6 +231,8 @@ export interface SubmissionsService {
   ): Promise<{ success: boolean }>;
   claimAndMergeSubmissions(githubUsername: string): Promise<ClaimResult>;
   checkClaimableSubmissions(githubUsername: string): Promise<ClaimStatus>;
+  /** 1-based leaderboard position for a given total cost (by-cost ranking). */
+  getGlobalRank(totalCost: number): Promise<number>;
 }
 
 export interface ProfilesService {
