@@ -7,16 +7,20 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import ShareCard from "./ShareCard";
 import Avatar from "./Avatar";
-import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
+import { formatNumber, formatCurrency, toolLabel, FEATURED_TOOLS } from "@/lib/utils";
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
-import type { Submission } from "@/lib/data/types";
+import type { Submission, GlobalStats } from "@/lib/data/types";
 
 type SortBy = "cost" | "tokens";
 
 interface LeaderboardProps {
   onCopyCommand?: () => void;
   copiedToClipboard?: boolean;
+  // Server-fetched first page + stats, so the leaderboard renders in the SSR
+  // HTML (SEO + no first-paint spinner) before the client hooks take over.
+  initialItems?: Submission[];
+  initialStats?: GlobalStats;
 }
 
 // Small flat pills showing which tools a submission used.
@@ -116,7 +120,7 @@ function StatCard({ icon: Icon, label, value, accent = false }: { icon: typeof U
   );
 }
 
-export default function Leaderboard({ onCopyCommand, copiedToClipboard }: LeaderboardProps) {
+export default function Leaderboard({ onCopyCommand, copiedToClipboard, initialItems, initialStats }: LeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortBy>("cost");
   const [tool, setTool] = useState<string | null>(null);
   const [showShareCard, setShowShareCard] = useState<string | null>(null);
@@ -124,10 +128,12 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
   const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
-  const [allItems, setAllItems] = useState<Submission[]>([]);
+  const [allItems, setAllItems] = useState<Submission[]>(initialItems ?? []);
   const { data: session } = useSession();
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { data: globalStats } = useGlobalStats();
+  const firstRender = useRef(true);
+  const { data: liveStats } = useGlobalStats();
+  const globalStats = liveStats ?? initialStats;
 
   const ITEMS_PER_PAGE = 25;
   const isDateFiltered = dateFrom && dateTo;
@@ -150,6 +156,12 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
     : [];
 
   useEffect(() => {
+    // Keep the server-seeded items on first render; only reset when a filter
+    // actually changes (avoids clearing the SSR'd rows during hydration).
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
     setAllItems([]);
     setPage(0);
   }, [sortBy, dateFrom, dateTo, tool]);
@@ -220,6 +232,15 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Claude Code, Codex &amp; AI Coding Leaderboard</h1>
             <p className="text-sm text-muted mt-1">Who's spending the most across AI coding tools?</p>
+            <div className="hidden sm:flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs text-muted">
+              <span>Per-tool boards:</span>
+              {FEATURED_TOOLS.map((t, i) => (
+                <span key={t.key} className="flex items-center gap-2">
+                  <Link href={`/tool/${t.key}`} className="hover:text-accent transition-colors">{toolLabel(t.key)}</Link>
+                  {i < FEATURED_TOOLS.length - 1 && <span className="text-border">·</span>}
+                </span>
+              ))}
+            </div>
           </div>
           {onCopyCommand && (
             <button
