@@ -305,9 +305,18 @@ export function useUpdateFlagStatus() {
 
       try {
         if (backend === "supabase") {
-          const { createSupabaseDataLayer } = await import("../supabase/client");
-          const dataLayer = createSupabaseDataLayer();
-          return await dataLayer.submissions.updateFlagStatus(id, flagged, reason);
+          // Route through the authenticated admin API (service-role) instead of
+          // a browser anon-key write, which RLS silently blocks. See #42/#47.
+          const res = await fetch("/api/admin/flag", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, flagged, reason }),
+          });
+          const body = await res.json();
+          if (!res.ok) {
+            throw new Error(body?.error || "Failed to update flag status");
+          }
+          return body;
         }
 
         return await convexMutation({

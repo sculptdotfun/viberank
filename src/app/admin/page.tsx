@@ -8,9 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { useFlaggedSubmissions, useUpdateFlagStatus } from "@/lib/data/hooks/useSubmissions";
-
-// Add your admin GitHub usernames here
-const ADMIN_USERS = ["nikshepsvn"];
+import { isAdmin as checkIsAdmin } from "@/lib/admin";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -20,8 +18,8 @@ export default function AdminPage() {
   const { data: flaggedSubmissions } = useFlaggedSubmissions();
   const { mutate: updateFlagStatus } = useUpdateFlagStatus();
 
-  // Check if user is admin
-  const isAdmin = session?.user?.username && ADMIN_USERS.includes(session.user.username);
+  // Check if user is admin (shared allowlist, also enforced server-side)
+  const isAdmin = checkIsAdmin(session?.user?.username);
 
   if (status === "loading") {
     return (
