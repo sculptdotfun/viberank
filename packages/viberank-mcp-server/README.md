@@ -1,6 +1,6 @@
 # Viberank MCP Server
 
-Submit your Claude Code usage stats to [Viberank](https://viberank.app) directly from your MCP-compatible AI assistant!
+Submit your AI coding usage stats (Claude Code, Codex, Gemini CLI and more) to [viberank](https://viberank.app) directly from your MCP-compatible AI assistant!
 
 ## Features
 
@@ -79,7 +79,7 @@ Fetches your current Claude Code usage statistics.
 
 **Example:**
 ```
-Use the get_usage tool to check my Claude usage stats
+Use the get_usage tool to check my AI coding usage stats
 ```
 
 ### 2. `submit_to_viberank`
@@ -157,7 +157,7 @@ Show me the top 20 users on Viberank
 ## Troubleshooting
 
 ### "Failed to get usage data"
-- Make sure you've used Claude Code at least once
+- Make sure you've used a supported AI coding tool (Claude Code, Codex, Gemini CLI, …) at least once
 - Ensure `ccusage` is accessible (it's automatically installed via npx)
 
 ### "GitHub username is required"

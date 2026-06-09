@@ -2,6 +2,8 @@
 
 How submissions are validated. Implemented in `src/lib/ccusage.ts` (`normalizeCcData` + `validateCcData`) and called from `POST /api/submit`. ccusage output is normalized first (period→date, the aggregate `agent:"all"` rows deduped, per-day tools resolved) and then validated.
 
+Normalization also records **which tools contributed** — `submissions.tools[]` (e.g. `{claude, codex, gemini}`) and `daily_breakdowns.agents[]` — derived from ccusage's `metadata.agents` (with a conservative model-name fallback for older single-source reports). This powers the leaderboard's tool filter and the per-tool boards.
+
 ## Hard rejection
 
 If any of these fail, the API responds with `400` and the submission is not stored.

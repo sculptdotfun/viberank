@@ -9,17 +9,20 @@ A community-driven leaderboard for AI coding usage — [Claude Code](https://cla
 
 Live at **[viberank.app](https://www.viberank.app)**.
 
-> **v2 — multi-tool support.** viberank started as a Claude Code leaderboard. As `ccusage` grew to track Codex, Gemini CLI, Copilot, OpenCode and more, viberank evolved with it: submissions from any supported tool are now accepted, recorded per tool, and filterable on the leaderboard. Claude Code remains a first-class citizen — you can now just see how it stacks up against the rest of your stack.
+> **v2 — multi-tool support.** viberank started as a Claude Code leaderboard. As `ccusage` grew to track Codex, Gemini CLI, Copilot, OpenCode and more, viberank evolved with it: submissions from any supported tool are now accepted, recorded per tool, and filterable on the leaderboard. Claude Code remains a first-class citizen — you can now just see how it stacks up against the rest of your stack. Full details in the [CHANGELOG](./CHANGELOG.md).
 
 ## Features
 
-- 🏆 **Global leaderboard** by cost or tokens, with 7d / 30d / custom date filters
-- 🧰 **Multi-tool** — usage from Claude Code, Codex, Gemini CLI, Copilot, OpenCode and other `ccusage`-supported agents, with an **"All tools / Claude / Codex / …" filter**
-- 📊 **Profile pages** at `viberank.app/profile/{username}` with daily charts and model breakdown
-- 🚀 **Three ways to submit**: `npx viberank-cli` CLI, plain `curl`, or signed-in web upload
+- 🏆 **Global leaderboard** — top-3 podium + full table, sorted by cost or tokens, with 7d / 30d / custom date filters
+- 🧰 **Multi-tool** — usage from Claude Code, Codex, Gemini CLI, Copilot, OpenCode and other `ccusage`-supported agents; every row shows **tool chips** and the board filters per tool
+- 🎯 **Per-tool boards** — dedicated leaderboards at [`/tool/claude`](https://www.viberank.app/tool/claude), [`/tool/codex`](https://www.viberank.app/tool/codex), [`/tool/gemini`](https://www.viberank.app/tool/gemini), [`/tool/copilot`](https://www.viberank.app/tool/copilot), [`/tool/opencode`](https://www.viberank.app/tool/opencode)
+- 📊 **Profile pages** at `viberank.app/profile/{username}` — global rank, daily charts, token breakdown, tools used
+- ⚡ **Server-rendered** — homepage, profiles, and tool boards are SSR'd with structured data (FAQPage, ProfilePage, BreadcrumbList) for fast paint and full crawlability
+- 🚀 **Three ways to submit**: `npx viberank-cli`, plain `curl`, or signed-in web upload
 - 🔐 **GitHub OAuth** — verified submissions show a blue check; unverified CLI submissions show a `cli` pill
-- 🛡️ **Input validation** — token math, date sanity, daily-cost ceilings, cost/token ratio
+- 🛡️ **Input validation** — one-sided token math (reasoning-token aware), cost/token ratio guard, date sanity, realistic-range ceilings
 - 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
+- ✍️ **Blog** — data-backed posts on AI coding costs at [viberank.app/blog](https://www.viberank.app/blog)
 
 ## Submitting your usage data
 
@@ -53,7 +56,11 @@ Web uploads come back with a verified badge automatically. CLI submissions show 
 
 ### Option 4: MCP server
 
-If you use a Claude Code MCP-compatible client, the [`viberank-mcp-server`](./packages/viberank-mcp-server) exposes submit and lookup tools. (Note: this package is currently unmaintained — see [issue tracker](https://github.com/sculptdotfun/viberank/issues) for status.)
+If you use an MCP-compatible client, [`viberank-mcp`](https://www.npmjs.com/package/viberank-mcp) ([source](./packages/viberank-mcp-server)) exposes submit and lookup tools:
+
+```bash
+npx viberank-mcp
+```
 
 ## Data validation
 
@@ -105,7 +112,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 
-NEXTAUTH_URL=http://localhost:3001
+NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<openssl rand -base64 32>
 
 GITHUB_ID=<github-oauth-client-id>
@@ -129,13 +136,13 @@ Run the dev server:
 pnpm dev
 ```
 
-Open <http://localhost:3001>.
+Open <http://localhost:3000>.
 
 ### Useful scripts
 
 | Command | What it does |
 |---|---|
-| `pnpm dev` | Start Next dev server (Turbopack) on port 3001 |
+| `pnpm dev` | Start Next dev server (Turbopack) on port 3000 |
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | Run `next lint` |
@@ -157,7 +164,7 @@ Open <http://localhost:3001>.
 
 Submit usage data. Authenticated submissions (with a NextAuth session cookie) are marked `verified: true`; otherwise the request must include an `X-GitHub-User` header.
 
-**Body**: contents of `cc.json` (output of `npx ccusage --json`).
+**Body**: contents of `cc.json` (output of `npx ccusage@latest daily --json`).
 
 **Response**:
 
@@ -173,6 +180,10 @@ Submit usage data. Authenticated submissions (with a NextAuth session cookie) ar
 ### `POST /api/claim`
 
 Authenticated — merges unverified CLI submissions into the caller's verified profile. Username is taken from the session, not the request body. Returns 401 without a session.
+
+### `POST /api/admin/flag`
+
+Admin-only (allowlist in `src/lib/admin.ts`) — flags or unflags a submission for review. Runs server-side with the service-role client; returns 403 for non-admins.
 
 ### `GET /api/health`
 
@@ -206,4 +217,5 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 - [Website](https://www.viberank.app)
 - [GitHub](https://github.com/sculptdotfun/viberank)
 - [Report issues](https://github.com/sculptdotfun/viberank/issues)
-- [`viberank` on npm](https://www.npmjs.com/package/viberank)
+- [`viberank-cli` on npm](https://www.npmjs.com/package/viberank-cli)
+- [`viberank-mcp` on npm](https://www.npmjs.com/package/viberank-mcp)
