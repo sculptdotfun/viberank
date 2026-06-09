@@ -129,7 +129,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
       <div className="flex-shrink-0 px-6 py-5 border-b border-border">
         <div className="flex items-center justify-between gap-4 mb-5">
           <div>
-            <h1 className="text-2xl font-bold">Claude Code Leaderboard</h1>
+            <h1 className="text-2xl font-bold">Claude Code, Codex &amp; AI Coding Leaderboard</h1>
             <p className="text-sm text-muted mt-1">Who's spending the most on AI coding?</p>
           </div>
           {onCopyCommand && (

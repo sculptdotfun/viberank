@@ -15,15 +15,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Viberank - Claude Code Usage Leaderboard | Track AI Development Stats",
-  description: "Track and compare Claude Code usage across developers. Upload your cc.json file, view detailed analytics, and see how you rank in the global AI-powered development community.",
-  keywords: ["claude", "claude code", "anthropic", "ai coding", "leaderboard", "developer stats", "code usage", "ai development", "claude analytics", "developer ranking", "cc.json", "npx viberank", "vibe coding", "ai pair programming"],
+  title: "Viberank - Claude Code, Codex & AI Coding Usage Leaderboard | Track AI Dev Stats",
+  description: "Track and compare AI coding usage — Claude Code, Codex, Gemini CLI and more — across developers. Upload your ccusage data, view detailed analytics, and see how you rank in the global AI-powered development community.",
+  keywords: ["claude", "claude code", "anthropic", "codex", "gemini cli", "github copilot", "opencode", "ccusage", "ai coding", "ai coding leaderboard", "leaderboard", "developer stats", "code usage", "ai development", "developer ranking", "cc.json", "npx viberank", "vibe coding", "ai pair programming"],
   authors: [{ name: "Viberank Team" }],
   creator: "Viberank",
   publisher: "Viberank",
   openGraph: {
-    title: "Viberank - Claude Code Usage Leaderboard",
-    description: "Track and compare your Claude Code usage with developers worldwide. View detailed analytics and climb the AI development leaderboard.",
+    title: "Viberank - Claude Code, Codex & AI Coding Usage Leaderboard",
+    description: "Track and compare your AI coding usage — Claude Code, Codex, Gemini CLI and more — with developers worldwide. View detailed analytics and climb the AI development leaderboard.",
     url: "https://www.viberank.app",
     siteName: "Viberank",
     images: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         url: "/api/og",
         width: 1200,
         height: 630,
-        alt: "Viberank - Claude Code Usage Leaderboard",
+        alt: "Viberank - Claude Code, Codex & AI Coding Usage Leaderboard",
       },
     ],
     locale: "en_US",
@@ -39,8 +39,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Viberank - Claude Code Usage Leaderboard",
-    description: "Track and compare your Claude Code usage with developers worldwide. Join the AI development leaderboard today!",
+    title: "Viberank - Claude Code, Codex & AI Coding Usage Leaderboard",
+    description: "Track and compare your AI coding usage — Claude Code, Codex, Gemini CLI and more — with developers worldwide. Join the AI development leaderboard today!",
     images: ["/api/og"],
     creator: "@viberank",
     site: "@viberank",
@@ -76,7 +76,7 @@ export default function RootLayout({
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "Viberank",
-      "description": "Track and compare Claude Code usage across developers. View detailed analytics and climb the AI development leaderboard.",
+      "description": "Track and compare AI coding usage — Claude Code, Codex, Gemini CLI and more — across developers. View detailed analytics and climb the AI development leaderboard.",
       "url": "https://www.viberank.app",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Any",

@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
     const title = searchParams.get('title') || 'Viberank';
-    const description = searchParams.get('description') || 'Claude Code Usage Leaderboard';
+    const description = searchParams.get('description') || 'Claude Code, Codex & AI Coding Leaderboard';
 
     return new ImageResponse(
       (

@@ -82,7 +82,7 @@ async function main() {
       const spinner = ora('Generating usage data with ccusage...').start();
       
       try {
-        execSync('npx ccusage@latest --json > cc.json', { 
+        execSync('npx ccusage@latest daily --json > cc.json', { 
           encoding: 'utf8',
           stdio: 'pipe' 
         });
@@ -90,7 +90,7 @@ async function main() {
       } catch (error) {
         spinner.fail('Failed to generate cc.json');
         console.error(chalk.red('Error:', error.message));
-        console.log(chalk.yellow('\nMake sure you have run Claude Code at least once.'));
+        console.log(chalk.yellow('\nMake sure you have used a supported AI coding tool (Claude Code, Codex, Gemini CLI, …) at least once.'));
         process.exit(1);
       }
     } else {
@@ -102,7 +102,7 @@ async function main() {
     const spinner = ora('Generating usage data with ccusage...').start();
     
     try {
-      execSync('npx ccusage@latest --json > cc.json', { 
+      execSync('npx ccusage@latest daily --json > cc.json', { 
         encoding: 'utf8',
         stdio: 'pipe' 
       });
@@ -110,7 +110,7 @@ async function main() {
     } catch (error) {
       spinner.fail('Failed to generate cc.json');
       console.error(chalk.red('Error:', error.message));
-      console.log(chalk.yellow('\nMake sure you have run Claude Code at least once.'));
+      console.log(chalk.yellow('\nMake sure you have used a supported AI coding tool (Claude Code, Codex, Gemini CLI, …) at least once.'));
       process.exit(1);
     }
   }
@@ -200,7 +200,7 @@ async function main() {
         if (response.status === 400) {
           console.log(chalk.yellow('\nTroubleshooting tips:'));
           console.log(chalk.yellow('- Ensure you\'re using the latest version of ccusage'));
-          console.log(chalk.yellow('- Try regenerating your cc.json file: npx ccusage@latest --json > cc.json'));
+          console.log(chalk.yellow('- Try regenerating your cc.json file: npx ccusage@latest daily --json > cc.json'));
           console.log(chalk.yellow('- Check that your cc.json file is valid JSON'));
         } else if (response.status === 413) {
           console.log(chalk.yellow('\nYour usage data is too large. Consider submitting data for a shorter time period.'));
@@ -231,7 +231,7 @@ async function main() {
         // Provide helpful context for common errors
         if (result.error && result.error.includes('cc.json')) {
           console.log(chalk.yellow('\nTry regenerating your cc.json file:'));
-          console.log(chalk.yellow('  npx ccusage@latest --json > cc.json'));
+          console.log(chalk.yellow('  npx ccusage@latest daily --json > cc.json'));
         }
         
         process.exit(1);

@@ -1,7 +1,7 @@
 {
   "name": "viberank",
-  "version": "1.0.3",
-  "description": "CLI tool to submit Claude usage stats to Viberank leaderboard",
+  "version": "1.1.0",
+  "description": "CLI tool to submit your AI coding usage stats (Claude Code, Codex, Gemini CLI, and more via ccusage) to the Viberank leaderboard",
   "type": "module",
   "main": "cli.js",
   "bin": {
@@ -13,7 +13,11 @@
   "keywords": [
     "viberank",
     "claude",
+    "claude-code",
+    "codex",
+    "gemini-cli",
     "ccusage",
+    "ai-coding",
     "leaderboard",
     "cli"
   ],
