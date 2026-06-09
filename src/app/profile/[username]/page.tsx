@@ -1,146 +1,93 @@
-"use client";
-
-import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
-import {
-  Calendar, Zap, ArrowLeft, ExternalLink,
-  TrendingUp, Code2, Activity, Github
-} from "lucide-react";
 import Link from "next/link";
-import { formatNumber, formatCurrency } from "@/lib/utils";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useState } from "react";
-import { useProfile } from "@/lib/data/hooks/useProfiles";
+import {
+  Calendar,
+  Zap,
+  ArrowLeft,
+  ExternalLink,
+  Activity,
+  Github,
+  DollarSign,
+  CalendarDays,
+  Wrench,
+} from "lucide-react";
+import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
+import { getProfileCached } from "./getProfile";
+import UsageChart from "./UsageChart";
 
-// Parse a ccusage model id into a friendly display label across tools, e.g.
-// "claude-opus-4-7-20260201" -> "Opus 4.7", "gpt-5-codex" -> "GPT-5 Codex",
-// "gemini-3-pro-preview" -> "Gemini 3 Pro". Unknown ids are returned cleaned
-// (stripping a "[tool] " or "vendor/" prefix) rather than mislabeled.
-function formatModelLabel(modelId: string): string {
-  const id = modelId.toLowerCase();
-
-  // Claude families carry a -<major>-<minor> version we can prettify.
-  const claudeFamily = id.includes("opus")
-    ? "Opus"
-    : id.includes("sonnet")
-    ? "Sonnet"
-    : id.includes("haiku")
-    ? "Haiku"
-    : null;
-  if (claudeFamily) {
-    const v = modelId.match(/-(\d+)-(\d+)(?:-|$)/);
-    return v ? `${claudeFamily} ${v[1]}.${v[2]}` : claudeFamily;
-  }
-
-  if (id.includes("gemini")) {
-    const v = modelId.match(/gemini-(\d+(?:\.\d+)?)/);
-    const variant = id.includes("flash") ? " Flash" : id.includes("pro") ? " Pro" : "";
-    return v ? `Gemini ${v[1]}${variant}` : "Gemini";
-  }
-
-  if (id.includes("codex") || id.includes("gpt")) {
-    const v = modelId.match(/gpt-(\d+(?:\.\d+)?)/);
-    const codex = id.includes("codex") ? " Codex" : "";
-    return v ? `GPT-${v[1]}${codex}` : id.includes("codex") ? "Codex" : "GPT";
-  }
-
-  // Unknown model: strip a "[tool] " prefix and any "vendor/" prefix.
-  return modelId.replace(/^\[[^\]]+\]\s*/, "").replace(/^[\w.-]+\//, "");
+interface ProfileParams {
+  params: Promise<{ username: string }>;
 }
 
-export default function ProfilePage() {
-  const params = useParams();
-  const username = decodeURIComponent(params.username as string);
-  const [selectedTimeRange, setSelectedTimeRange] = useState<"7d" | "30d" | "all">("30d");
+export default async function ProfilePage({ params }: ProfileParams) {
+  const { username: raw } = await params;
+  const username = decodeURIComponent(raw);
+  const profileData = await getProfileCached(username);
 
-  const { data: profileData, isLoading } = useProfile(username);
-
-  if (isLoading) {
+  if (!profileData) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted">Loading profile...</p>
+          <h1 className="text-2xl font-semibold mb-2">Profile not found</h1>
+          <p className="text-muted mb-6">No profile found for @{username}</p>
+          <Link href="/" className="inline-flex items-center gap-2 text-accent hover:text-accent-hover transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to leaderboard
+          </Link>
         </div>
       </div>
     );
   }
 
-  if (!profileData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <h1 className="text-2xl font-light mb-2">Profile not found</h1>
-          <p className="text-muted mb-6">No profile found for @{username}</p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-accent hover:text-accent-hover transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to leaderboard
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Ensure submissions is always an array
   const submissions = profileData.submissions ?? [];
   const latestSubmission = submissions[0];
 
-  // Calculate statistics with safe defaults
-  const totalCost = submissions.reduce((sum, sub) => sum + sub.totalCost, 0);
-  const totalTokens = submissions.reduce((sum, sub) => sum + sub.totalTokens, 0);
-  const allDailyBreakdowns = submissions.flatMap(sub => sub.dailyBreakdown ?? []);
-  const daysActive = new Set(allDailyBreakdowns.map(d => d.date)).size || 1;
+  // Aggregate stats across all of the profile's submissions.
+  const totalCost = submissions.reduce((s, sub) => s + sub.totalCost, 0);
+  const totalTokens = submissions.reduce((s, sub) => s + sub.totalTokens, 0);
+  const allDaily = submissions.flatMap((sub) => sub.dailyBreakdown ?? []);
+  const daysActive = new Set(allDaily.map((d) => d.date)).size || 1;
   const avgDailyCost = totalCost / daysActive;
 
-  // Prepare chart data
-  const dailyDataMap = allDailyBreakdowns.reduce((acc, day) => {
-    if (!acc[day.date]) {
-      acc[day.date] = { date: day.date, cost: 0, tokens: 0 };
-    }
-    acc[day.date].cost += day.totalCost;
-    acc[day.date].tokens += day.totalTokens;
+  // Per-day chart series (summed across submissions).
+  const dailyMap = allDaily.reduce((acc, d) => {
+    if (!acc[d.date]) acc[d.date] = { date: d.date, cost: 0, tokens: 0 };
+    acc[d.date].cost += d.totalCost;
+    acc[d.date].tokens += d.totalTokens;
     return acc;
   }, {} as Record<string, { date: string; cost: number; tokens: number }>);
+  const dailySeries = Object.values(dailyMap);
 
-  const sortedDailyData = Object.values(dailyDataMap)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(selectedTimeRange === "7d" ? -7 : selectedTimeRange === "30d" ? -30 : 0);
+  // Tools used across the profile (Claude sorts first).
+  const tools = Array.from(new Set(submissions.flatMap((s) => s.tools ?? []))).sort();
 
-  // Get primary model used - count from daily breakdowns for more accurate representation
-  const allModelsUsed = allDailyBreakdowns.flatMap(d => d.modelsUsed ?? []);
-  const modelCounts = allModelsUsed.reduce((acc, model) => {
-    acc[model] = (acc[model] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const primaryModel = Object.entries(modelCounts).sort(([,a], [,b]) => b - a)[0]?.[0];
+  // Token breakdown (summed across submissions).
+  const tokenAgg = submissions.reduce(
+    (a, s) => ({
+      input: a.input + (s.inputTokens ?? 0),
+      output: a.output + (s.outputTokens ?? 0),
+      cacheRead: a.cacheRead + (s.cacheReadTokens ?? 0),
+      cacheCreation: a.cacheCreation + (s.cacheCreationTokens ?? 0),
+    }),
+    { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+  );
+  const maxDailyCost = allDaily.length > 0 ? Math.max(...allDaily.map((d) => d.totalCost)) : 0;
 
-  // Get token breakdown from latest submission
-  const inputTokens = latestSubmission?.inputTokens ?? 0;
-  const outputTokens = latestSubmission?.outputTokens ?? 0;
-  const cacheReadTokens = latestSubmission?.cacheReadTokens ?? 0;
-  const cacheCreationTokens = latestSubmission?.cacheCreationTokens ?? 0;
-  const latestDailyBreakdown = latestSubmission?.dailyBreakdown ?? [];
-  const maxDailyCost = latestDailyBreakdown.length > 0
-    ? Math.max(...latestDailyBreakdown.map(d => d.totalCost))
-    : 0;
+  const displayName = profileData.githubName || profileData.githubUsername || username;
+  const handle = profileData.githubUsername || username;
+
+  const tokenRows = [
+    { label: "Input", value: tokenAgg.input, color: "bg-accent" },
+    { label: "Output", value: tokenAgg.output, color: "bg-blue-500" },
+    { label: "Cache read", value: tokenAgg.cacheRead, color: "bg-emerald-500" },
+    { label: "Cache creation", value: tokenAgg.cacheCreation, color: "bg-purple-500" },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="flex items-center justify-between h-14">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors"
-            >
+          <div className="flex items-center h-14">
+            <Link href="/" className="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors text-sm">
               <ArrowLeft className="w-4 h-4" />
               Back to leaderboard
             </Link>
@@ -149,251 +96,133 @@ export default function ProfilePage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {/* Profile Header */}
-          <div className="mb-8">
-            <div className="flex items-start gap-5 mb-6">
-              {profileData.avatar && (
-                <img
-                  src={profileData.avatar}
-                  alt={profileData.githubName || username}
-                  className="w-16 h-16 rounded-full"
-                />
-              )}
-              <div className="flex-1">
-                <h1 className="text-2xl font-semibold mb-2">
-                  {profileData.githubName || username}
-                </h1>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted">
-                  <a
-                    href={`https://github.com/${profileData.githubUsername || username}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 hover:text-accent transition-colors"
-                  >
-                    <Github className="w-4 h-4" />
-                    @{profileData.githubUsername || username}
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    Joined {new Date(profileData.createdAt).toLocaleDateString()}
-                  </span>
-                  {primaryModel && (
-                    <span className="flex items-center gap-1">
-                      <Code2 className="w-4 h-4" />
-                      {formatModelLabel(primaryModel)} user
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Key Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-card border border-border rounded-lg p-4">
-                <p className="text-xs text-muted mb-1">Total Spent</p>
-                <p className="text-xl font-semibold font-mono">${formatCurrency(totalCost)}</p>
-                <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg p-4">
-                <p className="text-xs text-muted mb-1">Total Tokens</p>
-                <p className="text-xl font-semibold font-mono">{formatNumber(totalTokens)}</p>
-                <p className="text-xs text-muted mt-1">{formatNumber(Math.round(totalTokens / daysActive))}/day</p>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg p-4">
-                <p className="text-xs text-muted mb-1">Days Active</p>
-                <p className="text-xl font-semibold">{daysActive}</p>
-                <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submissions</p>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg p-4">
-                <p className="text-xs text-muted mb-1">Global Rank</p>
-                <p className="text-xl font-semibold">-</p>
-                <p className="text-xs text-muted mt-1">Coming soon</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Usage Chart */}
-          <div className="bg-card border border-border rounded-lg p-5 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-medium flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-accent" />
-                Usage Over Time
-              </h2>
-              <div className="flex gap-1">
-                {(["7d", "30d", "all"] as const).map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setSelectedTimeRange(range)}
-                    className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                      selectedTimeRange === range
-                        ? "bg-accent text-white"
-                        : "text-muted hover:text-foreground hover:bg-surface-2"
-                    }`}
-                  >
-                    {range === "all" ? "All" : range}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {sortedDailyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={sortedDailyData}>
-                  <defs>
-                    <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2e2e2e" strokeOpacity={0.5} />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#888888"
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                    tickFormatter={(date) => new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-                  />
-                  <YAxis
-                    stroke="#888888"
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                    tickFormatter={(value) => `$${value}`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1e1e1e',
-                      border: '1px solid #2e2e2e',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
-                    labelFormatter={(date) => new Date(date).toLocaleDateString('en', {
-                      weekday: 'short',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="cost"
-                    stroke="#f97316"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted text-sm">
-                No data for selected time range
-              </div>
+        {/* Profile header */}
+        <div className="mb-8">
+          <div className="flex items-start gap-5 mb-6">
+            {profileData.avatar && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profileData.avatar}
+                alt={displayName}
+                width={64}
+                height={64}
+                className="w-16 h-16 rounded-full ring-2 ring-border/40"
+              />
             )}
-          </div>
-
-          {/* Additional Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Token Breakdown */}
-            <div className="bg-card border border-border rounded-lg p-5">
-              <h2 className="text-base font-medium mb-4 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-accent" />
-                Token Breakdown
-              </h2>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-muted">Input Tokens</span>
-                    <span className="font-mono text-xs">{formatNumber(inputTokens)}</span>
-                  </div>
-                  <div className="w-full bg-surface-1 rounded-full h-1.5">
-                    <div
-                      className="bg-accent h-1.5 rounded-full transition-all"
-                      style={{ width: `${totalTokens > 0 ? (inputTokens / totalTokens * 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-muted">Output Tokens</span>
-                    <span className="font-mono text-xs">{formatNumber(outputTokens)}</span>
-                  </div>
-                  <div className="w-full bg-surface-1 rounded-full h-1.5">
-                    <div
-                      className="bg-blue-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${totalTokens > 0 ? (outputTokens / totalTokens * 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-muted">Cache Read</span>
-                    <span className="font-mono text-xs">{formatNumber(cacheReadTokens)}</span>
-                  </div>
-                  <div className="w-full bg-surface-1 rounded-full h-1.5">
-                    <div
-                      className="bg-green-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${totalTokens > 0 ? (cacheReadTokens / totalTokens * 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-muted">Cache Creation</span>
-                    <span className="font-mono text-xs">{formatNumber(cacheCreationTokens)}</span>
-                  </div>
-                  <div className="w-full bg-surface-1 rounded-full h-1.5">
-                    <div
-                      className="bg-purple-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${totalTokens > 0 ? (cacheCreationTokens / totalTokens * 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight mb-2">{displayName}</h1>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
+                <a
+                  href={`https://github.com/${handle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-accent transition-colors"
+                >
+                  <Github className="w-4 h-4" />@{handle}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-4 h-4" />
+                  Joined {new Date(profileData.createdAt).toLocaleDateString()}
+                </span>
               </div>
-            </div>
-
-            {/* Usage Insights */}
-            <div className="bg-card border border-border rounded-lg p-5">
-              <h2 className="text-base font-medium mb-4 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-accent" />
-                Usage Insights
-              </h2>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-xs text-muted">Most Expensive Day</span>
-                  <span className="font-mono text-xs">${formatCurrency(maxDailyCost)}</span>
+              {tools.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                  {tools.map((t) => (
+                    <span
+                      key={t}
+                      className="text-xs font-medium px-2 py-1 rounded-md bg-surface-2 text-foreground/80 border border-border"
+                    >
+                      {toolLabel(t)}
+                    </span>
+                  ))}
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-xs text-muted">Average Daily Cost</span>
-                  <span className="font-mono text-xs">${formatCurrency(avgDailyCost)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-xs text-muted">Total Days Tracked</span>
-                  <span className="font-mono text-xs">{daysActive} days</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-xs text-muted">Last Updated</span>
-                  <span className="text-xs">
-                    {latestSubmission?.submittedAt
-                      ? new Date(latestSubmission.submittedAt).toLocaleDateString('en', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })
-                      : 'N/A'
-                    }
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
-        </motion.div>
+
+          {/* Key stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-surface-1 border border-border rounded-2xl p-4">
+              <p className="flex items-center gap-1.5 text-xs text-muted mb-1"><DollarSign className="w-3.5 h-3.5" />Total spent</p>
+              <p className="text-xl font-bold font-mono text-accent">${formatNumber(totalCost)}</p>
+              <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
+            </div>
+            <div className="bg-surface-1 border border-border rounded-2xl p-4">
+              <p className="flex items-center gap-1.5 text-xs text-muted mb-1"><Zap className="w-3.5 h-3.5" />Total tokens</p>
+              <p className="text-xl font-bold font-mono">{formatNumber(totalTokens)}</p>
+              <p className="text-xs text-muted mt-1">{formatNumber(Math.round(totalTokens / daysActive))}/day</p>
+            </div>
+            <div className="bg-surface-1 border border-border rounded-2xl p-4">
+              <p className="flex items-center gap-1.5 text-xs text-muted mb-1"><CalendarDays className="w-3.5 h-3.5" />Days active</p>
+              <p className="text-xl font-bold">{daysActive}</p>
+              <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submission{profileData.totalSubmissions === 1 ? "" : "s"}</p>
+            </div>
+            <div className="bg-surface-1 border border-border rounded-2xl p-4">
+              <p className="flex items-center gap-1.5 text-xs text-muted mb-1"><Wrench className="w-3.5 h-3.5" />Tools</p>
+              <p className="text-xl font-bold">{tools.length || 1}</p>
+              <p className="text-xs text-muted mt-1 truncate">{tools.length ? toolLabel(tools[0]) : "Claude"}{tools.length > 1 ? ` +${tools.length - 1}` : ""}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Usage chart (client island) */}
+        <UsageChart daily={dailySeries} />
+
+        {/* Token breakdown + insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-surface-1 border border-border rounded-2xl p-5">
+            <h2 className="text-base font-medium mb-4 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-accent" />
+              Token breakdown
+            </h2>
+            <div className="space-y-3">
+              {tokenRows.map((row) => (
+                <div key={row.label}>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-muted">{row.label}</span>
+                    <span className="font-mono text-xs">{formatNumber(row.value)}</span>
+                  </div>
+                  <div className="w-full bg-surface-3 rounded-full h-1.5">
+                    <div
+                      className={`${row.color} h-1.5 rounded-full`}
+                      style={{ width: `${totalTokens > 0 ? (row.value / totalTokens) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-surface-1 border border-border rounded-2xl p-5">
+            <h2 className="text-base font-medium mb-4 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-accent" />
+              Usage insights
+            </h2>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center py-2 border-b border-border-subtle">
+                <span className="text-xs text-muted">Most expensive day</span>
+                <span className="font-mono text-xs">${formatCurrency(maxDailyCost)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-border-subtle">
+                <span className="text-xs text-muted">Average daily cost</span>
+                <span className="font-mono text-xs">${formatCurrency(avgDailyCost)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-border-subtle">
+                <span className="text-xs text-muted">Total days tracked</span>
+                <span className="font-mono text-xs">{daysActive} days</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-xs text-muted">Last updated</span>
+                <span className="text-xs">
+                  {latestSubmission?.submittedAt
+                    ? new Date(latestSubmission.submittedAt).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })
+                    : "N/A"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getServerDataLayer } from "@/lib/data";
+import { getProfileCached } from "./getProfile";
 
 interface ProfileParams {
   params: Promise<{ username: string }>;
@@ -10,8 +10,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
   const username = decodeURIComponent(raw);
 
   try {
-    const dataLayer = await getServerDataLayer();
-    const profile = await dataLayer.profiles.getProfile(username, 25);
+    const profile = await getProfileCached(username);
 
     if (!profile) {
       return {
@@ -84,22 +83,33 @@ export default async function ProfileLayout({
   const { username: raw } = await params;
   const username = decodeURIComponent(raw);
 
-  let profile: Awaited<ReturnType<Awaited<ReturnType<typeof getServerDataLayer>>["profiles"]["getProfile"]>> = null;
+  let profile: Awaited<ReturnType<typeof getProfileCached>> = null;
   try {
-    const dataLayer = await getServerDataLayer();
-    profile = await dataLayer.profiles.getProfile(username, 25);
+    profile = await getProfileCached(username);
   } catch {
-    // ignore — page will render its own loading/empty state
+    // ignore — page renders its own empty state
   }
 
   const display = profile?.githubName || profile?.githubUsername || username;
   const totalCost = profile?.submissions.reduce((acc, s) => acc + s.totalCost, 0) ?? 0;
+  const canonical = `https://www.viberank.app/profile/${encodeURIComponent(profile?.username || username)}`;
 
-  const jsonLd = profile
+  // Breadcrumb is emitted even without a profile so the page always has the
+  // Home → Profile trail for crawlers.
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", position: 1, name: "Leaderboard", item: "https://www.viberank.app" },
+      { "@type": "ListItem", position: 2, name: `${display} on Viberank`, item: canonical },
+    ],
+  };
+
+  const profileLd = profile
     ? {
         "@context": "https://schema.org",
         "@type": "ProfilePage",
-        "url": `https://www.viberank.app/profile/${encodeURIComponent(profile.username)}`,
+        "url": canonical,
         "name": `${display} on Viberank`,
         "mainEntity": {
           "@type": "Person",
@@ -113,14 +123,14 @@ export default async function ProfileLayout({
       }
     : null;
 
+  const jsonLd = [breadcrumbLd, ...(profileLd ? [profileLd] : [])];
+
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {children}
     </>
   );
