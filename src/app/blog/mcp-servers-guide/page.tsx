@@ -451,7 +451,7 @@ await server.connect(transport);`}</code>
             <p className="text-muted mb-4">See your Claude Code stats and join the leaderboard</p>
             <div className="bg-background rounded-lg px-6 py-4 inline-flex items-center gap-3 font-mono">
               <span className="text-stone-500">$</span>
-              <span className="text-accent text-lg">npx viberank</span>
+              <span className="text-accent text-lg">npx viberank-cli</span>
             </div>
             <p className="text-stone-500 text-sm mt-4">
               Upload your cc.json and compare your usage with other developers

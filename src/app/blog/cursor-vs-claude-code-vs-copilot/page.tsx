@@ -437,7 +437,7 @@ export default function CursorVsClaudeCodeVsCopilot() {
             <p className="text-muted mb-4">Join thousands of developers tracking their AI coding journey</p>
             <div className="bg-background rounded-lg px-6 py-4 inline-flex items-center gap-3 font-mono">
               <span className="text-stone-500">$</span>
-              <span className="text-accent text-lg">npx viberank</span>
+              <span className="text-accent text-lg">npx viberank-cli</span>
             </div>
             <p className="text-stone-500 text-sm mt-4">
               Upload your Claude Code stats and see how you compare

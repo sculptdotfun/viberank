@@ -1,5 +1,5 @@
 {
-  "name": "viberank-mcp-server",
+  "name": "viberank-mcp",
   "version": "1.0.1",
   "description": "MCP server for submitting Claude usage stats to Viberank",
   "type": "module",

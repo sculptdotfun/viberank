@@ -84,7 +84,7 @@ viberank/
 ├── supabase/
 │   └── migrations/           # SQL migrations
 ├── packages/
-│   ├── viberank-cli/         # `npx viberank` CLI
+│   ├── viberank-cli/         # `npx viberank-cli` CLI
 │   └── viberank-mcp-server/  # MCP server (currently unmaintained)
 └── public/                   # Static assets
 ```

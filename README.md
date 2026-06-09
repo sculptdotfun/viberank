@@ -16,17 +16,17 @@ Live at **[viberank.app](https://www.viberank.app)**.
 - 🏆 **Global leaderboard** by cost or tokens, with 7d / 30d / custom date filters
 - 🧰 **Multi-tool** — usage from Claude Code, Codex, Gemini CLI, Copilot, OpenCode and other `ccusage`-supported agents, with an **"All tools / Claude / Codex / …" filter**
 - 📊 **Profile pages** at `viberank.app/profile/{username}` with daily charts and model breakdown
-- 🚀 **Three ways to submit**: `npx viberank` CLI, plain `curl`, or signed-in web upload
+- 🚀 **Three ways to submit**: `npx viberank-cli` CLI, plain `curl`, or signed-in web upload
 - 🔐 **GitHub OAuth** — verified submissions show a blue check; unverified CLI submissions show a `cli` pill
 - 🛡️ **Input validation** — token math, date sanity, daily-cost ceilings, cost/token ratio
 - 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
 
 ## Submitting your usage data
 
-### Option 1: `npx viberank` (recommended)
+### Option 1: `npx viberank-cli` (recommended)
 
 ```bash
-npx viberank
+npx viberank-cli
 ```
 
 This generates a fresh `cc.json` via `ccusage daily --json` (the aggregate report across **all** your detected tools) and POSTs it to `/api/submit`. It picks up your GitHub username from your git remote / `git config user.name`.

@@ -24,7 +24,7 @@ export default function Home() {
   const { mutate: claimAndMerge } = useClaimAndMergeSubmissions();
 
   const copyCommand = () => {
-    navigator.clipboard.writeText("npx viberank");
+    navigator.clipboard.writeText("npx viberank-cli");
     setCopiedToClipboard(true);
     setTimeout(() => setCopiedToClipboard(false), 2000);
   };
@@ -127,7 +127,7 @@ export default function Home() {
                     onClick={copyCommand}
                     className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 border border-border hover:border-accent/50 transition-colors"
                   >
-                    <code className="text-sm font-mono text-accent">npx viberank</code>
+                    <code className="text-sm font-mono text-accent">npx viberank-cli</code>
                     {copiedToClipboard ? (
                       <Check className="w-4 h-4 text-green-500" />
                     ) : (

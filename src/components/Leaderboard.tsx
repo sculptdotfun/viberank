@@ -138,7 +138,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
               className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-sm bg-surface-1 hover:bg-surface-2 border border-border rounded-lg transition-colors"
             >
               <Terminal className="w-4 h-4 text-muted" />
-              <code className="font-mono text-accent font-medium">npx viberank</code>
+              <code className="font-mono text-accent font-medium">npx viberank-cli</code>
               {copiedToClipboard ? (
                 <Check className="w-4 h-4 text-green-500" />
               ) : (
@@ -393,7 +393,7 @@ export default function Leaderboard({ onCopyCommand, copiedToClipboard }: Leader
             <Trophy className="w-10 h-10 text-muted mx-auto mb-3" />
             <p className="text-base font-medium mb-1">No submissions yet</p>
             <p className="text-sm text-muted mb-4">Be the first on the leaderboard</p>
-            <code className="text-sm font-mono text-accent">npx viberank</code>
+            <code className="text-sm font-mono text-accent">npx viberank-cli</code>
           </div>
         )}
       </div>

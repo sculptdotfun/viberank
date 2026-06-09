@@ -72,7 +72,7 @@ The username comes from the authenticated session, never the client request body
 ## Trust signals on the leaderboard
 
 - **OAuth-submitted rows** (uploaded via a signed-in session, or claimed by their owner) display a blue verified check
-- **Unverified CLI rows** (raw `curl` / `npx viberank` without OAuth claim) display a muted `cli` pill
+- **Unverified CLI rows** (raw `curl` / `npx viberank-cli` without OAuth claim) display a muted `cli` pill
 
 The CLI submission path trusts the `X-GitHub-User` header as the username — by design, since the CLI doesn't authenticate. The badge difference exists so leaderboard viewers can tell the two apart.
 

@@ -7,7 +7,7 @@ CLI tool to submit your Claude usage stats to the [Viberank](https://viberank.ap
 You don't need to install anything! Simply run:
 
 ```bash
-npx viberank
+npx viberank-cli
 ```
 
 This will:
@@ -39,7 +39,7 @@ If you prefer to generate the data separately:
 npx ccusage@latest --json > cc.json
 
 # Submit to Viberank
-npx viberank
+npx viberank-cli
 ```
 
 The CLI will detect the existing `cc.json` file and ask if you want to use it.
@@ -63,7 +63,7 @@ curl -X POST https://www.viberank.app/api/submit \
 
 ### Common Issues
 
-- **"npx viberank" not found**: Try `npx viberank@latest` or clear npx cache with `npx clear-npx-cache`
+- **"npx viberank-cli" not found**: Try `npx viberank-cli@latest` or clear npx cache with `npx clear-npx-cache`
 - **"Failed to submit data"**: Ensure your cc.json is valid JSON format
 - **"GitHub username not found"**: Run `git config --global user.name "YourGitHubUsername"`
 - **"No usage data"**: Make sure you've used Claude Code at least once

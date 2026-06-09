@@ -89,7 +89,7 @@ export default async function Image() {
           }}
         >
           <span style={{ fontSize: 28, color: '#a8a29e' }}>$</span>
-          <span style={{ fontSize: 28, color: '#dc8850', fontFamily: 'monospace' }}>npx viberank</span>
+          <span style={{ fontSize: 28, color: '#dc8850', fontFamily: 'monospace' }}>npx viberank-cli</span>
         </div>
       </div>
     ),

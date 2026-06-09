@@ -90,7 +90,7 @@ export async function GET(request: Request) {
             }}
           >
             <span style={{ fontSize: 24, color: '#a1a1aa' }}>$</span>
-            <span style={{ fontSize: 24, color: '#f97316', fontFamily: 'monospace' }}>npx viberank</span>
+            <span style={{ fontSize: 24, color: '#f97316', fontFamily: 'monospace' }}>npx viberank-cli</span>
           </div>
         </div>
       ),
