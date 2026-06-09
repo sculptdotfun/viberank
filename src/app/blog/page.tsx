@@ -3,6 +3,27 @@ import { ArrowLeft } from "lucide-react";
 
 const blogPosts = [
   {
+    slug: "codex-vs-claude-code-vs-gemini-cli",
+    title: "Codex vs Claude Code vs Gemini CLI: AI Coding Cost & Usage Compared (2026)",
+    excerpt: "How OpenAI Codex, Claude Code, and Gemini CLI compare on cost, tokens, and real-world usage — backed by data from 800+ developers.",
+    date: "June 9, 2026",
+    readTime: "8 min read",
+  },
+  {
+    slug: "how-much-does-claude-code-cost",
+    title: "How Much Does Claude Code Cost? Real Data From 800+ Developers (2026)",
+    excerpt: "What does Claude Code actually cost per month? Real spend, tokens, and daily averages from 800+ developers on the leaderboard.",
+    date: "June 9, 2026",
+    readTime: "6 min read",
+  },
+  {
+    slug: "reduce-ai-coding-costs",
+    title: "How to Cut Your AI Coding Bill: 9 Ways to Reduce Claude Code & Codex Costs",
+    excerpt: "Practical, proven ways to lower your AI coding costs — model routing, prompt caching, context hygiene — without slowing down.",
+    date: "June 9, 2026",
+    readTime: "7 min read",
+  },
+  {
     slug: "mcp-servers-guide",
     title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
     excerpt: "Learn how to extend Claude Code with MCP servers. Connect to GitHub, PostgreSQL, Slack, and build custom integrations for AI-powered development.",
