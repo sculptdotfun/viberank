@@ -55,7 +55,22 @@ export interface Profile {
   avatar?: string;
   totalSubmissions: number;
   bestSubmission?: string;
+  /** Explicit opt-in flag shown on the profile and the /hire page. */
+  openToWork?: boolean;
   createdAt: number; // Unix timestamp in ms
+}
+
+/** Row on the /hire page: an opted-in profile with its board stats. */
+export interface HireListing {
+  username: string;
+  githubUsername: string;
+  githubName?: string;
+  avatar?: string;
+  bestCost: number;
+  totalTokens: number;
+  tools: string[];
+  rank: number | null;
+  verified: boolean;
 }
 
 export interface ProfileWithSubmissions extends Profile {
@@ -244,6 +259,13 @@ export interface ProfilesService {
     username: string,
     submissionLimit?: number
   ): Promise<ProfileWithSubmissions | null>;
+  /** Set the open-to-work flag for a GitHub-verified profile. */
+  setOpenToWork(
+    githubUsername: string,
+    open: boolean
+  ): Promise<{ success: boolean; error?: string }>;
+  /** All opted-in profiles with board stats, sorted by best cost. */
+  getHireListings(): Promise<HireListing[]>;
   deleteByPattern(
     patterns: string[],
     options: PatternSearchOptions & { dryRun?: boolean }

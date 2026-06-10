@@ -18,6 +18,7 @@ import UsageChart from "./UsageChartLazy";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
+import OpenToWorkToggle from "@/components/OpenToWorkToggle";
 
 // ISR the full profile page too — direct loads and sheet "view full profile"
 // both get cached HTML; data is at most 2 minutes stale.
@@ -147,6 +148,10 @@ export default async function ProfilePage({ params }: ProfileParams) {
                     #{globalRank}
                   </span>
                 )}
+                <OpenToWorkToggle
+                  profileGithubUsername={profileData.githubUsername}
+                  initialOpen={profileData.openToWork ?? false}
+                />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
                 <a
