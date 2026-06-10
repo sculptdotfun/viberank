@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 
 const ShareCard = dynamic(() => import("./ShareCard"), { ssr: false });
 import Avatar from "./Avatar";
+import SponsorSlot from "./SponsorSlot";
 import TierBadge from "./TierBadge";
 import { TIERS } from "@/lib/tiers";
 import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
@@ -279,6 +280,8 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
           )}
         </AnimatePresence>
       </div>
+
+      <SponsorSlot />
 
       {/* Tier ladder key — desktop gets the sidebar ladder instead */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-5 px-0.5 lg:hidden">
