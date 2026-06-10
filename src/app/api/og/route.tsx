@@ -1,10 +1,113 @@
 import { ImageResponse } from 'next/og';
+import { getTier } from '@/lib/tiers';
 
 export const runtime = 'edge';
+
+const Logo = ({ size = 72 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <rect x="3" y="14" width="5" height="7" rx="1" fill="#f97316" opacity="0.5" />
+    <rect x="9.5" y="8" width="5" height="13" rx="1" fill="#f97316" opacity="0.75" />
+    <rect x="16" y="3" width="5" height="18" rx="1" fill="#f97316" />
+  </svg>
+);
+
+// Share card for profile pages: avatar, rank, tier, cost, tokens.
+function profileCard(searchParams: URLSearchParams) {
+  const username = searchParams.get('username') || 'developer';
+  const avatar = searchParams.get('avatar');
+  const cost = Number(searchParams.get('cost') || 0);
+  const tokens = searchParams.get('tokens') || '';
+  const rank = searchParams.get('rank');
+  const tier = getTier(cost);
+  const costLabel =
+    cost >= 1000 ? `$${(cost / 1000).toFixed(cost >= 10000 ? 0 : 1)}k` : `$${Math.round(cost)}`;
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          backgroundColor: '#121212',
+          padding: 64,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Logo size={44} />
+            <span style={{ fontSize: 36, fontWeight: 'bold', color: '#fafafa' }}>viberank</span>
+          </div>
+          {rank && (
+            <div
+              style={{
+                display: 'flex',
+                fontSize: 40,
+                fontWeight: 'bold',
+                color: '#f97316',
+                padding: '8px 28px',
+                backgroundColor: 'rgba(249, 115, 22, 0.12)',
+                borderRadius: 16,
+              }}
+            >
+              #{rank} global
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatar}
+              alt=""
+              width={160}
+              height={160}
+              style={{ borderRadius: 80, border: '4px solid #2e2e2e' }}
+            />
+          ) : null}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 64, fontWeight: 'bold', color: '#fafafa' }}>{username}</span>
+            {/* No tier glyph here — the OG renderer's font lacks those code
+                points and draws tofu boxes. */}
+            <span style={{ fontSize: 32, color: tier.color, marginTop: 8, fontWeight: 'bold', letterSpacing: 4 }}>
+              {tier.name.toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 64 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 60, fontWeight: 'bold', color: '#f97316' }}>{costLabel}</span>
+              <span style={{ fontSize: 24, color: '#a1a1aa' }}>AI coding usage</span>
+            </div>
+            {tokens && (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: 60, fontWeight: 'bold', color: '#fafafa' }}>{tokens}</span>
+                <span style={{ fontSize: 24, color: '#a1a1aa' }}>tokens</span>
+              </div>
+            )}
+          </div>
+          <span style={{ fontSize: 24, color: '#a1a1aa', fontFamily: 'monospace' }}>
+            npx viberank-cli
+          </span>
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630 }
+  );
+}
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+
+    if (searchParams.get('type') === 'profile') {
+      return profileCard(searchParams);
+    }
 
     const title = searchParams.get('title') || 'Viberank';
     const description = searchParams.get('description') || 'Claude Code, Codex & AI Coding Leaderboard';

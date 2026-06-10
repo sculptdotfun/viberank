@@ -44,7 +44,30 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     const title = `${display} — ${cost} on ${toolsShort} | Viberank`;
     const description = `${display} has spent ${cost} across ${tokensB} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
     const canonical = `https://www.viberank.app/profile/${encodeURIComponent(profile.username)}`;
-    const ogImage = `/api/og?title=${encodeURIComponent(display)}&description=${encodeURIComponent(`${cost} • ${tokensB} tokens`)}`;
+
+    // Rich share card: avatar, rank, tier, cost, tokens. Rank and tier match
+    // the leaderboard convention (best submission, not lifetime sum).
+    const bestCost = profile.submissions.reduce((acc, s) => Math.max(acc, s.totalCost), 0);
+    let rank: number | null = null;
+    try {
+      if (bestCost > 0) {
+        const { getServerDataLayer } = await import("@/lib/data");
+        const dataLayer = await getServerDataLayer();
+        rank = await dataLayer.submissions.getGlobalRank(bestCost);
+      }
+    } catch {
+      // rank is nice-to-have on the card; render without it on failure
+    }
+    const avatar = profile.submissions.find((s) => s.githubAvatar)?.githubAvatar;
+    const ogParams = new URLSearchParams({
+      type: "profile",
+      username: profile.githubUsername || profile.username,
+      cost: String(Math.round(bestCost)),
+      tokens: tokensB,
+    });
+    if (rank) ogParams.set("rank", String(rank));
+    if (avatar) ogParams.set("avatar", avatar);
+    const ogImage = `/api/og?${ogParams.toString()}`;
 
     return {
       title,
