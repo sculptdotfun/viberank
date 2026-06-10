@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { track } from "@vercel/analytics/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
@@ -211,6 +212,14 @@ export async function POST(request: NextRequest) {
 
       throw new Error(errorMessage);
     }
+
+    // Analytics events never block or fail a submission.
+    await track("submit_completed", {
+      source,
+      verified,
+      tools: (normalized.tools ?? []).join(","),
+      cliVersion: cliVersion || "unknown",
+    }).catch((e) => console.error("Analytics track failed:", e));
 
     return NextResponse.json({
       success: true,

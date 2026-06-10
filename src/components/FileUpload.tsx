@@ -5,6 +5,7 @@ import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Github } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
+import { track } from "@vercel/analytics";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 import { useSubmit } from "@/lib/data/hooks/useSubmissions";
 
@@ -96,6 +97,7 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
         ccData: parsedData,
       });
       setUploadState("success");
+      track("submit_completed", { source: "web" });
       setParsedData(null);
       setTimeout(() => onSuccess?.(), 1500);
     } catch (error) {
