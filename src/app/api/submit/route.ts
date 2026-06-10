@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
 import { normalizeCcData } from "@/lib/ccusage";
+import { getCliNotice } from "@/lib/sponsor";
 
 export async function POST(request: NextRequest) {
   try {
@@ -225,7 +226,9 @@ export async function POST(request: NextRequest) {
       success: true,
       submissionId,
       message: `Successfully submitted data for ${githubUsername}`,
-      profileUrl: `https://viberank.app/profile/${githubUsername}`
+      profileUrl: `https://viberank.app/profile/${githubUsername}`,
+      // Optional sponsor line the CLI prints after a successful submission.
+      notice: getCliNotice(),
     });
 
   } catch (error) {

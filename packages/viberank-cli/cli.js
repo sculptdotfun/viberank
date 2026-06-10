@@ -223,6 +223,9 @@ async function main() {
       if (result.success) {
         submitSpinner.succeed('Successfully submitted to Viberank!');
         console.log(`\nView your profile at: ${chalk.green(result.profileUrl)}\n`);
+        if (result.notice) {
+          console.log(chalk.gray(result.notice) + '\n');
+        }
         break; // Success, exit the retry loop
       } else {
         submitSpinner.fail('Failed to submit to Viberank');
