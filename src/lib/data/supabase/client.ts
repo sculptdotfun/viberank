@@ -25,6 +25,7 @@ import type {
   DeleteResult,
   FindProfilesResult,
   PatternSearchOptions,
+  HireListing,
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import { validateCcData, inferToolFromModel } from "@/lib/ccusage";
@@ -84,6 +85,7 @@ interface DbProfile {
   avatar: string | null;
   total_submissions: number;
   best_submission_id: string | null;
+  open_to_work: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -980,11 +982,75 @@ class SupabaseProfilesService implements ProfilesService {
       avatar: profile.avatar || undefined,
       totalSubmissions: profile.total_submissions,
       bestSubmission: profile.best_submission_id || undefined,
+      openToWork: profile.open_to_work || false,
       createdAt: new Date(profile.created_at).getTime(),
       submissions: (submissions || []).map((s) =>
         convertDbSubmissionToSubmission(s, dailyBySubmission.get(s.id) || [])
       ),
     };
+  }
+
+  async setOpenToWork(
+    githubUsername: string,
+    open: boolean
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await this.client
+      .from("profiles")
+      .update({ open_to_work: open })
+      .ilike("github_username", githubUsername)
+      .select("id");
+
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) {
+      return { success: false, error: "No profile found — submit your stats first." };
+    }
+    return { success: true };
+  }
+
+  async getHireListings(): Promise<HireListing[]> {
+    const { data: profiles } = await this.client
+      .from("profiles")
+      .select("*")
+      .eq("open_to_work", true);
+
+    if (!profiles || profiles.length === 0) return [];
+
+    // Best submission per opted-in profile, plus the full cost ladder so we
+    // can attach the same global rank the leaderboard would show.
+    const usernames = profiles.map((p) => p.username);
+    const [{ data: subs }, { data: ladder }] = await Promise.all([
+      this.client.from("submissions").select("*").in("username", usernames),
+      this.client
+        .from("submissions")
+        .select("total_cost")
+        .order("total_cost", { ascending: false }),
+    ]);
+
+    const costs = (ladder || []).map((r) => Number(r.total_cost));
+    const bestByUser = new Map<string, DbSubmission>();
+    (subs || []).forEach((s) => {
+      const cur = bestByUser.get(s.username);
+      if (!cur || Number(s.total_cost) > Number(cur.total_cost)) bestByUser.set(s.username, s);
+    });
+
+    return profiles
+      .filter((p) => p.github_username && bestByUser.has(p.username))
+      .map((p) => {
+        const best = bestByUser.get(p.username)!;
+        const bestCost = Number(best.total_cost);
+        return {
+          username: p.username,
+          githubUsername: p.github_username!,
+          githubName: p.github_name || best.github_name || undefined,
+          avatar: p.avatar || best.github_avatar || undefined,
+          bestCost,
+          totalTokens: Number(best.total_tokens),
+          tools: best.tools && best.tools.length > 0 ? best.tools : ["claude"],
+          rank: costs.length > 0 ? costs.filter((c) => c > bestCost).length + 1 : null,
+          verified: best.verified,
+        };
+      })
+      .sort((a, b) => b.bestCost - a.bestCost);
   }
 
   async deleteByPattern(
