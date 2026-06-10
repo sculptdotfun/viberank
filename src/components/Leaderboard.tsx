@@ -56,6 +56,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [allItems, setAllItems] = useState<Submission[]>(initialItems ?? []);
   const { data: session } = useSession();
@@ -74,11 +75,12 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     page === 0 &&
     sortBy === "cost" &&
     !tool &&
+    !verifiedOnly &&
     !isDateFiltered;
 
   const { data: regularResult, isLoading } = useLeaderboard(
     !isDateFiltered && !isSeededDefaultView
-      ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined }
+      ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
       : "skip"
   );
 
@@ -86,7 +88,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
 
   const { data: dateFilteredResult } = useLeaderboardByDateRange(
     isDateFiltered
-      ? { dateFrom, dateTo, sortBy, limit: 100, tool: tool ?? undefined }
+      ? { dateFrom, dateTo, sortBy, limit: 100, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
       : "skip"
   );
 
@@ -104,7 +106,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     }
     setAllItems([]);
     setPage(0);
-  }, [sortBy, dateFrom, dateTo, tool]);
+  }, [sortBy, dateFrom, dateTo, tool, verifiedOnly]);
 
   useEffect(() => {
     if (isDateFiltered && dateFilteredResult?.items) {
@@ -190,6 +192,18 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
               className={`p-1.5 rounded transition-colors ${showFilters ? "text-accent" : "text-muted hover:text-foreground"}`}
             >
               <Calendar className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={() => setVerifiedOnly(v => !v)}
+              aria-pressed={verifiedOnly}
+              title="Only show GitHub-verified submissions"
+              className={`px-2 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
+                verifiedOnly ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2"
+              }`}
+            >
+              <BadgeCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Verified</span>
             </button>
 
             {availableTools.length > 1 && (
@@ -324,13 +338,18 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                         />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium group-hover:text-accent transition-colors truncate">
+                            <span className={`text-sm font-medium group-hover:text-accent transition-colors truncate ${!submission.verified ? "text-muted" : ""}`}>
                               {submission.githubUsername || submission.username}
                             </span>
                             {submission.verified ? (
                               <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
                             ) : (
-                              <span className="text-[9px] font-mono uppercase tracking-wider px-1 py-px rounded bg-muted/15 text-muted flex-shrink-0">cli</span>
+                              <span
+                                title="Submitted via CLI — identity not verified with GitHub"
+                                className="text-[9px] font-mono uppercase tracking-wider px-1 py-px rounded bg-muted/15 text-muted flex-shrink-0"
+                              >
+                                cli
+                              </span>
                             )}
                           </div>
                           {submission.githubName && submission.githubName !== submission.githubUsername && (
