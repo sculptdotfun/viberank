@@ -7,6 +7,15 @@
 // CORE DATA TYPES
 // ============================================================================
 
+export interface ModelBreakdown {
+  modelName: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  cost: number;
+}
+
 export interface DailyBreakdown {
   date: string; // YYYY-MM-DD format
   inputTokens: number;
@@ -17,6 +26,8 @@ export interface DailyBreakdown {
   totalCost: number;
   modelsUsed: string[];
   agents?: string[]; // tools that contributed to this day
+  /** Per-model token/cost split for this day. Null/absent on rows ingested before migration 004. */
+  modelBreakdowns?: ModelBreakdown[];
 }
 
 export interface Submission {

@@ -41,6 +41,8 @@ async function profileCard(searchParams: URLSearchParams) {
   const cost = Number(searchParams.get('cost') || 0);
   const tokens = searchParams.get('tokens') || '';
   const rank = searchParams.get('rank');
+  const days = searchParams.get('days');
+  const tools = (searchParams.get('tools') || '').split(',').filter(Boolean);
   const tier = getTier(cost);
   const costLabel =
     cost >= 1000 ? `$${(cost / 1000).toFixed(cost >= 10000 ? 0 : 1)}K` : `$${Math.round(cost)}`;
@@ -145,40 +147,56 @@ async function profileCard(searchParams: URLSearchParams) {
                 }}
               />
             ) : null}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <span style={{ fontSize: 72, fontWeight: 700, color: '#fafafa', lineHeight: 1 }}>
                 {username}
               </span>
-              <div
-                style={{
-                  display: 'flex',
-                  alignSelf: 'flex-start',
-                  padding: '8px 22px',
-                  borderRadius: 10,
-                  backgroundColor: tier.soft,
-                  border: `1px solid ${tier.color}`,
-                }}
-              >
-                <span
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div
                   style={{
-                    fontSize: 24,
-                    color: tier.color,
-                    fontWeight: 700,
-                    letterSpacing: 6,
-                    fontFamily: 'Geist Mono',
+                    display: 'flex',
+                    padding: '8px 22px',
+                    borderRadius: 10,
+                    backgroundColor: tier.soft,
+                    border: `1px solid ${tier.color}`,
                   }}
                 >
-                  {tier.name.toUpperCase()}
-                </span>
+                  <span
+                    style={{
+                      fontSize: 24,
+                      color: tier.color,
+                      fontWeight: 700,
+                      letterSpacing: 6,
+                      fontFamily: 'Geist Mono',
+                    }}
+                  >
+                    {tier.name.toUpperCase()}
+                  </span>
+                </div>
+                {tools.map((t) => (
+                  <div
+                    key={t}
+                    style={{
+                      display: 'flex',
+                      padding: '8px 18px',
+                      borderRadius: 10,
+                      backgroundColor: '#16161a',
+                      border: '1px solid #26262d',
+                    }}
+                  >
+                    <span style={{ fontSize: 20, color: '#9a9aa5', fontFamily: 'Geist Mono' }}>{t}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           {/* stats + CTA */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 80 }}>
+            <div style={{ display: 'flex', gap: 72 }}>
               {stat(costLabel, 'AI CODING USAGE', '#f97316')}
               {tokens ? stat(tokens, 'TOKENS', '#fafafa') : null}
+              {days ? stat(days, 'ACTIVE DAYS', '#fafafa') : null}
             </div>
             <div
               style={{

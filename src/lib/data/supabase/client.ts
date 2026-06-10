@@ -26,6 +26,7 @@ import type {
   FindProfilesResult,
   PatternSearchOptions,
   HireListing,
+  ModelBreakdown,
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import { validateCcData, inferToolFromModel } from "@/lib/ccusage";
@@ -73,6 +74,7 @@ interface DbDailyBreakdown {
   total_cost: number;
   models_used: string[];
   agents: string[] | null;
+  model_breakdowns: ModelBreakdown[] | null;
 }
 
 interface DbProfile {
@@ -137,6 +139,7 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
     totalCost: Number(db.total_cost),
     modelsUsed: db.models_used || [],
     agents: db.agents || [],
+    modelBreakdowns: db.model_breakdowns || undefined,
   };
 }
 
@@ -262,6 +265,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         total_cost: day.totalCost,
         models_used: day.modelsUsed,
         agents: day.agents ?? [],
+        model_breakdowns: day.modelBreakdowns ?? null,
       };
 
       if (dailyMap.has(day.date)) {
@@ -386,6 +390,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
       total_cost: day.totalCost,
       models_used: day.modelsUsed,
       agents: day.agents ?? [],
+      model_breakdowns: day.modelBreakdowns ?? null,
     }));
 
     const { error: dailyError } = await this.client
@@ -817,6 +822,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         total_cost: d.total_cost,
         models_used: d.models_used,
         agents: d.agents || [],
+        model_breakdowns: d.model_breakdowns ?? null,
       }))
     );
 
