@@ -73,6 +73,8 @@ export interface LeaderboardParams {
   includeFlagged?: boolean;
   /** Filter to submissions that used this tool/agent (e.g. "codex"). */
   tool?: string;
+  /** Only show GitHub-OAuth-verified submissions (CLI rows are unverified). */
+  verifiedOnly?: boolean;
 }
 
 export interface DateRangeLeaderboardParams {
@@ -84,6 +86,8 @@ export interface DateRangeLeaderboardParams {
   includeFlagged?: boolean;
   /** Filter to submissions that used this tool/agent (e.g. "codex"). */
   tool?: string;
+  /** Only show GitHub-OAuth-verified submissions (CLI rows are unverified). */
+  verifiedOnly?: boolean;
 }
 
 export interface SubmitData {

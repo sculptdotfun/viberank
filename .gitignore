@@ -46,3 +46,6 @@ scripts/
 *.tsbuildinfo
 next-env.d.ts
 .playwright-mcp/
+
+# local research docs (contain user data — keep out of public repo)
+/research/

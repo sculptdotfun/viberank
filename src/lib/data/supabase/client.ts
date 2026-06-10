@@ -462,6 +462,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
       query = query.contains("tools", [params.tool]);
     }
 
+    if (params.verifiedOnly) {
+      query = query.eq("verified", true);
+    }
+
     const { data: submissions, count, error } = await query;
 
     if (error) {
@@ -513,6 +517,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     if (params.tool) {
       query = query.contains("tools", [params.tool]);
+    }
+
+    if (params.verifiedOnly) {
+      query = query.eq("verified", true);
     }
 
     const { data: submissions } = await query.limit(SUBMISSION_CAP);

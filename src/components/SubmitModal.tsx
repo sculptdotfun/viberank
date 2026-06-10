@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, Terminal, Copy, Check } from "lucide-react";
+import { track } from "@vercel/analytics";
 import FileUpload from "./FileUpload";
 
 interface SubmitModalProps {
@@ -15,6 +16,7 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
 
   const copyCommand = () => {
     navigator.clipboard.writeText("npx viberank-cli");
+    track("cli_command_copied");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

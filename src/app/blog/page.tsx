@@ -2,6 +2,13 @@ import Link from "next/link";
 
 const blogPosts = [
   {
+    slug: "state-of-ai-coding-2026",
+    title: "State of AI Coding Spend 2026: Benchmarks From 800 Developers and $2.3M of Usage",
+    excerpt: "Percentiles, daily burn rates, model mix, and power-user benchmarks from 29,000 days of real Claude Code, Codex, and Gemini CLI usage.",
+    date: "June 10, 2026",
+    readTime: "8 min read",
+  },
+  {
     slug: "codex-vs-claude-code-vs-gemini-cli",
     title: "Codex vs Claude Code vs Gemini CLI: AI Coding Cost & Usage Compared (2026)",
     excerpt: "How OpenAI Codex, Claude Code, and Gemini CLI compare on cost, tokens, and real-world usage — backed by data from 800+ developers.",
