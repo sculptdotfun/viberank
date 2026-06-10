@@ -41,6 +41,15 @@ interface RawCcData {
   daily: RawDailyEntry[];
 }
 
+export interface NormalizedModelBreakdown {
+  modelName: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  cost: number;
+}
+
 /** A daily entry after normalization — always keyed by `date`, agents resolved. */
 export interface NormalizedDaily {
   date: string;
@@ -52,6 +61,53 @@ export interface NormalizedDaily {
   totalCost: number;
   modelsUsed: string[];
   agents: string[];
+  /** Per-model split for the day, when the report provides it. */
+  modelBreakdowns?: NormalizedModelBreakdown[];
+}
+
+// Per-model day splits come straight from user-supplied JSON, so rebuild them
+// field-by-field and cap the count — never trust the shape.
+const MAX_MODELS_PER_DAY = 50;
+function sanitizeModelBreakdowns(value: unknown): NormalizedModelBreakdown[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+  const out: NormalizedModelBreakdown[] = [];
+  for (const item of value.slice(0, MAX_MODELS_PER_DAY)) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    if (typeof o.modelName !== "string" || o.modelName.length === 0) continue;
+    out.push({
+      modelName: o.modelName.slice(0, 200),
+      inputTokens: num(o.inputTokens),
+      outputTokens: num(o.outputTokens),
+      cacheCreationTokens: num(o.cacheCreationTokens),
+      cacheReadTokens: num(o.cacheReadTokens),
+      cost: num(o.cost),
+    });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+function mergeModelBreakdowns(
+  a: NormalizedModelBreakdown[] | undefined,
+  b: NormalizedModelBreakdown[] | undefined
+): NormalizedModelBreakdown[] | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const byModel = new Map<string, NormalizedModelBreakdown>();
+  for (const m of [...a, ...b]) {
+    const cur = byModel.get(m.modelName);
+    if (cur) {
+      cur.inputTokens += m.inputTokens;
+      cur.outputTokens += m.outputTokens;
+      cur.cacheCreationTokens += m.cacheCreationTokens;
+      cur.cacheReadTokens += m.cacheReadTokens;
+      cur.cost += m.cost;
+    } else {
+      byModel.set(m.modelName, { ...m });
+    }
+  }
+  return Array.from(byModel.values());
 }
 
 export interface NormalizedCcData {
@@ -153,6 +209,7 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
 
     const agents = resolveAgents(entry);
     const models = entry.modelsUsed ?? [];
+    const breakdowns = sanitizeModelBreakdowns(entry.modelBreakdowns);
     const existing = byDate.get(date);
 
     if (existing) {
@@ -164,6 +221,7 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
       existing.totalCost += entry.totalCost;
       existing.modelsUsed = Array.from(new Set([...existing.modelsUsed, ...models]));
       existing.agents = Array.from(new Set([...existing.agents, ...agents]));
+      existing.modelBreakdowns = mergeModelBreakdowns(existing.modelBreakdowns, breakdowns);
     } else {
       byDate.set(date, {
         date,
@@ -175,6 +233,7 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
         totalCost: entry.totalCost,
         modelsUsed: [...models],
         agents: [...agents],
+        modelBreakdowns: breakdowns,
       });
     }
   }

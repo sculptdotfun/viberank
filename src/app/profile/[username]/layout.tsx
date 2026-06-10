@@ -59,6 +59,9 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       // rank is nice-to-have on the card; render without it on failure
     }
     const avatar = profile.submissions.find((s) => s.githubAvatar)?.githubAvatar;
+    const daysActive = new Set(
+      profile.submissions.flatMap((s) => (s.dailyBreakdown ?? []).map((d) => d.date))
+    ).size;
     const ogParams = new URLSearchParams({
       type: "profile",
       username: profile.githubUsername || profile.username,
@@ -67,6 +70,8 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     });
     if (rank) ogParams.set("rank", String(rank));
     if (avatar) ogParams.set("avatar", avatar);
+    if (daysActive > 0) ogParams.set("days", String(daysActive));
+    if (tools.length > 0) ogParams.set("tools", tools.slice(0, 4).join(","));
     const ogImage = `/api/og?${ogParams.toString()}`;
 
     return {

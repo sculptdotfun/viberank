@@ -9,6 +9,8 @@ import {
   DollarSign,
   CalendarDays,
   Trophy,
+  Cpu,
+  Wrench,
 } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl } from "@/lib/utils";
 import { getTierProgress } from "@/lib/tiers";
@@ -112,6 +114,58 @@ export default async function ProfilePage({ params }: ProfileParams) {
     { label: "Cache read", value: tokenAgg.cacheRead, color: "bg-emerald-500" },
     { label: "Cache creation", value: tokenAgg.cacheCreation, color: "bg-purple-500" },
   ];
+
+  // Per-model aggregation. Cost splits exist on rows ingested after migration
+  // 004; older rows fall back to "days used". Dates can repeat across
+  // submissions, so dedupe per date first (prefer the newest submission's row,
+  // matching how merge overwrites days).
+  const seenDates = new Set<string>();
+  const uniqueDaily = allDaily.filter((d) => {
+    if (seenDates.has(d.date)) return false;
+    seenDates.add(d.date);
+    return true;
+  });
+
+  const prettyModel = (raw: string) => {
+    let m = raw.replace(/^\[[^\]]+\]\s*/, ""); // "[openclaw] x/y" → "x/y"
+    m = m.split("/").pop() ?? m; // drop provider path
+    m = m.replace(/-\d{8}$/, ""); // drop date suffix
+    return m;
+  };
+
+  const modelCost = new Map<string, number>();
+  const modelDays = new Map<string, number>();
+  let breakdownCost = 0;
+  for (const d of uniqueDaily) {
+    for (const m of d.modelsUsed ?? []) {
+      const name = prettyModel(m);
+      modelDays.set(name, (modelDays.get(name) ?? 0) + 1);
+    }
+    for (const mb of d.modelBreakdowns ?? []) {
+      const name = prettyModel(mb.modelName);
+      modelCost.set(name, (modelCost.get(name) ?? 0) + mb.cost);
+      breakdownCost += mb.cost;
+    }
+  }
+  // Cost shares only tell the truth once most tracked days carry splits.
+  const daysWithBreakdown = uniqueDaily.filter((d) => (d.modelBreakdowns?.length ?? 0) > 0).length;
+  const hasModelCosts = breakdownCost > 0 && daysWithBreakdown >= uniqueDaily.length * 0.5;
+  const MODEL_ROWS = 8;
+  const modelEntries = Array.from((hasModelCosts ? modelCost : modelDays).entries()).sort(
+    (a, b) => b[1] - a[1]
+  );
+  const modelTotal = modelEntries.reduce((s, [, v]) => s + v, 0) || 1;
+  const topModels = modelEntries.slice(0, MODEL_ROWS);
+  const otherModels = modelEntries.slice(MODEL_ROWS);
+  const otherValue = otherModels.reduce((s, [, v]) => s + v, 0);
+
+  // Days each tool was active (cost attribution per tool isn't reliable when
+  // a day mixes tools, so day counts are the honest stat).
+  const toolDays = new Map<string, number>();
+  for (const d of uniqueDaily) {
+    for (const t of d.agents ?? []) toolDays.set(t, (toolDays.get(t) ?? 0) + 1);
+  }
+  const toolEntries = Array.from(toolDays.entries()).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -298,6 +352,85 @@ export default async function ProfilePage({ params }: ProfileParams) {
             </div>
           </div>
         </div>
+
+        {/* Model + tool breakdown */}
+        {(topModels.length > 0 || toolEntries.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            {topModels.length > 0 && (
+              <div className="bg-surface-1 border border-border rounded-lg p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-medium flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-accent" />
+                    Models
+                  </h2>
+                  <span className="micro-label">{hasModelCosts ? "by cost" : "by days used"}</span>
+                </div>
+                <div className="space-y-3">
+                  {topModels.map(([name, value]) => (
+                    <div key={name}>
+                      <div className="flex justify-between items-center mb-1.5 gap-2">
+                        <span className="text-xs font-mono truncate">{name}</span>
+                        <span className="font-mono text-xs text-muted flex-shrink-0">
+                          {hasModelCosts ? `$${formatCurrency(value)}` : `${value}d`}
+                          <span className="text-muted/60"> · {Math.round((value / modelTotal) * 100)}%</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-surface-3 rounded-full h-1.5">
+                        <div
+                          className="bg-accent h-1.5 rounded-full"
+                          style={{ width: `${Math.max((value / modelTotal) * 100, 1)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {otherValue > 0 && (
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-xs text-muted">+{otherModels.length} more models</span>
+                      <span className="font-mono text-xs text-muted/60">
+                        {hasModelCosts ? `$${formatCurrency(otherValue)}` : `${otherValue}d`}
+                      </span>
+                    </div>
+                  )}
+                  {!hasModelCosts && (
+                    <p className="text-[11px] text-muted/70 pt-1">
+                      Cost split per model appears after the next <code className="font-mono">npx viberank-cli</code> submission.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {toolEntries.length > 0 && (
+              <div className="bg-surface-1 border border-border rounded-lg p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-medium flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-accent" />
+                    Tools
+                  </h2>
+                  <span className="micro-label">by active days</span>
+                </div>
+                <div className="space-y-3">
+                  {toolEntries.map(([tool, days]) => (
+                    <div key={tool}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-medium">{toolLabel(tool)}</span>
+                        <span className="font-mono text-xs text-muted">
+                          {days}d <span className="text-muted/60">· {Math.round((days / daysActive) * 100)}%</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-surface-3 rounded-full h-1.5">
+                        <div
+                          className="bg-blue-500 h-1.5 rounded-full"
+                          style={{ width: `${Math.max((days / daysActive) * 100, 1)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <Footer />
     </div>
