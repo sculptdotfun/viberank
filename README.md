@@ -2,6 +2,8 @@
 
 A community-driven leaderboard for AI coding usage — [Claude Code](https://claude.com/claude-code), [Codex](https://ccusage.com/guide/codex/), Gemini CLI and every other tool [`ccusage`](https://github.com/ryoppippi/ccusage) tracks. Submit your stats and see how you rank.
 
+![viberank — a global multi-tool AI coding leaderboard. Submit your ccusage stats from Claude Code, Codex, Gemini and more, and see how you rank by cost, tokens, and days active.](public/hero.gif)
+
 ![viberank](https://img.shields.io/badge/viberank-Track%20Your%20AI%20Coding%20Usage-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
