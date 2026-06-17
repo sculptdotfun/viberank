@@ -72,6 +72,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   // The server already rendered page 0 of the default view — don't re-fetch
   // it on mount. The hook only runs for non-default filters or later pages.
   const isSeededDefaultView =
+    firstRender.current &&
     (initialItems?.length ?? 0) > 0 &&
     page === 0 &&
     sortBy === "cost" &&
