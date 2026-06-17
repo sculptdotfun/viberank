@@ -3,7 +3,7 @@
 export const HOME_FAQS = [
   {
     q: "What is viberank?",
-    a: "viberank is a community leaderboard for AI coding usage. Developers submit their real usage data — exported by ccusage from Claude Code, Codex, Gemini CLI and other tools — and get ranked by cost and tokens.",
+    a: "viberank is a community leaderboard for AI coding usage. Developers submit their real usage data — exported by ccusage from Claude Code, Codex, Gemini CLI and other tools — and get ranked by cost, tokens, and token-per-dollar efficiency.",
   },
   {
     q: "How do I get on the leaderboard?",
