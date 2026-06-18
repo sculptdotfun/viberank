@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node test/ccusage.test.mts"
+    "test": "node test/ccusage.test.mts && for f in test/*.test.mts; do [ \"$f\" = \"test/ccusage.test.mts\" ] || node \"$f\" || exit 1; done"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
