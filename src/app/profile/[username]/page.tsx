@@ -21,6 +21,7 @@ import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
 import OpenToWorkToggle from "@/components/OpenToWorkToggle";
+import ProfileModelList from "@/components/ProfileModelList";
 
 // ISR the full profile page too — direct loads and sheet "view full profile"
 // both get cached HTML; data is at most 2 minutes stale.
@@ -156,8 +157,6 @@ export default async function ProfilePage({ params }: ProfileParams) {
   );
   const modelTotal = modelEntries.reduce((s, [, v]) => s + v, 0) || 1;
   const topModels = modelEntries.slice(0, MODEL_ROWS);
-  const otherModels = modelEntries.slice(MODEL_ROWS);
-  const otherValue = otherModels.reduce((s, [, v]) => s + v, 0);
 
   // Days each tool was active (cost attribution per tool isn't reliable when
   // a day mixes tools, so day counts are the honest stat).
@@ -365,38 +364,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
                   </h2>
                   <span className="micro-label">{hasModelCosts ? "by cost" : "by days used"}</span>
                 </div>
-                <div className="space-y-3">
-                  {topModels.map(([name, value]) => (
-                    <div key={name}>
-                      <div className="flex justify-between items-center mb-1.5 gap-2">
-                        <span className="text-xs font-mono truncate">{name}</span>
-                        <span className="font-mono text-xs text-muted flex-shrink-0">
-                          {hasModelCosts ? `$${formatCurrency(value)}` : `${value}d`}
-                          <span className="text-muted/60"> · {Math.round((value / modelTotal) * 100)}%</span>
-                        </span>
-                      </div>
-                      <div className="w-full bg-surface-3 rounded-full h-1.5">
-                        <div
-                          className="bg-accent h-1.5 rounded-full"
-                          style={{ width: `${Math.max((value / modelTotal) * 100, 1)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  {otherValue > 0 && (
-                    <div className="flex justify-between items-center pt-1">
-                      <span className="text-xs text-muted">+{otherModels.length} more models</span>
-                      <span className="font-mono text-xs text-muted/60">
-                        {hasModelCosts ? `$${formatCurrency(otherValue)}` : `${otherValue}d`}
-                      </span>
-                    </div>
-                  )}
-                  {!hasModelCosts && (
-                    <p className="text-[11px] text-muted/70 pt-1">
-                      Cost split per model appears after the next <code className="font-mono">npx viberank-cli</code> submission.
-                    </p>
-                  )}
-                </div>
+                <ProfileModelList entries={modelEntries} modelTotal={modelTotal} hasModelCosts={hasModelCosts} />
               </div>
             )}
 
