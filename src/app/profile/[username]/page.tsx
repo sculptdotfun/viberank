@@ -17,6 +17,7 @@ import { getTierProgress } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
+import { getProfileRankDisplay } from "@/lib/profile-rank";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
@@ -107,6 +108,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
   } catch {
     // rank is nice-to-have; render without it on failure
   }
+  const rankDisplay = getProfileRankDisplay(globalRank);
 
   const tokenRows = [
     { label: "Input", value: tokenAgg.input, color: "bg-accent" },
@@ -197,11 +199,6 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <div className="flex flex-wrap items-center gap-2.5 mb-2">
                 <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
                 <TierBadge totalCost={bestCost} size="md" />
-                {globalRank && (
-                  <span className="font-mono text-xs font-semibold px-2 py-1 rounded bg-accent/12 text-accent leading-none">
-                    #{globalRank}
-                  </span>
-                )}
                 <OpenToWorkToggle
                   profileGithubUsername={profileData.githubUsername}
                   initialOpen={profileData.openToWork ?? false}
@@ -221,6 +218,20 @@ export default async function ProfilePage({ params }: ProfileParams) {
                   <Calendar className="w-4 h-4" />
                   Joined {new Date(profileData.createdAt).toLocaleDateString()}
                 </span>
+              </div>
+              <div className="mt-4 inline-flex max-w-full items-center gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
+                <Trophy className="w-5 h-5 text-accent flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="micro-label text-accent/90">{rankDisplay.label}</p>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="font-mono text-3xl font-bold leading-none text-foreground">
+                      {rankDisplay.value}
+                    </span>
+                    {rankDisplay.isRanked && (
+                      <span className="text-xs text-muted">on the global leaderboard</span>
+                    )}
+                  </div>
+                </div>
               </div>
               {tools.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5 mt-3">
@@ -255,8 +266,8 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submission{profileData.totalSubmissions === 1 ? "" : "s"}</p>
             </div>
             <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><Trophy className="w-3.5 h-3.5" />Global rank</p>
-              <p className="text-xl font-bold">{globalRank ? `#${globalRank}` : "—"}</p>
+              <p className="flex items-center gap-1.5 micro-label mb-1"><Trophy className="w-3.5 h-3.5" />{rankDisplay.label}</p>
+              <p className="text-2xl font-bold font-mono">{rankDisplay.value}</p>
               <p className="text-xs text-muted mt-1 truncate">{tools.length ? `${tools.map(toolLabel).slice(0, 2).join(", ")}${tools.length > 2 ? " +" + (tools.length - 2) : ""}` : "by cost"}</p>
             </div>
           </div>
