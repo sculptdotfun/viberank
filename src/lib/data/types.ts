@@ -68,6 +68,8 @@ export interface Profile {
   bestSubmission?: string;
   /** Explicit opt-in flag shown on the profile and the /hire page. */
   openToWork?: boolean;
+  /** Optional contact email shown only when the profile is open to work. */
+  openToWorkEmail?: string;
   createdAt: number; // Unix timestamp in ms
 }
 
@@ -82,6 +84,7 @@ export interface HireListing {
   tools: string[];
   rank: number | null;
   verified: boolean;
+  workEmail?: string;
 }
 
 export interface ProfileWithSubmissions extends Profile {
@@ -273,7 +276,8 @@ export interface ProfilesService {
   /** Set the open-to-work flag for a GitHub-verified profile. */
   setOpenToWork(
     githubUsername: string,
-    open: boolean
+    open: boolean,
+    workEmail?: string | null
   ): Promise<{ success: boolean; error?: string }>;
   /** All opted-in profiles with board stats, sorted by best cost. */
   getHireListings(): Promise<HireListing[]>;
