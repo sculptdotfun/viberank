@@ -15,6 +15,7 @@ import {
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl } from "@/lib/utils";
 import { getTierProgress } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
+import { buildCalendarDailySeries, getDailyFreshness, todayIso } from "@/lib/profile-timeline";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
 import Footer from "@/components/Footer";
@@ -66,14 +67,22 @@ export default async function ProfilePage({ params }: ProfileParams) {
   const daysActive = new Set(allDaily.map((d) => d.date)).size || 1;
   const avgDailyCost = totalCost / daysActive;
 
-  // Per-day chart series (summed across submissions).
-  const dailyMap = allDaily.reduce((acc, d) => {
-    if (!acc[d.date]) acc[d.date] = { date: d.date, cost: 0, tokens: 0 };
-    acc[d.date].cost += d.totalCost;
-    acc[d.date].tokens += d.totalTokens;
-    return acc;
-  }, {} as Record<string, { date: string; cost: number; tokens: number }>);
-  const dailySeries = Object.values(dailyMap);
+  const today = todayIso();
+  const dailyPoints = allDaily.map((d) => ({
+    date: d.date,
+    cost: d.totalCost,
+    tokens: d.totalTokens,
+  }));
+  const firstTrackedDate = submissions
+    .map((s) => s.dateRange.start)
+    .filter(Boolean)
+    .sort()[0];
+  const dailySeries = buildCalendarDailySeries(dailyPoints, {
+    range: "all",
+    today,
+    startDate: firstTrackedDate,
+  });
+  const dailyFreshness = getDailyFreshness(dailyPoints, today);
 
   // Tools used across the profile (Claude sorts first).
   const tools = Array.from(new Set(submissions.flatMap((s) => s.tools ?? []))).sort();
@@ -296,7 +305,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         </div>
 
         {/* Usage chart (client island) */}
-        <UsageChart daily={dailySeries} />
+        <UsageChart daily={dailySeries} freshness={dailyFreshness} />
 
         {/* Token breakdown + insights */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

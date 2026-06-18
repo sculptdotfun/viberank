@@ -1,5 +1,6 @@
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "@/app/profile/[username]/getProfile";
+import { buildRecentSpendSpark, getDailyFreshness, todayIso } from "@/lib/profile-timeline";
 import ProfileSheet from "./ProfileSheet";
 
 interface Params {
@@ -32,11 +33,14 @@ export default async function InterceptedProfile({ params }: Params) {
   const tools = Array.from(new Set(submissions.flatMap((s) => s.tools ?? []))).sort();
   const bestCost = submissions.length > 0 ? Math.max(...submissions.map((s) => s.totalCost)) : 0;
 
-  // Last 30 calendar days of spend for the sheet's sparkline.
-  const byDate = new Map<string, number>();
-  for (const d of allDaily) byDate.set(d.date, (byDate.get(d.date) ?? 0) + d.totalCost);
-  const days = [...byDate.keys()].sort();
-  const spark = days.slice(-30).map((d) => byDate.get(d) ?? 0);
+  const today = todayIso();
+  const dailyPoints = allDaily.map((d) => ({
+    date: d.date,
+    cost: d.totalCost,
+    tokens: d.totalTokens,
+  }));
+  const spark = buildRecentSpendSpark(dailyPoints, { days: 30, today });
+  const dailyFreshness = getDailyFreshness(dailyPoints, today);
 
   let globalRank: number | null = null;
   try {
@@ -60,7 +64,10 @@ export default async function InterceptedProfile({ params }: Params) {
       bestCost={bestCost}
       globalRank={globalRank}
       tools={tools}
-      spark={spark}
+      spark={spark.values}
+      sparkStartDate={spark.startDate}
+      sparkEndDate={spark.endDate}
+      dailyFreshness={dailyFreshness}
     />
   );
 }
