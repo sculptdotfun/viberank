@@ -205,6 +205,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
                 <OpenToWorkToggle
                   profileGithubUsername={profileData.githubUsername}
                   initialOpen={profileData.openToWork ?? false}
+                  initialEmail={profileData.openToWork ? profileData.openToWorkEmail : undefined}
                 />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
