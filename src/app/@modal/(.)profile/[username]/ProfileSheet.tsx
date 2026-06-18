@@ -7,6 +7,7 @@ import { X, Github, ArrowUpRight } from "lucide-react";
 import TierBadge from "@/components/TierBadge";
 import { getTierProgress } from "@/lib/tiers";
 import { formatNumber, toolLabel, sizedAvatarUrl } from "@/lib/utils";
+import { formatCompactDate, type DailyFreshness } from "@/lib/profile-timeline";
 
 interface ProfileSheetProps {
   username: string;
@@ -21,6 +22,9 @@ interface ProfileSheetProps {
   tools: string[];
   /** Daily spend, oldest → newest, for the mini bar chart. */
   spark: number[];
+  sparkStartDate: string | null;
+  sparkEndDate: string | null;
+  dailyFreshness: DailyFreshness;
 }
 
 export default function ProfileSheet(props: ProfileSheetProps) {
@@ -126,7 +130,12 @@ export default function ProfileSheet(props: ProfileSheetProps) {
           {/* Daily spend sparkline */}
           {props.spark.length > 1 && (
             <div className="rounded-lg bg-background border border-border-subtle p-3 mb-3">
-              <p className="micro-label mb-2">Daily spend · last {props.spark.length} days</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <p className="micro-label">Daily spend · last {props.spark.length} calendar days</p>
+                <span className="text-[10px] font-mono text-muted">
+                  {formatCompactDate(props.sparkStartDate)} - {formatCompactDate(props.sparkEndDate)}
+                </span>
+              </div>
               <div className="flex items-end gap-px h-12">
                 {props.spark.map((v, i) => {
                   const max = Math.max(...props.spark) || 1;
@@ -139,6 +148,11 @@ export default function ProfileSheet(props: ProfileSheetProps) {
                   );
                 })}
               </div>
+              {props.dailyFreshness.isStale && (
+                <p className="mt-2 text-[11px] text-muted">
+                  Data ends {formatCompactDate(props.dailyFreshness.lastRecordedDate)}. Run <code className="font-mono text-accent">npx viberank-cli</code> to update recent days.
+                </p>
+              )}
             </div>
           )}
 

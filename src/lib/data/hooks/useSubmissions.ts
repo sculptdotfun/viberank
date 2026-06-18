@@ -17,6 +17,10 @@ import type {
   ClaimStatus,
   ClaimResult,
 } from "../types";
+import { getLeaderboardRequestKey } from "@/lib/leaderboard-view";
+
+type KeyedLeaderboardResult = LeaderboardResult & { requestKey: string };
+type KeyedDateRangeLeaderboardResult = DateRangeLeaderboardResult & { requestKey: string };
 
 // ============================================================================
 // LEADERBOARD HOOKS
@@ -26,16 +30,21 @@ import type {
  * Hook for fetching the leaderboard (regular, paginated)
  */
 export function useLeaderboard(params: LeaderboardParams | "skip") {
-  const [supabaseData, setSupabaseData] = useState<LeaderboardResult | undefined>();
+  const [supabaseData, setSupabaseData] = useState<KeyedLeaderboardResult | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<Error | null>(null);
+  const paramsKey = params === "skip" ? "skip" : getLeaderboardRequestKey(params);
 
   useEffect(() => {
+    let active = true;
+
     if (params === "skip") {
       setSupabaseData(undefined);
+      setSupabaseLoading(false);
       return;
     }
 
+    setSupabaseData(undefined);
     setSupabaseLoading(true);
     setSupabaseError(null);
 
@@ -44,10 +53,20 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.getLeaderboard(params);
       })
-      .then(setSupabaseData)
-      .catch(setSupabaseError)
-      .finally(() => setSupabaseLoading(false));
-  }, [JSON.stringify(params)]);
+      .then((data) => {
+        if (active) setSupabaseData({ ...data, requestKey: paramsKey });
+      })
+      .catch((error) => {
+        if (active) setSupabaseError(error);
+      })
+      .finally(() => {
+        if (active) setSupabaseLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [paramsKey]);
 
   return {
     data: supabaseData,
@@ -60,16 +79,31 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
  * Hook for fetching date-filtered leaderboard
  */
 export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "skip") {
-  const [supabaseData, setSupabaseData] = useState<DateRangeLeaderboardResult | undefined>();
+  const [supabaseData, setSupabaseData] = useState<KeyedDateRangeLeaderboardResult | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<Error | null>(null);
+  const paramsKey = params === "skip"
+    ? "skip"
+    : JSON.stringify({
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+        sortBy: params.sortBy ?? "cost",
+        limit: params.limit ?? null,
+        cursor: params.cursor ?? null,
+        tool: params.tool ?? null,
+        verifiedOnly: Boolean(params.verifiedOnly),
+      });
 
   useEffect(() => {
+    let active = true;
+
     if (params === "skip") {
       setSupabaseData(undefined);
+      setSupabaseLoading(false);
       return;
     }
 
+    setSupabaseData(undefined);
     setSupabaseLoading(true);
     setSupabaseError(null);
 
@@ -78,10 +112,20 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.getLeaderboardByDateRange(params);
       })
-      .then(setSupabaseData)
-      .catch(setSupabaseError)
-      .finally(() => setSupabaseLoading(false));
-  }, [JSON.stringify(params)]);
+      .then((data) => {
+        if (active) setSupabaseData({ ...data, requestKey: paramsKey });
+      })
+      .catch((error) => {
+        if (active) setSupabaseError(error);
+      })
+      .finally(() => {
+        if (active) setSupabaseLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [paramsKey]);
 
   return {
     data: supabaseData,

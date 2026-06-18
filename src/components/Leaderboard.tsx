@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -13,6 +13,7 @@ import SponsorSlot from "./SponsorSlot";
 import TierBadge from "./TierBadge";
 import { TIERS } from "@/lib/tiers";
 import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
+import { isLeaderboardResultForRequest, shouldUseServerSeededLeaderboard } from "@/lib/leaderboard-view";
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
@@ -60,9 +61,9 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [allItems, setAllItems] = useState<Submission[]>(initialItems ?? []);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session } = useSession();
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const firstRender = useRef(true);
   const { data: liveStats } = useGlobalStats();
   const globalStats = liveStats ?? initialStats;
 
@@ -70,27 +71,51 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const isDateFiltered = dateFrom && dateTo;
 
   // The server already rendered page 0 of the default view — don't re-fetch
-  // it on mount. The hook only runs for non-default filters or later pages.
-  const isSeededDefaultView =
-    (initialItems?.length ?? 0) > 0 &&
-    page === 0 &&
-    sortBy === "cost" &&
-    !tool &&
-    !verifiedOnly &&
-    !isDateFiltered;
+  // it on mount. After any user sort/filter click, page 0 must be fetched
+  // fresh; otherwise stale seeded or later-page results can masquerade as top.
+  const isSeededDefaultView = shouldUseServerSeededLeaderboard({
+    hasInitialItems: (initialItems?.length ?? 0) > 0,
+    hasUserInteracted,
+    page,
+    sortBy,
+    hasToolFilter: !!tool,
+    verifiedOnly,
+    isDateFiltered: !!isDateFiltered,
+  });
+
+  const regularParams = useMemo(() => ({
+    sortBy,
+    page,
+    pageSize: ITEMS_PER_PAGE,
+    tool: tool ?? undefined,
+    verifiedOnly: verifiedOnly || undefined,
+  }), [sortBy, page, tool, verifiedOnly]);
+  const dateRangeParams = useMemo(() => ({
+    dateFrom,
+    dateTo,
+    sortBy,
+    limit: 100,
+    tool: tool ?? undefined,
+    verifiedOnly: verifiedOnly || undefined,
+  }), [dateFrom, dateTo, sortBy, tool, verifiedOnly]);
+  const dateRangeRequestKey = useMemo(() => JSON.stringify({
+    dateFrom,
+    dateTo,
+    sortBy,
+    limit: 100,
+    cursor: null,
+    tool: tool ?? null,
+    verifiedOnly: Boolean(verifiedOnly),
+  }), [dateFrom, dateTo, sortBy, tool, verifiedOnly]);
 
   const { data: regularResult, isLoading } = useLeaderboard(
-    !isDateFiltered && !isSeededDefaultView
-      ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
-      : "skip"
+    !isDateFiltered && !isSeededDefaultView ? regularParams : "skip"
   );
 
   const hasMore = regularResult?.hasMore ?? (isSeededDefaultView ? initialHasMore ?? false : false);
 
   const { data: dateFilteredResult } = useLeaderboardByDateRange(
-    isDateFiltered
-      ? { dateFrom, dateTo, sortBy, limit: 100, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
-      : "skip"
+    isDateFiltered ? dateRangeParams : "skip"
   );
 
   // Tools available to filter by, sourced from the global per-tool stats.
@@ -98,21 +123,21 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     ? Object.keys(globalStats.modelUsage).sort()
     : [];
 
-  useEffect(() => {
-    // Keep the server-seeded items on first render; only reset when a filter
-    // actually changes (avoids clearing the SSR'd rows during hydration).
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
+  const resetBoardForUserChange = () => {
+    setHasUserInteracted(true);
     setAllItems([]);
     setPage(0);
-  }, [sortBy, dateFrom, dateTo, tool, verifiedOnly]);
+  };
+
+  const updateSort = (nextSort: SortBy) => {
+    if (nextSort !== sortBy) resetBoardForUserChange();
+    setSortBy(nextSort);
+  };
 
   useEffect(() => {
-    if (isDateFiltered && dateFilteredResult?.items) {
+    if (isDateFiltered && dateFilteredResult?.items && dateFilteredResult.requestKey === dateRangeRequestKey) {
       setAllItems(dateFilteredResult.items);
-    } else if (!isDateFiltered && regularResult?.items) {
+    } else if (!isDateFiltered && regularResult?.items && isLeaderboardResultForRequest(regularResult, regularParams)) {
       if (page === 0) {
         setAllItems(regularResult.items);
       } else {
@@ -123,7 +148,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
         });
       }
     }
-  }, [regularResult, dateFilteredResult, page, isDateFiltered]);
+  }, [regularResult, regularParams, dateFilteredResult, dateRangeRequestKey, page, isDateFiltered]);
 
   useEffect(() => {
     if (isDateFiltered || !hasMore) return;
@@ -145,6 +170,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   }, [hasMore, isLoading, isDateFiltered, allItems.length]);
 
   const setQuickFilter = (days: number | null) => {
+    resetBoardForUserChange();
     if (days === null) {
       setDateFrom("");
       setDateTo("");
@@ -196,7 +222,10 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
             </button>
 
             <button
-              onClick={() => setVerifiedOnly(v => !v)}
+              onClick={() => {
+                resetBoardForUserChange();
+                setVerifiedOnly(v => !v);
+              }}
               aria-pressed={verifiedOnly}
               title="Only show GitHub-verified submissions"
               className={`px-2 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
@@ -210,7 +239,10 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
             {availableTools.length > 1 && (
               <select
                 value={tool ?? ""}
-                onChange={(e) => setTool(e.target.value || null)}
+                onChange={(e) => {
+                  resetBoardForUserChange();
+                  setTool(e.target.value || null);
+                }}
                 aria-label="Filter by tool"
                 className={`px-2 py-1 text-xs font-mono font-medium rounded bg-surface-2 border border-border transition-colors focus:outline-none focus:ring-1 focus:ring-accent ${
                   tool ? "text-accent" : "text-muted hover:text-foreground"
@@ -228,7 +260,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
 
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setSortBy("cost")}
+              onClick={() => updateSort("cost")}
               className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
                 sortBy === "cost" ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2"
               }`}
@@ -237,7 +269,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
               <span className="hidden sm:inline">Cost</span>
             </button>
             <button
-              onClick={() => setSortBy("tokens")}
+              onClick={() => updateSort("tokens")}
               className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
                 sortBy === "tokens" ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2"
               }`}
@@ -260,18 +292,31 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                 <input
                   type="date"
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  onChange={(e) => {
+                    resetBoardForUserChange();
+                    setDateFrom(e.target.value);
+                  }}
                   className="px-3 py-1.5 bg-background border border-border rounded-md"
                 />
                 <span className="text-muted">→</span>
                 <input
                   type="date"
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  onChange={(e) => {
+                    resetBoardForUserChange();
+                    setDateTo(e.target.value);
+                  }}
                   className="px-3 py-1.5 bg-background border border-border rounded-md"
                 />
                 {(dateFrom || dateTo) && (
-                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-muted hover:text-foreground">
+                  <button
+                    onClick={() => {
+                      resetBoardForUserChange();
+                      setDateFrom("");
+                      setDateTo("");
+                    }}
+                    className="text-muted hover:text-foreground"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 )}

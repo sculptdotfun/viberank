@@ -11,10 +11,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { formatCompactDate, type DailyFreshness } from "@/lib/profile-timeline";
 
 type DailyPoint = { date: string; cost: number; tokens: number };
 
-export default function UsageChart({ daily }: { daily: DailyPoint[] }) {
+export default function UsageChart({ daily, freshness }: { daily: DailyPoint[]; freshness?: DailyFreshness }) {
   const [range, setRange] = useState<"7d" | "30d" | "all">("30d");
 
   const data = [...daily]
@@ -24,10 +25,17 @@ export default function UsageChart({ daily }: { daily: DailyPoint[] }) {
   return (
     <div className="bg-surface-1 border border-border rounded-lg p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-medium flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-accent" />
-          Usage over time
-        </h2>
+        <div>
+          <h2 className="text-base font-medium flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-accent" />
+            Usage over time
+          </h2>
+          {freshness?.isStale && (
+            <p className="text-xs text-muted mt-1">
+              Data ends {formatCompactDate(freshness.lastRecordedDate)}. Run <code className="font-mono text-accent">npx viberank-cli</code> to update recent days.
+            </p>
+          )}
+        </div>
         <div className="flex gap-1">
           {(["7d", "30d", "all"] as const).map((r) => (
             <button

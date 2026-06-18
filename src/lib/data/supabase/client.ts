@@ -30,6 +30,7 @@ import type {
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import { validateCcData, inferToolFromModel } from "@/lib/ccusage";
+import { isClaimableCliAlias, normalizeClaimHandle } from "@/lib/claim-handles";
 
 // ============================================================================
 // DATABASE TYPES (matching Supabase schema)
@@ -670,11 +671,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
   }
 
   async claimAndMergeSubmissions(githubUsername: string): Promise<ClaimResult> {
-    const { data: submissions } = await this.client
-      .from("submissions")
-      .select("*")
-      .eq("github_username", githubUsername)
-      .limit(100);
+    const submissions = await this.getClaimCandidateSubmissions(githubUsername);
 
     if (!submissions || submissions.length === 0) {
       throw new Error("No submissions found");
@@ -695,8 +692,14 @@ class SupabaseSubmissionsService implements SubmissionsService {
     if (oauthSubmissions.length === 0 && cliSubmissions.length === 1) {
       await this.client
         .from("submissions")
-        .update({ verified: true })
+        .update({
+          username: githubUsername,
+          github_username: githubUsername,
+          verified: true,
+        })
         .eq("id", cliSubmissions[0].id);
+
+      await this.repairClaimedProfile(githubUsername, cliSubmissions[0].id);
 
       return {
         success: true,
@@ -788,6 +791,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
         cache_read_tokens: totals.cacheReadTokens,
         date_range_start: dateRange.start,
         date_range_end: dateRange.end,
+        username: githubUsername,
+        github_username: githubUsername,
         models_used: allModels,
         tools: allTools,
         submitted_at: new Date().toISOString(),
@@ -840,29 +845,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
       }
     }
 
-    // Recompute total_submissions from the source of truth (a count of rows
-    // post-delete), and always repoint best_submission_id at the surviving
-    // base — even if no rows were deleted, this self-heals stale FK state.
-    const { data: profile } = await this.client
-      .from("profiles")
-      .select("id")
-      .eq("github_username", githubUsername)
-      .single();
-
-    if (profile) {
-      const { count: liveCount } = await this.client
-        .from("submissions")
-        .select("id", { count: "exact", head: true })
-        .eq("github_username", githubUsername);
-
-      await this.client
-        .from("profiles")
-        .update({
-          total_submissions: Math.max(1, liveCount ?? 1),
-          best_submission_id: baseSubmission.id,
-        })
-        .eq("id", profile.id);
-    }
+    await this.repairClaimedProfile(githubUsername, baseSubmission.id);
 
     return {
       success: true,
@@ -873,11 +856,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
   }
 
   async checkClaimableSubmissions(githubUsername: string): Promise<ClaimStatus> {
-    const { data: submissions } = await this.client
-      .from("submissions")
-      .select("*")
-      .eq("github_username", githubUsername)
-      .limit(100);
+    const submissions = await this.getClaimCandidateSubmissions(githubUsername);
 
     if (!submissions || submissions.length === 0) {
       return {
@@ -915,6 +894,79 @@ class SupabaseSubmissionsService implements SubmissionsService {
       totalSubmissions: submissions.length,
       unverifiedCount,
     };
+  }
+
+  private async getClaimCandidateSubmissions(githubUsername: string): Promise<DbSubmission[]> {
+    const [{ data: exactMatches }, { data: cliCandidates }] = await Promise.all([
+      this.client
+        .from("submissions")
+        .select("*")
+        .ilike("github_username", githubUsername)
+        .limit(100),
+      this.client
+        .from("submissions")
+        .select("*")
+        .eq("source", "cli")
+        .eq("verified", false)
+        .limit(1000),
+    ]);
+
+    const byId = new Map<string, DbSubmission>();
+    for (const submission of exactMatches || []) byId.set(submission.id, submission);
+    for (const submission of cliCandidates || []) {
+      if (
+        isClaimableCliAlias(githubUsername, {
+          username: submission.username,
+          githubUsername: submission.github_username,
+          source: submission.source,
+          verified: submission.verified,
+        })
+      ) {
+        byId.set(submission.id, submission);
+      }
+    }
+
+    return [...byId.values()].slice(0, 100);
+  }
+
+  private async repairClaimedProfile(githubUsername: string, bestSubmissionId: string): Promise<void> {
+    const { count: liveCount } = await this.client
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .ilike("github_username", githubUsername);
+
+    const { data: profile } = await this.client
+      .from("profiles")
+      .select("id,username,github_username")
+      .ilike("github_username", githubUsername)
+      .maybeSingle();
+
+    let profileId = profile?.id;
+
+    if (!profileId) {
+      const signed = normalizeClaimHandle(githubUsername);
+      const { data: aliasProfiles } = await this.client
+        .from("profiles")
+        .select("id,username,github_username")
+        .limit(1000);
+
+      profileId = (aliasProfiles || []).find((candidate) =>
+        normalizeClaimHandle(candidate.username) === signed ||
+        normalizeClaimHandle(candidate.github_username) === signed
+      )?.id;
+    }
+
+    if (profileId) {
+      await this.client
+        .from("profiles")
+        .update({
+          username: githubUsername,
+          github_username: githubUsername,
+          total_submissions: Math.max(1, liveCount ?? 1),
+          best_submission_id: bestSubmissionId,
+        })
+        .eq("id", profileId);
+    }
   }
 
   async getGlobalRank(totalCost: number): Promise<number> {
