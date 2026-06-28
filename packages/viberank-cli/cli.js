@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
+import crypto from 'crypto';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
@@ -15,6 +17,29 @@ const __dirname = path.dirname(__filename);
 // Read package.json to get version
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const CLI_VERSION = packageJson.version;
+
+// Stable, anonymous per-machine id so the server can sum usage submitted from
+// multiple machines under one account instead of overwriting it, while still
+// treating a re-submission from this machine as a replace (issue #43). It's a
+// random UUID — no hardware/identifying info — persisted under ~/.viberank.
+function getMachineId() {
+  const dir = path.join(os.homedir(), '.viberank');
+  const idFile = path.join(dir, 'machine-id');
+  try {
+    return fs.readFileSync(idFile, 'utf8').trim();
+  } catch {
+    // Not created yet (or unreadable) — generate and persist one.
+  }
+  const id = crypto.randomUUID();
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(idFile, id, { mode: 0o600 });
+  } catch {
+    // Read-only home dir: fall back to an ephemeral id for this run. Worst case
+    // a future run gets a new id and that day sums once — never data loss.
+  }
+  return id;
+}
 
 async function main() {
   console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
@@ -158,7 +183,8 @@ async function main() {
         headers: {
           'Content-Type': 'application/json',
           'X-GitHub-User': githubUser,
-          'X-CLI-Version': CLI_VERSION
+          'X-CLI-Version': CLI_VERSION,
+          'X-Machine-Id': getMachineId()
         },
         body: JSON.stringify(ccData)
       });

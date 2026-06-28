@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 // Dynamic import: Node's native .ts loader reparses as ESM at runtime, so a
 // static `import {…} from "….ts"` fails name resolution; dynamic import works.
-const { normalizeCcData, validateCcData } = await import("../src/lib/ccusage.ts");
+const { normalizeCcData, validateCcData, mergeMachineContribution } = await import("../src/lib/ccusage.ts");
 
 let passed = 0;
 let failed = 0;
@@ -258,6 +258,42 @@ console.log("\n[7] Real cc.json (your machine, if present)");
   } else {
     console.log("  (no path arg given, skipping)");
   }
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n[8] Per-machine daily merge (#43)");
+{
+  const contrib = (cost: number, models: string[] = ["claude-opus-4-8"], agents: string[] = ["claude"]) => ({
+    inputTokens: cost * 100,
+    outputTokens: cost * 10,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: cost * 110,
+    totalCost: cost,
+    modelsUsed: models,
+    agents,
+  });
+
+  // Two distinct machines on the same day -> SUM.
+  const m1 = mergeMachineContribution(null, "machineA", contrib(15));
+  const m2 = mergeMachineContribution(m1.contributions, "machineB", contrib(10));
+  ok("distinct machines sum cost ($15+$10=$25)", m2.aggregate.totalCost === 25, `got ${m2.aggregate.totalCost}`);
+  ok("distinct machines sum tokens", m2.aggregate.totalTokens === 110 * 25, `got ${m2.aggregate.totalTokens}`);
+  ok("both machines tracked", Object.keys(m2.contributions).sort().join(",") === "machineA,machineB");
+
+  // Same machine re-submits (ccusage is authoritative) -> REPLACE its slice, no double-count.
+  const m3 = mergeMachineContribution(m2.contributions, "machineA", contrib(20));
+  ok("same-machine re-submit replaces ($20+$10=$30, not $45)", m3.aggregate.totalCost === 30, `got ${m3.aggregate.totalCost}`);
+
+  // Legacy row (null contributions) -> first id'd submission starts fresh.
+  const legacy = mergeMachineContribution(null, "machineA", contrib(12));
+  ok("legacy null starts at incoming ($12)", legacy.aggregate.totalCost === 12, `got ${legacy.aggregate.totalCost}`);
+
+  // Models/agents unioned across machines.
+  const u1 = mergeMachineContribution(null, "machineA", contrib(5, ["claude-opus-4-8"], ["claude"]));
+  const u2 = mergeMachineContribution(u1.contributions, "machineB", contrib(5, ["gpt-5-codex"], ["codex"]));
+  ok("agents unioned across machines", u2.aggregate.agents.sort().join(",") === "claude,codex");
+  ok("models unioned across machines", u2.aggregate.modelsUsed.sort().join(",") === "claude-opus-4-8,gpt-5-codex");
 }
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);

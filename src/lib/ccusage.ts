@@ -110,6 +110,100 @@ function mergeModelBreakdowns(
   return Array.from(byModel.values());
 }
 
+// ---------------------------------------------------------------------------
+// Per-machine daily merge (issue #43)
+// ---------------------------------------------------------------------------
+// ccusage exposes no machine identifier, so the server can't tell "different
+// machine, same day" (should sum) from "re-submit, same day" (should replace).
+// The CLI now sends a stable `X-Machine-Id`; we record each machine's slice of
+// a day under that id so overlapping dates from distinct machines sum while a
+// re-submission from the same machine replaces only its own slice. The daily
+// row keeps aggregate (summed) fields for display — the per-machine map is
+// bookkeeping the merge needs and the UI never reads.
+
+/** One machine's contribution to a single day. */
+export interface MachineContribution {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  totalCost: number;
+  modelsUsed: string[];
+  agents: string[];
+  modelBreakdowns?: NormalizedModelBreakdown[];
+}
+
+/** Aggregate of every machine's slice for a day — what the row stores/displays. */
+export interface DailyAggregate {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  totalCost: number;
+  modelsUsed: string[];
+  agents: string[];
+  modelBreakdowns?: NormalizedModelBreakdown[];
+}
+
+/** Sentinel machine id for submissions that carry no `X-Machine-Id` header. */
+export const DEFAULT_MACHINE_ID = "default";
+
+function aggregateContributions(
+  contributions: Record<string, MachineContribution>
+): DailyAggregate {
+  const agg: DailyAggregate = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 0,
+    totalCost: 0,
+    modelsUsed: [],
+    agents: [],
+    modelBreakdowns: undefined,
+  };
+  const models = new Set<string>();
+  const agents = new Set<string>();
+  for (const c of Object.values(contributions)) {
+    agg.inputTokens += c.inputTokens;
+    agg.outputTokens += c.outputTokens;
+    agg.cacheCreationTokens += c.cacheCreationTokens;
+    agg.cacheReadTokens += c.cacheReadTokens;
+    agg.totalTokens += c.totalTokens;
+    agg.totalCost += c.totalCost;
+    c.modelsUsed.forEach((m) => models.add(m));
+    c.agents.forEach((a) => agents.add(a));
+    agg.modelBreakdowns = mergeModelBreakdowns(agg.modelBreakdowns, c.modelBreakdowns);
+  }
+  agg.modelsUsed = Array.from(models);
+  agg.agents = Array.from(agents);
+  return agg;
+}
+
+/**
+ * Fold one machine's slice for a day into the existing per-machine map and
+ * recompute the day's aggregate. Pure so it can be unit-tested.
+ *
+ * @param existing prior per-machine map, or null for a legacy row that predates
+ *   per-machine tracking. A legacy row's aggregate is *not* preserved: we can't
+ *   attribute it to a machine, so the first id'd submission replaces it (today's
+ *   overwrite behavior). Once a machine re-submits, distinct machines sum and
+ *   the day self-heals.
+ */
+export function mergeMachineContribution(
+  existing: Record<string, MachineContribution> | null | undefined,
+  machineId: string,
+  incoming: MachineContribution
+): { contributions: Record<string, MachineContribution>; aggregate: DailyAggregate } {
+  const contributions: Record<string, MachineContribution> = {
+    ...(existing ?? {}),
+    [machineId]: incoming,
+  };
+  return { contributions, aggregate: aggregateContributions(contributions) };
+}
+
 export interface NormalizedCcData {
   totals: {
     inputTokens: number;

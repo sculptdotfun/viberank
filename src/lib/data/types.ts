@@ -123,6 +123,10 @@ export interface SubmitData {
   githubAvatar?: string;
   source: "cli" | "oauth";
   verified: boolean;
+  // Stable per-machine id (CLI `X-Machine-Id` header). Absent for web uploads /
+  // older CLIs; the data layer falls back to a shared "default" bucket. Used to
+  // sum overlapping dates across machines without double-counting re-submits (#43).
+  machineId?: string;
   ccData: {
     totals: {
       inputTokens: number;

@@ -29,7 +29,13 @@ import type {
   ModelBreakdown,
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
-import { validateCcData, inferToolFromModel } from "@/lib/ccusage";
+import {
+  validateCcData,
+  inferToolFromModel,
+  mergeMachineContribution,
+  DEFAULT_MACHINE_ID,
+  type MachineContribution,
+} from "@/lib/ccusage";
 
 // ============================================================================
 // DATABASE TYPES (matching Supabase schema)
@@ -75,6 +81,9 @@ interface DbDailyBreakdown {
   models_used: string[];
   agents: string[] | null;
   model_breakdowns: ModelBreakdown[] | null;
+  // Per-machine slices of this day, keyed by machine id. NULL on legacy rows
+  // that predate per-machine tracking (#43).
+  machine_contributions: Record<string, MachineContribution> | null;
 }
 
 interface DbProfile {
@@ -125,6 +134,23 @@ function convertDbSubmissionToSubmission(
     claimedBy: dbSubmission.claimed_by || undefined,
     flaggedForReview: dbSubmission.flagged_for_review || undefined,
     flagReasons: dbSubmission.flag_reasons || undefined,
+  };
+}
+
+/** One incoming day (one machine's cc.json) as a per-machine contribution. */
+function dailyEntryToContribution(
+  day: SubmitData["ccData"]["daily"][number]
+): MachineContribution {
+  return {
+    inputTokens: day.inputTokens,
+    outputTokens: day.outputTokens,
+    cacheCreationTokens: day.cacheCreationTokens,
+    cacheReadTokens: day.cacheReadTokens,
+    totalTokens: day.totalTokens,
+    totalCost: day.totalCost,
+    modelsUsed: day.modelsUsed,
+    agents: day.agents ?? [],
+    modelBreakdowns: day.modelBreakdowns,
   };
 }
 
@@ -198,6 +224,11 @@ class SupabaseSubmissionsService implements SubmissionsService {
       )
       .limit(1);
 
+    // Identify the contributing machine so overlapping dates from distinct
+    // machines sum while a same-machine re-submit replaces only its slice (#43).
+    // Web uploads / older CLIs send no id and share the "default" bucket.
+    const machineId = data.machineId || DEFAULT_MACHINE_ID;
+
     let submissionId: string;
 
     if (existingSubmissions && existingSubmissions.length > 0) {
@@ -208,7 +239,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
         dateRangeStart,
         dateRangeEnd,
         modelsUsed,
-        tools
+        tools,
+        machineId
       );
     } else {
       // Create new submission
@@ -217,7 +249,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
         dateRangeStart,
         dateRangeEnd,
         modelsUsed,
-        tools
+        tools,
+        machineId
       );
     }
 
@@ -240,7 +273,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
     dateRangeStart: string,
     dateRangeEnd: string,
     modelsUsed: string[],
-    tools: string[]
+    tools: string[],
+    machineId: string
   ): Promise<string> {
     // Get existing daily breakdowns
     const { data: existingDaily } = await this.client
@@ -252,23 +286,33 @@ class SupabaseSubmissionsService implements SubmissionsService {
     const dailyMap = new Map<string, DbDailyBreakdown>();
     (existingDaily || []).forEach((day) => dailyMap.set(day.date, day));
 
-    // Update with new daily data
+    // Fold each incoming day into the existing per-machine map. A day from a new
+    // machine adds a slice (sums); a re-submit from the same machine replaces
+    // only its own slice (no double-count). #43
     for (const day of data.ccData.daily) {
+      const prior = dailyMap.get(day.date);
+      const { contributions, aggregate } = mergeMachineContribution(
+        prior?.machine_contributions ?? null,
+        machineId,
+        dailyEntryToContribution(day)
+      );
+
       const dailyData = {
         submission_id: existing.id,
         date: day.date,
-        input_tokens: day.inputTokens,
-        output_tokens: day.outputTokens,
-        cache_creation_tokens: day.cacheCreationTokens,
-        cache_read_tokens: day.cacheReadTokens,
-        total_tokens: day.totalTokens,
-        total_cost: day.totalCost,
-        models_used: day.modelsUsed,
-        agents: day.agents ?? [],
-        model_breakdowns: day.modelBreakdowns ?? null,
+        input_tokens: aggregate.inputTokens,
+        output_tokens: aggregate.outputTokens,
+        cache_creation_tokens: aggregate.cacheCreationTokens,
+        cache_read_tokens: aggregate.cacheReadTokens,
+        total_tokens: aggregate.totalTokens,
+        total_cost: aggregate.totalCost,
+        models_used: aggregate.modelsUsed,
+        agents: aggregate.agents,
+        model_breakdowns: aggregate.modelBreakdowns ?? null,
+        machine_contributions: contributions,
       };
 
-      if (dailyMap.has(day.date)) {
+      if (prior) {
         // Update existing
         await this.client
           .from("daily_breakdowns")
@@ -347,7 +391,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
     dateRangeStart: string,
     dateRangeEnd: string,
     modelsUsed: string[],
-    tools: string[]
+    tools: string[],
+    machineId: string
   ): Promise<string> {
     // Insert submission
     const { data: submission, error } = await this.client
@@ -378,7 +423,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
       throw new Error("Failed to create submission: " + error?.message);
     }
 
-    // Insert daily breakdowns
+    // Insert daily breakdowns. Seed each day's per-machine map with this
+    // machine's slice so a later submission from another machine sums (#43).
     const dailyRows = data.ccData.daily.map((day) => ({
       submission_id: submission.id,
       date: day.date,
@@ -391,6 +437,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
       models_used: day.modelsUsed,
       agents: day.agents ?? [],
       model_breakdowns: day.modelBreakdowns ?? null,
+      machine_contributions: { [machineId]: dailyEntryToContribution(day) },
     }));
 
     const { error: dailyError } = await this.client
@@ -823,6 +870,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
         models_used: d.models_used,
         agents: d.agents || [],
         model_breakdowns: d.model_breakdowns ?? null,
+        machine_contributions: d.machine_contributions ?? null,
       }))
     );
 
