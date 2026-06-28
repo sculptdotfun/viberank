@@ -270,7 +270,12 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
 
 // Realistic-range constants (shared, ported from the original Convex checks).
 const MAX_DAILY_COST = 5000; // $5k/day is already extreme usage
-const MAX_DAILY_TOKENS = 250_000_000; // 250M tokens/day
+// Absolute token ceiling. Cache-read tokens are ~free (≈1/10th the input
+// price) and dominate `totalTokens` for heavy context-reuse users, so they're
+// excluded from this cap — counting them produced false rejections for genuine
+// high-cache submissions that sit far under the cost ceiling (#77). The cost
+// cap and the cost/token ratio band remain the primary anti-inflation guards.
+const MAX_DAILY_TOKENS = 250_000_000; // 250M non-cache-read tokens/day
 const MIN_COST_PER_TOKEN = 0.0000001; // cache reads are very cheap
 const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
 
@@ -308,7 +313,12 @@ export function validateCcData(
   if (ccData.totals.totalCost > MAX_DAILY_COST * 365) {
     throw new Error("Total cost exceeds realistic limits.");
   }
-  if (ccData.totals.totalTokens > MAX_DAILY_TOKENS * 365) {
+  // Exclude cache-read tokens: they're ~free and legitimately balloon
+  // `totalTokens` for heavy context-reuse, so they don't belong against a
+  // "realistic tokens" bound (#77).
+  const nonCacheReadTokens =
+    ccData.totals.totalTokens - ccData.totals.cacheReadTokens;
+  if (nonCacheReadTokens > MAX_DAILY_TOKENS * 365) {
     throw new Error("Total tokens exceed realistic limits.");
   }
 

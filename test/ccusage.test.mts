@@ -178,6 +178,53 @@ console.log("\n[4] Anti-cheat still holds");
       ),
     "Cost per token ratio is unrealistic"
   );
+  // heavy cache-read user: totalTokens trips the old absolute cap but
+  // non-cache-read tokens are well under it, cost is far below the cap, and the
+  // cost/token ratio is in band -> must be accepted (#77).
+  doesNotThrow(
+    "cache-read-heavy submission accepted (was rejected by token cap)",
+    () =>
+      validateCcData(
+        {
+          totals: {
+            inputTokens: 25_000_000_000,
+            outputTokens: 113_577_997,
+            cacheCreationTokens: 0,
+            cacheReadTokens: 66_351_156_098,
+            totalTokens: 91_464_734_095,
+            totalCost: 44_218,
+          },
+          daily: [
+            {
+              date: "2025-01-01",
+              inputTokens: 25_000_000_000,
+              outputTokens: 113_577_997,
+              cacheCreationTokens: 0,
+              cacheReadTokens: 66_351_156_098,
+              totalTokens: 91_464_734_095,
+              totalCost: 44_218,
+              modelsUsed: ["claude-opus-4-8"],
+              agents: ["claude"],
+            },
+          ],
+        },
+        FIXED_NOW
+      )
+  );
+  // but inflating *non-cache-read* tokens past the cap is still rejected (cap
+  // still bites when cache reads aren't doing the inflating).
+  throws(
+    "non-cache-read tokens over cap still rejected",
+    () =>
+      validateCcData(
+        {
+          totals: { inputTokens: 100_000_000_000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 100_000_000_000, totalCost: 1_000_000 },
+          daily: [{ date: "2025-01-01", inputTokens: 100_000_000_000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 100_000_000_000, totalCost: 1_000_000, modelsUsed: [], agents: [] }],
+        },
+        FIXED_NOW
+      ),
+    "Total tokens exceed realistic limits"
+  );
   // future date -> reject
   throws(
     "future date rejected",
