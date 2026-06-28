@@ -48,12 +48,26 @@ echo "Summary:"
 jq -r '.totals | "  Total Cost: $\(.totalCost | round)\n  Total Tokens: \(.totalTokens)\n  Days Tracked: \(.daily | length)"' cc.json 2>/dev/null || echo "  (install jq for summary)"
 echo ""
 
+# Stable, anonymous per-machine id so submissions from multiple machines under
+# one account sum instead of overwriting, while a re-submit from this machine
+# replaces (issue #43). Random UUID persisted under ~/.viberank.
+MACHINE_ID_FILE="$HOME/.viberank/machine-id"
+if [ -s "$MACHINE_ID_FILE" ]; then
+    MACHINE_ID=$(cat "$MACHINE_ID_FILE")
+else
+    MACHINE_ID=$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "")
+    if [ -n "$MACHINE_ID" ]; then
+        mkdir -p "$HOME/.viberank" && printf '%s' "$MACHINE_ID" > "$MACHINE_ID_FILE" 2>/dev/null || true
+    fi
+fi
+
 # Submit to Viberank
 echo -e "${YELLOW}Submitting to Viberank...${NC}"
 
 RESPONSE=$(curl -s -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
   -H "X-GitHub-User: $GITHUB_USER" \
+  -H "X-Machine-Id: $MACHINE_ID" \
   -d @cc.json)
 
 # Check if submission was successful

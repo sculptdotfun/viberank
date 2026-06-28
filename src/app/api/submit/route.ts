@@ -162,6 +162,11 @@ export async function POST(request: NextRequest) {
     try {
       const dataLayer = await getServerDataLayer();
 
+      // Stable per-machine id lets us sum overlapping dates across machines
+      // without double-counting same-machine re-submits (#43). Optional: web
+      // uploads and older CLIs omit it and fall back to a shared bucket.
+      const machineId = request.headers.get("X-Machine-Id") || undefined;
+
       const submissionPromise = dataLayer.submissions.submit({
         username: githubUsername,
         githubUsername: githubUsername,
@@ -169,6 +174,7 @@ export async function POST(request: NextRequest) {
         githubAvatar,
         source: source,
         verified: verified,
+        machineId,
         ccData: ccData,
       });
 
@@ -362,7 +368,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-GitHub-User",
+      "Access-Control-Allow-Headers": "Content-Type, X-GitHub-User, X-Machine-Id, X-CLI-Version",
     },
   });
 }
