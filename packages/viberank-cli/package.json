@@ -1,6 +1,6 @@
 {
   "name": "viberank-cli",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "CLI tool to submit your AI coding usage stats (Claude Code, Codex, Gemini CLI, and more via ccusage) to the Viberank leaderboard",
   "type": "module",
   "main": "cli.js",
@@ -30,7 +30,7 @@
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=14.17.0"
   },
   "repository": {
     "type": "git",
