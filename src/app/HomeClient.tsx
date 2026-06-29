@@ -146,8 +146,8 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
                 </span>
               </h1>
               <p className="text-muted text-base sm:text-lg mt-4 max-w-2xl">
-                Developers ranked by API spend and token usage across Claude Code, OpenAI Codex,
-                Gemini CLI, Copilot and every coding agent ccusage tracks.
+                Developers ranked by API spend, token usage, and token-per-dollar efficiency across
+                Claude Code, OpenAI Codex, Gemini CLI, Copilot and every coding agent ccusage tracks.
               </p>
 
               {/* CTA — mobile/tablet only; the sidebar card covers desktop */}

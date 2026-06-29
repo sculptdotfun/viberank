@@ -549,7 +549,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
   async getLeaderboardByDateRange(
     params: DateRangeLeaderboardParams
   ): Promise<DateRangeLeaderboardResult> {
-    const limit = Math.min(params.limit || 50, 100);
+    const limit = Math.min(params.limit || 50, 5000);
     const includeFlagged = params.includeFlagged || false;
     const sortBy = params.sortBy || "cost";
 

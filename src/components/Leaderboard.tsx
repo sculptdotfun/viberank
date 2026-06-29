@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
+import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2, Gauge } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -17,7 +17,7 @@ import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useS
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 
-type SortBy = "cost" | "tokens";
+type SortBy = "cost" | "tokens" | "efficiency";
 
 interface LeaderboardProps {
   // Server-fetched first page + stats so the board renders in the SSR HTML.
@@ -32,6 +32,33 @@ const RANK_COLORS: Record<number, string> = {
   2: "text-[#b8bcc4]",
   3: "text-[#c2703f]",
 };
+
+function getEfficiencyScore(submission: Submission): number {
+  if (submission.totalCost === 0) {
+    return submission.totalTokens > 0 ? Number.POSITIVE_INFINITY : 0;
+  }
+  return submission.totalTokens / submission.totalCost;
+}
+
+function sortItems(items: Submission[], sortBy: SortBy): Submission[] {
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    if (sortBy === "tokens") return b.totalTokens - a.totalTokens;
+    if (sortBy === "efficiency") {
+      const diff = getEfficiencyScore(b) - getEfficiencyScore(a);
+      if (diff !== 0) return diff;
+      return b.totalTokens - a.totalTokens;
+    }
+    return b.totalCost - a.totalCost;
+  });
+  return sorted;
+}
+
+function formatEfficiency(submission: Submission): string {
+  const efficiency = getEfficiencyScore(submission);
+  if (!Number.isFinite(efficiency)) return "free";
+  return formatNumber(Math.round(efficiency));
+}
 
 // Flat placeholder rows shown while a filter/sort change is fetching.
 function SkeletonRows({ count = 8 }: { count?: number }) {
@@ -60,6 +87,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [allItems, setAllItems] = useState<Submission[]>(initialItems ?? []);
+  const [isEfficiencyLoading, setIsEfficiencyLoading] = useState(false);
   const { data: session } = useSession();
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
@@ -67,7 +95,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const globalStats = liveStats ?? initialStats;
 
   const ITEMS_PER_PAGE = 25;
-  const isDateFiltered = dateFrom && dateTo;
+  const isDateFiltered = Boolean(dateFrom && dateTo);
 
   // The server already rendered page 0 of the default view — don't re-fetch
   // it on mount. The hook only runs for non-default filters or later pages.
@@ -80,15 +108,17 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     !isDateFiltered;
 
   const { data: regularResult, isLoading } = useLeaderboard(
-    !isDateFiltered && !isSeededDefaultView
+    !isDateFiltered && !isSeededDefaultView && sortBy !== "efficiency"
       ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
       : "skip"
   );
 
-  const hasMore = regularResult?.hasMore ?? (isSeededDefaultView ? initialHasMore ?? false : false);
+  const hasMore = sortBy === "efficiency"
+    ? false
+    : regularResult?.hasMore ?? (isSeededDefaultView ? initialHasMore ?? false : false);
 
-  const { data: dateFilteredResult } = useLeaderboardByDateRange(
-    isDateFiltered
+  const { data: dateFilteredResult, isLoading: isDateFilteredLoading } = useLeaderboardByDateRange(
+    isDateFiltered && sortBy !== "efficiency"
       ? { dateFrom, dateTo, sortBy, limit: 100, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
       : "skip"
   );
@@ -110,6 +140,8 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   }, [sortBy, dateFrom, dateTo, tool, verifiedOnly]);
 
   useEffect(() => {
+    if (sortBy === "efficiency") return;
+
     if (isDateFiltered && dateFilteredResult?.items) {
       setAllItems(dateFilteredResult.items);
     } else if (!isDateFiltered && regularResult?.items) {
@@ -123,7 +155,69 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
         });
       }
     }
-  }, [regularResult, dateFilteredResult, page, isDateFiltered]);
+  }, [sortBy, regularResult, dateFilteredResult, page, isDateFiltered]);
+
+  useEffect(() => {
+    if (sortBy !== "efficiency") return;
+
+    let cancelled = false;
+
+    const loadEfficiencyItems = async () => {
+      setIsEfficiencyLoading(true);
+
+      try {
+        const { createSupabaseDataLayer } = await import("@/lib/data/supabase/client");
+        const dataLayer = createSupabaseDataLayer();
+        let items: Submission[] = [];
+
+        if (isDateFiltered) {
+          const result = await dataLayer.submissions.getLeaderboardByDateRange({
+            dateFrom,
+            dateTo,
+            sortBy: "cost",
+            limit: 5000,
+            tool: tool ?? undefined,
+            verifiedOnly: verifiedOnly || undefined,
+          });
+          items = result.items;
+        } else {
+          let nextPage = 0;
+          let hasNextPage = true;
+
+          while (hasNextPage) {
+            const result = await dataLayer.submissions.getLeaderboard({
+              sortBy: "cost",
+              page: nextPage,
+              pageSize: 50,
+              tool: tool ?? undefined,
+              verifiedOnly: verifiedOnly || undefined,
+            });
+            items.push(...result.items);
+            hasNextPage = result.hasMore;
+            nextPage += 1;
+          }
+        }
+
+        if (!cancelled) {
+          setAllItems(sortItems(items, "efficiency"));
+        }
+      } catch {
+        if (!cancelled) {
+          setAllItems([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsEfficiencyLoading(false);
+        }
+      }
+    };
+
+    void loadEfficiencyItems();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sortBy, isDateFiltered, dateFrom, dateTo, tool, verifiedOnly]);
 
   useEffect(() => {
     if (isDateFiltered || !hasMore) return;
@@ -162,6 +256,8 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     const diff = Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000));
     return diff === days;
   };
+
+  const isBoardLoading = sortBy === "efficiency" ? isEfficiencyLoading : isDateFiltered ? isDateFilteredLoading : isLoading;
 
   return (
     <div>
@@ -245,6 +341,15 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
               <Zap className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Tokens</span>
             </button>
+            <button
+              onClick={() => setSortBy("efficiency")}
+              className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
+                sortBy === "efficiency" ? "bg-accent text-white" : "text-muted hover:text-foreground hover:bg-surface-2"
+              }`}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Efficiency</span>
+            </button>
           </div>
         </div>
 
@@ -310,6 +415,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                 <div className="hidden sm:block w-28">Tier</div>
                 <div className="w-28 text-right">Cost</div>
                 <div className="w-24 text-right hidden sm:block">Tokens</div>
+                <div className="w-24 text-right hidden md:block">Tok/$</div>
                 <div className="w-8" />
               </div>
 
@@ -373,6 +479,12 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                         <div className="text-sm font-mono text-muted">{formatNumber(submission.totalTokens)}</div>
                       </div>
 
+                      <div className="w-24 text-right flex-shrink-0 hidden md:block">
+                        <div className={`text-sm font-mono ${sortBy === "efficiency" ? "text-accent font-semibold" : "text-muted"}`}>
+                          {formatEfficiency(submission)}
+                        </div>
+                      </div>
+
                       <div className="w-8 flex-shrink-0 justify-end hidden sm:flex">
                         {isCurrentUser && (
                           <button
@@ -396,7 +508,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
             </div>
           )}
         </div>
-      ) : isLoading ? (
+      ) : isBoardLoading ? (
         <SkeletonRows />
       ) : (
         <div className="text-center py-16">
