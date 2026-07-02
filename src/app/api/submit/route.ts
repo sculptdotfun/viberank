@@ -295,8 +295,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check for timeout or database-specific errors
-      if (error.message.includes("timeout") || error.message.includes("deadline")) {
+      // Check for timeout or database-specific errors. The 25s race above
+      // rejects with "Database operation timed out" — match that spelling too,
+      // or large-history merges surface as the generic 500 instead of a 504.
+      if (
+        error.message.includes("timeout") ||
+        error.message.includes("timed out") ||
+        error.message.includes("deadline")
+      ) {
         return NextResponse.json(
           { error: "Request timed out. Please try again or submit smaller batches of data." },
           { status: 504 }
