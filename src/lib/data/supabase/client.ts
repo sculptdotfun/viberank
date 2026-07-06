@@ -226,7 +226,8 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     // Identify the contributing machine so overlapping dates from distinct
     // machines sum while a same-machine re-submit replaces only its slice (#43).
-    // Web uploads / older CLIs send no id and share the "default" bucket.
+    // Web uploads / older CLIs send no id ("default"): unattributable, so
+    // they replace the whole day rather than sum against id'd slices (#81).
     const machineId = data.machineId || DEFAULT_MACHINE_ID;
 
     let submissionId: string;

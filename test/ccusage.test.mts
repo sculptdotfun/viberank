@@ -343,5 +343,41 @@ console.log("\n[8] Per-machine daily merge (#43)");
   ok("models unioned across machines", u2.aggregate.modelsUsed.sort().join(",") === "claude-opus-4-8,gpt-5-codex");
 }
 
+// ---------------------------------------------------------------------------
+console.log("\n[9] Default bucket never sums against id'd slices (#81)");
+{
+  const contrib = (cost: number) => ({
+    inputTokens: cost * 100,
+    outputTokens: cost * 10,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: cost * 110,
+    totalCost: cost,
+    modelsUsed: ["claude-opus-4-8"],
+    agents: ["claude"],
+  });
+
+  // The #81 doubling: no-id submission filled "default", then the same machine
+  // re-submits with an id. The id'd slice must REPLACE default, not add to it.
+  const d1 = mergeMachineContribution(null, "default", contrib(15));
+  const d2 = mergeMachineContribution(d1.contributions, "machineA", contrib(15));
+  ok("id'd submission drops default slice ($15, not $30)", d2.aggregate.totalCost === 15, `got ${d2.aggregate.totalCost}`);
+  ok("default slice removed from map", Object.keys(d2.contributions).join(",") === "machineA");
+
+  // Id'd slices survive an id'd submission from another machine.
+  const d3 = mergeMachineContribution(d2.contributions, "machineB", contrib(10));
+  ok("distinct id'd machines still sum ($15+$10=$25)", d3.aggregate.totalCost === 25, `got ${d3.aggregate.totalCost}`);
+
+  // A no-id submission is unattributable: it owns the whole day (pre-#43
+  // overwrite), never sums against id'd slices it may itself contain.
+  const d4 = mergeMachineContribution(d3.contributions, "default", contrib(30));
+  ok("no-id submission replaces whole day ($30, not $55)", d4.aggregate.totalCost === 30, `got ${d4.aggregate.totalCost}`);
+  ok("only default slice remains", Object.keys(d4.contributions).join(",") === "default");
+
+  // No-id re-submit over default-only day: plain replace, unchanged behavior.
+  const d5 = mergeMachineContribution(d4.contributions, "default", contrib(12));
+  ok("no-id re-submit replaces default ($12)", d5.aggregate.totalCost === 12, `got ${d5.aggregate.totalCost}`);
+}
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
