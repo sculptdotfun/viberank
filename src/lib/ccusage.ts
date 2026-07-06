@@ -120,6 +120,15 @@ function mergeModelBreakdowns(
 // re-submission from the same machine replaces only its own slice. The daily
 // row keeps aggregate (summed) fields for display — the per-machine map is
 // bookkeeping the merge needs and the UI never reads.
+//
+// The "default" bucket (no X-Machine-Id: web uploads, pre-1.2 CLIs) is NOT a
+// machine — it is unattributable data that in practice comes from the same
+// machine that later submits with an id. Summing it against a UUID slice
+// double-counts the same history (#81), so it never coexists with id'd
+// slices: an id'd submission drops the default slice for the days it covers,
+// and a no-id submission replaces the whole day (pre-#43 overwrite
+// semantics). Cross-machine summing therefore only happens between id'd
+// slices, where attribution is sound.
 
 /** One machine's contribution to a single day. */
 export interface MachineContribution {
@@ -187,20 +196,24 @@ function aggregateContributions(
  * recompute the day's aggregate. Pure so it can be unit-tested.
  *
  * @param existing prior per-machine map, or null for a legacy row that predates
- *   per-machine tracking. A legacy row's aggregate is *not* preserved: we can't
- *   attribute it to a machine, so the first id'd submission replaces it (today's
- *   overwrite behavior). Once a machine re-submits, distinct machines sum and
- *   the day self-heals.
+ *   per-machine tracking. Unattributable data (legacy null rows and the
+ *   "default" slice) is never preserved alongside id'd slices: we can't know
+ *   which machine it came from, and assuming "a different one" double-counts
+ *   single-machine users (#81). It is replaced instead.
  */
 export function mergeMachineContribution(
   existing: Record<string, MachineContribution> | null | undefined,
   machineId: string,
   incoming: MachineContribution
 ): { contributions: Record<string, MachineContribution>; aggregate: DailyAggregate } {
-  const contributions: Record<string, MachineContribution> = {
-    ...(existing ?? {}),
-    [machineId]: incoming,
-  };
+  let contributions: Record<string, MachineContribution>;
+  if (machineId === DEFAULT_MACHINE_ID) {
+    // No-id submission: unattributable, so it owns the whole day.
+    contributions = { [DEFAULT_MACHINE_ID]: incoming };
+  } else {
+    const { [DEFAULT_MACHINE_ID]: _unattributed, ...idSlices } = existing ?? {};
+    contributions = { ...idSlices, [machineId]: incoming };
+  }
   return { contributions, aggregate: aggregateContributions(contributions) };
 }
 
