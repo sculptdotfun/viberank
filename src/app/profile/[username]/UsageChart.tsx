@@ -13,13 +13,8 @@ import {
   type TooltipProps,
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { SERIES_COLORS, OTHER_COLOR } from "@/lib/chartColors";
 
-// Categorical palette for the dark surface (#0f0f12), validated with the
-// dataviz six-check script (lightness band, chroma floor, CVD separation,
-// normal-vision floor, contrast). Hues are assigned to models in fixed
-// order of total spend — a model keeps its color across range switches.
-const SERIES_COLORS = ["#d95926", "#3987e5", "#199e70", "#c98500", "#d55181", "#9085e9"];
-const OTHER_COLOR = "#6e6e78";
 const SURFACE = "#0f0f12";
 
 export const OTHER_KEY = "Other";

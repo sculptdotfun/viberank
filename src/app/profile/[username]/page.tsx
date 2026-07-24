@@ -16,6 +16,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelName } from "@/lib/utils";
+import { seriesColor } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
 import { getServerDataLayer } from "@/lib/data";
@@ -495,10 +496,13 @@ export default async function ProfilePage({ params }: ProfileParams) {
                   <span className="micro-label">{hasModelCosts ? "by cost" : "by days used"}</span>
                 </div>
                 <div className="space-y-3">
-                  {topModels.map(([name, value]) => (
+                  {topModels.map(([name, value], i) => (
                     <div key={name}>
                       <div className="flex justify-between items-center mb-1.5 gap-2">
-                        <span className="text-xs font-mono truncate">{name}</span>
+                        <span className="flex items-center gap-1.5 text-xs font-mono truncate">
+                          <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+                          {name}
+                        </span>
                         <span className="font-mono text-xs text-muted flex-shrink-0">
                           {hasModelCosts ? `$${formatCurrency(value)}` : `${value}d`}
                           <span className="text-muted/60"> · {Math.round((value / modelTotal) * 100)}%</span>
@@ -506,8 +510,8 @@ export default async function ProfilePage({ params }: ProfileParams) {
                       </div>
                       <div className="w-full bg-surface-3 rounded-full h-1.5">
                         <div
-                          className="bg-accent h-1.5 rounded-full"
-                          style={{ width: `${Math.max((value / modelTotal) * 100, 1)}%` }}
+                          className="h-1.5 rounded-full"
+                          style={{ width: `${Math.max((value / modelTotal) * 100, 1)}%`, background: seriesColor(i) }}
                         />
                       </div>
                     </div>
@@ -539,18 +543,21 @@ export default async function ProfilePage({ params }: ProfileParams) {
                   <span className="micro-label">by active days</span>
                 </div>
                 <div className="space-y-3">
-                  {toolEntries.map(([tool, days]) => (
+                  {toolEntries.map(([tool, days], i) => (
                     <div key={tool}>
                       <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs font-medium">{toolLabel(tool)}</span>
+                        <span className="flex items-center gap-1.5 text-xs font-medium">
+                          <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+                          {toolLabel(tool)}
+                        </span>
                         <span className="font-mono text-xs text-muted">
                           {days}d <span className="text-muted/60">· {Math.round((days / daysActive) * 100)}%</span>
                         </span>
                       </div>
                       <div className="w-full bg-surface-3 rounded-full h-1.5">
                         <div
-                          className="bg-blue-500 h-1.5 rounded-full"
-                          style={{ width: `${Math.max((days / daysActive) * 100, 1)}%` }}
+                          className="h-1.5 rounded-full"
+                          style={{ width: `${Math.max((days / daysActive) * 100, 1)}%`, background: seriesColor(i) }}
                         />
                       </div>
                     </div>
