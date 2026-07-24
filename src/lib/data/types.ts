@@ -218,6 +218,10 @@ export interface SiteStats {
   firstDate: string | null;
   lastDate: string | null;
   activeDays: number;
+  /** 12-month site-wide rollup (migration 008); absent before it's applied. */
+  monthly?: { month: string; cost: number; users: number }[];
+  /** Developers per spend tier, bucketed on best submission (migration 008). */
+  tiers?: { tier: string; users: number }[];
   tools: { tool: string; users: number }[];
   models: { model: string; users: number }[];
   modelSpend: { model: string; cost: number }[];

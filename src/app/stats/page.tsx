@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database } from "lucide-react";
+import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, prettyModelName } from "@/lib/utils";
+import { seriesColor } from "@/lib/chartColors";
+import { TIERS } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
@@ -52,23 +54,27 @@ function StatTile({
 function BarList({
   rows,
   format,
-  barClass = "bg-accent",
 }: {
   rows: { label: string; value: number }[];
   format: (value: number) => string;
-  barClass?: string;
 }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
   return (
     <div className="space-y-3">
-      {rows.map(({ label, value }) => (
+      {rows.map(({ label, value }, i) => (
         <div key={label}>
           <div className="flex justify-between items-center mb-1.5 gap-2">
-            <span className="text-xs font-mono truncate">{label}</span>
+            <span className="flex items-center gap-1.5 text-xs font-mono truncate">
+              <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+              {label}
+            </span>
             <span className="font-mono text-xs text-muted flex-shrink-0">{format(value)}</span>
           </div>
           <div className="w-full bg-surface-3 rounded-full h-1.5">
-            <div className={`${barClass} h-1.5 rounded-full`} style={{ width: `${Math.max((value / max) * 100, 1)}%` }} />
+            <div
+              className="h-1.5 rounded-full"
+              style={{ width: `${Math.max((value / max) * 100, 1)}%`, background: seriesColor(i) }}
+            />
           </div>
         </div>
       ))}
@@ -124,6 +130,15 @@ export default async function StatsPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
   const toolRows = (site?.tools ?? []).slice(0, 10);
+
+  const monthly = (site?.monthly ?? []).map((m) => ({ ...m, cost: Number(m.cost) }));
+  const maxMonthlyCost = Math.max(...monthly.map((m) => m.cost), 1);
+  const monthLabel = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]} '${String(y).slice(2)}`;
+  };
+  const tierCounts = new Map((site?.tiers ?? []).map((t) => [t.tier, t.users]));
+  const tierTotal = (site?.tiers ?? []).reduce((s, t) => s + t.users, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -208,6 +223,80 @@ export default async function StatsPage() {
           </div>
         )}
 
+        {/* Monthly trend + tier distribution */}
+        {(monthly.length > 1 || tierTotal > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            {monthly.length > 1 && (
+              <div className="bg-surface-1 border border-border rounded-lg p-5 lg:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-medium flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-accent" />
+                    Monthly spend
+                  </h2>
+                  <span className="micro-label">last {monthly.length} months · all developers</span>
+                </div>
+                <div className="flex items-end gap-1.5 sm:gap-2 h-44">
+                  {monthly.map((m, i) => (
+                    <div
+                      key={m.month}
+                      data-tip={`${monthLabel(m.month)} · $${formatNumber(m.cost)} · ${m.users} devs`}
+                      className="flex-1 flex flex-col items-center justify-end gap-1.5 min-w-0 h-full"
+                    >
+                      <div
+                        className="w-full bg-accent/80 hover:bg-accent transition-colors rounded-t-sm"
+                        style={{ height: `${Math.max((m.cost / maxMonthlyCost) * 130, 3)}px` }}
+                      />
+                      <span className={`text-[9px] font-mono text-muted/70 truncate ${i % 2 === 1 ? "invisible sm:visible" : ""}`}>
+                        {monthLabel(m.month)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tierTotal > 0 && (
+              <div className="bg-surface-1 border border-border rounded-lg p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-medium flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-accent" />
+                    Tier ladder
+                  </h2>
+                  <span className="micro-label">by best submission</span>
+                </div>
+                <div className="flex h-2 rounded-full overflow-hidden mb-4">
+                  {TIERS.map((t) => {
+                    const users = tierCounts.get(t.key) ?? 0;
+                    if (users === 0) return null;
+                    return (
+                      <div
+                        key={t.key}
+                        style={{ width: `${(users / tierTotal) * 100}%`, background: t.color, minWidth: 3 }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="space-y-2">
+                  {[...TIERS].reverse().map((t) => {
+                    const users = tierCounts.get(t.key) ?? 0;
+                    return (
+                      <div key={t.key} className="flex items-center justify-between font-mono text-xs">
+                        <span style={{ color: t.color }}>
+                          {t.glyph} {t.name.toUpperCase()}
+                        </span>
+                        <span className="text-muted">
+                          {formatNumber(users)}
+                          <span className="text-muted/60"> · {tierTotal > 0 ? Math.round((users / tierTotal) * 100) : 0}%</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Models + tools */}
         {(topModelUsers.length > 0 || topModelSpend.length > 0 || toolRows.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -249,7 +338,6 @@ export default async function StatsPage() {
                 <BarList
                   rows={toolRows.map((t) => ({ label: toolLabel(t.tool), value: t.users }))}
                   format={(v) => `${formatNumber(v)} devs`}
-                  barClass="bg-blue-500"
                 />
               </div>
             )}
