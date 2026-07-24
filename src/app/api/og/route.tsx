@@ -57,6 +57,9 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
   const days = searchParams.get('days');
   const streak = searchParams.get('streak');
   const tools = (searchParams.get('tools') || '').split(',').filter(Boolean);
+  // Mini contribution grid: one level digit (0–4) per day, oldest first,
+  // rendered column-per-week like the profile heatmap.
+  const hm = (searchParams.get('hm') || '').replace(/[^0-4]/g, '').slice(0, 112);
   const tier = getTier(cost);
   const costLabel =
     cost >= 1000 ? `$${(cost / 1000).toFixed(cost >= 10000 ? 0 : 1)}K` : `$${Math.round(cost)}`;
@@ -145,7 +148,8 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
             )}
           </div>
 
-          {/* identity */}
+          {/* identity + mini heatmap */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 44 }}>
             {avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -203,6 +207,37 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                 ))}
               </div>
             </div>
+          </div>
+
+          {hm.length >= 14 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {Array.from({ length: Math.ceil(hm.length / 7) }, (_, w) => (
+                  <div key={w} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {Array.from({ length: 7 }, (_, d) => {
+                      const level = Number(hm[w * 7 + d] ?? 0);
+                      const fill = [
+                        '#1e1e23',
+                        'rgba(249,115,22,0.25)',
+                        'rgba(249,115,22,0.45)',
+                        'rgba(249,115,22,0.7)',
+                        '#f97316',
+                      ][level];
+                      return (
+                        <div
+                          key={d}
+                          style={{ display: 'flex', width: 13, height: 13, borderRadius: 3, backgroundColor: fill }}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              <span style={{ fontSize: 15, color: '#9a9aa5', fontFamily: 'Geist Mono', letterSpacing: 2 }}>
+                LAST 16 WEEKS
+              </span>
+            </div>
+          ) : null}
           </div>
 
           {/* stats + CTA */}
