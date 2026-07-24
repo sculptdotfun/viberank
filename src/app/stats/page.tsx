@@ -105,11 +105,15 @@ export default async function StatsPage() {
   // the max as a lower bound instead of overcounting.
   const modelUsers = new Map<string, number>();
   for (const { model, users } of site?.models ?? []) {
+    // models_used elements aren't type-checked at ingest; skip junk instead
+    // of crashing the ISR render on a null.
+    if (typeof model !== "string" || !model) continue;
     const name = prettyModelName(model);
     modelUsers.set(name, Math.max(modelUsers.get(name) ?? 0, users));
   }
   const modelSpend = new Map<string, number>();
   for (const { model, cost } of site?.modelSpend ?? []) {
+    if (typeof model !== "string" || !model) continue;
     const name = prettyModelName(model);
     modelSpend.set(name, (modelSpend.get(name) ?? 0) + Number(cost));
   }

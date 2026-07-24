@@ -165,7 +165,9 @@ export default async function ProfileLayout({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // GitHub display names are attacker-controlled free text; a literal
+        // "</script>" inside would break out of this tag, so escape "<".
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       {children}
     </>

@@ -80,15 +80,27 @@ export default async function ProfilePage({ params }: ProfileParams) {
   }, {} as Record<string, { date: string; cost: number; tokens: number }>);
   const dailySeries = Object.values(dailyMap);
 
+  // Dates can repeat across un-merged submissions (e.g. an unclaimed cli row
+  // next to an oauth row), so per-day dollar figures must come from deduped
+  // days — prefer the newest submission's row, matching how merge overwrites
+  // days. The heatmap, streaks and rhythm charts all read from this.
+  const seenDates = new Set<string>();
+  const uniqueDaily = allDaily.filter((d) => {
+    if (seenDates.has(d.date)) return false;
+    seenDates.add(d.date);
+    return true;
+  });
+  const dedupedSeries = uniqueDaily.map((d) => ({ date: d.date, cost: d.totalCost }));
+
   // Streaks over days that actually have usage recorded.
-  const streaks = computeStreaks(Object.keys(dailyMap));
+  const streaks = computeStreaks(uniqueDaily.map((d) => d.date));
 
   // Spend by weekday (Monday-first) and by calendar month, for the rhythm
   // charts. Weekday comes from the date string itself (UTC, matching how
   // ccusage buckets days).
   const weekdayCost = new Array(7).fill(0) as number[];
   const monthlyCost = new Map<string, number>();
-  for (const d of dailySeries) {
+  for (const d of dedupedSeries) {
     weekdayCost[new Date(`${d.date}T00:00:00Z`).getUTCDay()] += d.cost;
     const month = d.date.slice(0, 7);
     monthlyCost.set(month, (monthlyCost.get(month) ?? 0) + d.cost);
@@ -152,17 +164,8 @@ export default async function ProfilePage({ params }: ProfileParams) {
     { label: "Cache creation", value: tokenAgg.cacheCreation, color: "bg-purple-500" },
   ];
 
-  // Per-model aggregation. Cost splits exist on rows ingested after migration
-  // 004; older rows fall back to "days used". Dates can repeat across
-  // submissions, so dedupe per date first (prefer the newest submission's row,
-  // matching how merge overwrites days).
-  const seenDates = new Set<string>();
-  const uniqueDaily = allDaily.filter((d) => {
-    if (seenDates.has(d.date)) return false;
-    seenDates.add(d.date);
-    return true;
-  });
-
+  // Per-model aggregation over the deduped days. Cost splits exist on rows
+  // ingested after migration 004; older rows fall back to "days used".
   const prettyModel = prettyModelName;
 
   const modelCost = new Map<string, number>();
@@ -346,7 +349,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
             <CalendarDays className="w-4 h-4 text-accent" />
             Activity
           </h2>
-          <ActivityHeatmap daily={dailySeries} />
+          <ActivityHeatmap daily={dedupedSeries} />
         </div>
 
         {/* Token breakdown + insights */}

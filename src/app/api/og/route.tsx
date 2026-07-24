@@ -37,7 +37,20 @@ function getFonts() {
 // site's visual language (Geist, dark surface, tier-colored glow).
 async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) {
   const username = searchParams.get('username') || 'developer';
-  const avatar = searchParams.get('avatar');
+  // This endpoint is an unauthenticated GET and Satori fetches the <img> src,
+  // so only allow GitHub-hosted avatars — anything else would let callers turn
+  // the edge function into an open image proxy.
+  const avatar = (() => {
+    try {
+      const u = new URL(searchParams.get('avatar') ?? '');
+      const ok =
+        u.protocol === 'https:' &&
+        (u.hostname === 'github.com' || u.hostname.endsWith('.githubusercontent.com'));
+      return ok ? u.toString() : null;
+    } catch {
+      return null;
+    }
+  })();
   const cost = Number(searchParams.get('cost') || 0);
   const tokens = searchParams.get('tokens') || '';
   const rank = searchParams.get('rank');

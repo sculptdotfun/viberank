@@ -45,6 +45,7 @@ AS $$
         SELECT m.model, COUNT(DISTINCT s.username) AS users
         FROM submissions s, unnest(s.models_used) AS m(model)
         WHERE s.flagged_for_review IS NOT TRUE
+          AND m.model IS NOT NULL AND m.model <> ''
         GROUP BY m.model
         ORDER BY COUNT(DISTINCT s.username) DESC
         LIMIT 20
@@ -59,6 +60,7 @@ AS $$
         LATERAL jsonb_array_elements(d.model_breakdowns) mb
         WHERE s.flagged_for_review IS NOT TRUE
           AND d.model_breakdowns IS NOT NULL
+          AND mb->>'modelName' IS NOT NULL
         GROUP BY 1
         ORDER BY 2 DESC
         LIMIT 20
