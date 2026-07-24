@@ -35,13 +35,14 @@ function getFonts() {
 
 // Share card for profile pages: avatar, rank, tier, cost, tokens — in the
 // site's visual language (Geist, dark surface, tier-colored glow).
-async function profileCard(searchParams: URLSearchParams) {
+async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) {
   const username = searchParams.get('username') || 'developer';
   const avatar = searchParams.get('avatar');
   const cost = Number(searchParams.get('cost') || 0);
   const tokens = searchParams.get('tokens') || '';
   const rank = searchParams.get('rank');
   const days = searchParams.get('days');
+  const streak = searchParams.get('streak');
   const tools = (searchParams.get('tools') || '').split(',').filter(Boolean);
   const tier = getTier(cost);
   const costLabel =
@@ -193,10 +194,11 @@ async function profileCard(searchParams: URLSearchParams) {
 
           {/* stats + CTA */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 72 }}>
+            <div style={{ display: 'flex', gap: streak ? 56 : 72 }}>
               {stat(costLabel, 'AI CODING USAGE', '#f97316')}
               {tokens ? stat(tokens, 'TOKENS', '#fafafa') : null}
               {days ? stat(days, 'ACTIVE DAYS', '#fafafa') : null}
+              {streak ? stat(`${streak}d`, 'STREAK', tier.color) : null}
             </div>
             <div
               style={{
@@ -228,7 +230,7 @@ async function profileCard(searchParams: URLSearchParams) {
         />
       </div>
     ),
-    { width: 1200, height: 630, fonts }
+    { width: 1200, height: 630, fonts, headers }
   );
 }
 
@@ -236,8 +238,17 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
+    // Versioned URLs carry a content fingerprint (`v`) that changes whenever
+    // the stats do, so the response itself can be cached as immutable — the
+    // CDN serves repeat crawler hits without re-rendering.
+    const cacheHeaders: HeadersInit = {
+      'Cache-Control': searchParams.has('v')
+        ? 'public, immutable, no-transform, max-age=31536000'
+        : 'public, max-age=3600, s-maxage=86400',
+    };
+
     if (searchParams.get('type') === 'profile') {
-      return profileCard(searchParams);
+      return profileCard(searchParams, cacheHeaders);
     }
 
     const title = searchParams.get('title') || 'Viberank';
@@ -331,6 +342,7 @@ export async function GET(request: Request) {
       {
         width: 1200,
         height: 630,
+        headers: cacheHeaders,
       },
     );
   } catch (e: unknown) {
