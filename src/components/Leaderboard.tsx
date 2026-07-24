@@ -317,6 +317,62 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
 
       <SponsorSlot />
 
+      {/* Top-3 podium — only on the unfiltered board, where ranks are global */}
+      {!tool && !verifiedOnly && !isDateFiltered && allItems.length >= 3 && (
+        <div className="flex items-end justify-center gap-4 sm:gap-10 mb-8 pt-2">
+          {[allItems[1], allItems[0], allItems[2]].map((s, col) => {
+            const rank = col === 1 ? 1 : col === 0 ? 2 : 3;
+            const medal = rank === 1 ? "#f5b008" : rank === 2 ? "#b8bcc4" : "#c2703f";
+            const first = rank === 1;
+            return (
+              <Link
+                key={s.id}
+                href={`/profile/${encodeURIComponent(s.githubUsername || s.username)}`}
+                className={`group flex flex-col items-center text-center ${first ? "" : "mb-1 sm:mb-2"}`}
+              >
+                <div className="relative">
+                  <div
+                    className={`rounded-full ${first ? "w-20 h-20" : "w-14 h-14"} overflow-hidden`}
+                    style={{ boxShadow: `0 0 0 2px ${medal}, 0 0 ${first ? 28 : 16}px ${medal}33` }}
+                  >
+                    <Avatar
+                      src={s.githubAvatar}
+                      githubUsername={s.githubUsername}
+                      name={s.githubName || s.username}
+                      size={first ? "lg" : "md"}
+                      priority
+                      className="!w-full !h-full"
+                    />
+                  </div>
+                  <span
+                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[10px] font-bold px-1.5 py-px rounded-full bg-background border"
+                    style={{ color: medal, borderColor: medal }}
+                  >
+                    {rank}
+                  </span>
+                </div>
+                <span className={`mt-3.5 font-medium truncate max-w-[7rem] sm:max-w-[10rem] group-hover:text-accent transition-colors ${first ? "text-sm" : "text-xs"}`}>
+                  {s.githubUsername || s.username}
+                </span>
+                <span className={`font-mono font-semibold text-accent ${first ? "text-base" : "text-sm"}`}>
+                  {sortBy === "tokens" ? (
+                    <>
+                      {formatNumber(s.totalTokens)}
+                      <span className="text-muted text-[10px] font-normal"> tok</span>
+                    </>
+                  ) : (
+                    <>${formatNumber(s.totalCost)}</>
+                  )}
+                </span>
+                <span className="mt-1">
+                  <TierBadge totalCost={s.totalCost} size="xs" bare />
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       {/* Tier ladder key — desktop gets the sidebar ladder instead */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-5 px-0.5 lg:hidden">
         <span className="micro-label">Tiers</span>
