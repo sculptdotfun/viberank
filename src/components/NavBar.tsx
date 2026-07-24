@@ -40,6 +40,7 @@ export default function NavBar() {
   const isAdmin = checkIsAdmin(session?.user?.username);
 
   const navItems = [
+    { name: "Stats", href: "/stats" },
     { name: "Blog", href: "/blog" },
     { name: "Hire", href: "/hire" },
     ...(isAdmin ? [{ name: "Admin", href: "/admin" }] : []),

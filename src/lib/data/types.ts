@@ -201,6 +201,28 @@ export interface GlobalStats {
   basedOnTop?: number;
 }
 
+/**
+ * Exact site-wide aggregates from the get_site_stats() SQL function
+ * (migration 007) — unlike GlobalStats, these are not approximated from the
+ * top-N submissions.
+ */
+export interface SiteStats {
+  totalUsers: number;
+  totalSubmissions: number;
+  totalCost: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  activeDays: number;
+  tools: { tool: string; users: number }[];
+  models: { model: string; users: number }[];
+  modelSpend: { model: string; cost: number }[];
+}
+
 export interface ClaimStatus {
   actionNeeded: "claim" | "merge" | null;
   actionText: string;
@@ -293,6 +315,8 @@ export interface ProfilesService {
 
 export interface StatsService {
   getGlobalStats(): Promise<GlobalStats>;
+  /** Exact aggregates via get_site_stats() (migration 007); null if the function isn't deployed. */
+  getSiteStats(): Promise<SiteStats | null>;
 }
 
 export interface DataLayer {
