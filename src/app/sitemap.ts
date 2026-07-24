@@ -17,6 +17,8 @@ const staticEntries: MetadataRoute.Sitemap = [
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/blog`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
+  { url: `${SITE}/blog/what-is-tokenmaxxing`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },
+  { url: `${SITE}/blog/codex-token-usage-leaderboard`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },
   { url: `${SITE}/blog/state-of-ai-coding-2026`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE}/blog/codex-vs-claude-code-vs-gemini-cli`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE}/blog/how-much-does-claude-code-cost`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },

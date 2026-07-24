@@ -30,6 +30,16 @@ export async function generateMetadata({ params }: ToolParams): Promise<Metadata
   return {
     title,
     description,
+    keywords: [
+      `${label.toLowerCase()} leaderboard`,
+      `${label.toLowerCase()} token usage`,
+      `${label.toLowerCase()} usage tracker`,
+      `how to check ${label.toLowerCase()} usage`,
+      "ccusage",
+      "ai token leaderboard",
+      "tokenmaxxing",
+      "vibe coding",
+    ],
     alternates: { canonical },
     openGraph: { title, description, url: canonical, siteName: "Viberank", type: "website" },
     twitter: { card: "summary_large_image", title, description },
@@ -62,6 +72,10 @@ export default async function ToolPage({ params }: ToolParams) {
     {
       q: `How is ${label} usage measured?`,
       a: `ccusage reads ${label}'s local logs and computes tokens and USD cost from model pricing. Viberank aggregates that per developer and ranks it.`,
+    },
+    {
+      q: `How do I check my ${label} token usage without submitting?`,
+      a: `Run npx ccusage@latest daily in your terminal — it parses ${label}'s local session logs into per-day token counts and API-equivalent costs, no account needed.`,
     },
   ];
 

@@ -2,6 +2,20 @@ import Link from "next/link";
 
 const blogPosts = [
   {
+    slug: "what-is-tokenmaxxing",
+    title: "What Is Tokenmaxxing? Inside the AI Token Leaderboard Craze (2026)",
+    excerpt: "The trend behind Meta's Claudeonomics and Uber's blown AI budget — where the term came from, why corporate token leaderboards failed, and how 1,000+ developers measure theirs.",
+    date: "July 24, 2026",
+    readTime: "7 min read",
+  },
+  {
+    slug: "codex-token-usage-leaderboard",
+    title: "How to Track OpenAI Codex Token Usage — and Join the Codex Leaderboard",
+    excerpt: "Turn Codex CLI's local logs into daily token counts and costs with ccusage, understand why the numbers look huge, and rank yourself against 190+ Codex developers.",
+    date: "July 24, 2026",
+    readTime: "6 min read",
+  },
+  {
     slug: "state-of-ai-coding-2026",
     title: "State of AI Coding Spend 2026: Benchmarks From 800 Developers and $2.3M of Usage",
     excerpt: "Percentiles, daily burn rates, model mix, and power-user benchmarks from 29,000 days of real Claude Code, Codex, and Gemini CLI usage.",
