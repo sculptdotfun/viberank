@@ -90,7 +90,7 @@ export default function UpdatesModal({ isOpen, onClose }: UpdatesModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -103,7 +103,11 @@ export default function UpdatesModal({ isOpen, onClose }: UpdatesModalProps) {
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="relative bg-card border border-border rounded-lg shadow-xl max-w-md w-full max-h-[70vh] overflow-hidden"
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Recent updates"
+            className="relative bg-card border border-border border-b-0 sm:border-b rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-md max-h-[70vh] overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0"
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">

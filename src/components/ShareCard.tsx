@@ -40,7 +40,7 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-surface-1 border border-border rounded-2xl p-5 max-w-md w-full mx-auto"
+      className="bg-surface-1 border border-border rounded-2xl p-4 sm:p-5 w-[min(28rem,calc(100vw-2rem))] max-h-[90vh] overflow-y-auto mx-auto"
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-medium">Share your rank</h3>
@@ -51,8 +51,11 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
         )}
       </div>
 
-      {/* Preview card */}
-      <div className="bg-background border border-border rounded-xl p-5 mb-4">
+      {/* Preview card — thin tier-colored cap ties it to the OG share image */}
+      <div
+        className="bg-background border border-border border-t-2 rounded-xl p-4 sm:p-5 mb-4"
+        style={{ borderTopColor: tier.color }}
+      >
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="micro-label mb-1">viberank.app</p>

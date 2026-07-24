@@ -44,7 +44,7 @@ export default function ProfileSheet(props: ProfileSheetProps) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       {/* The loading skeleton already played the big slide-up — real content
           swaps in with a quick fade so the sheet doesn't animate twice. */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={close} />
@@ -53,12 +53,12 @@ export default function ProfileSheet(props: ProfileSheetProps) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="relative w-full max-w-2xl bg-surface-1 border border-border border-b-0 rounded-t-xl shadow-2xl max-h-[85vh] overflow-y-auto"
+        className="relative w-full max-w-2xl bg-surface-1 border border-border border-b-0 sm:border-b rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[85vh] sm:max-h-[80vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
       >
-        {/* Grab handle + close */}
+        {/* Grab handle (mobile sheet affordance) + close */}
         <div className="sticky top-0 bg-surface-1 pt-3 pb-2 px-5 flex items-center justify-between border-b border-border-subtle">
           <div className="w-8" />
-          <div className="w-10 h-1 rounded-full bg-surface-4" aria-hidden />
+          <div className="w-10 h-1 rounded-full bg-surface-4 sm:invisible" aria-hidden />
           <button
             onClick={close}
             aria-label="Close"

@@ -2,12 +2,12 @@
 // sheet. Mirrors ProfileSheet's layout so the content swap doesn't jump.
 export default function SheetLoading() {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm backdrop-in" />
 
-      <div className="sheet-up relative w-full max-w-2xl bg-surface-1 border border-border border-b-0 rounded-t-xl shadow-2xl">
+      <div className="sheet-up relative w-full max-w-2xl bg-surface-1 border border-border border-b-0 sm:border-b rounded-t-2xl sm:rounded-xl shadow-2xl">
         <div className="pt-3 pb-2 px-5 flex items-center justify-center border-b border-border-subtle">
-          <div className="w-10 h-1 rounded-full bg-surface-4" aria-hidden />
+          <div className="w-10 h-1 rounded-full bg-surface-4 sm:invisible" aria-hidden />
         </div>
 
         <div className="px-5 py-5 animate-pulse" aria-hidden>

@@ -201,8 +201,8 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     <div>
       {/* Filter bar — sticky under the nav while scrolling the board */}
       <div className="sticky top-14 z-40 py-2.5 bg-background/95 backdrop-blur border-b border-border mb-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="micro-label mr-2 hidden lg:block">Leaderboard</span>
             {[
               { label: "All", days: null },
@@ -389,8 +389,12 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                               </span>
                             )}
                           </div>
+                          {/* Tokens live here on mobile, where the column is hidden */}
+                          <div className="text-xs text-muted font-mono sm:hidden">
+                            {formatNumber(submission.totalTokens)} tokens
+                          </div>
                           {submission.githubName && submission.githubName !== submission.githubUsername && (
-                            <div className="text-xs text-muted truncate">{submission.githubName}</div>
+                            <div className="text-xs text-muted truncate hidden sm:block">{submission.githubName}</div>
                           )}
                         </div>
                       </div>

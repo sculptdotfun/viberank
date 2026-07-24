@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, Terminal, Copy, Check } from "lucide-react";
 import { track } from "@vercel/analytics";
@@ -13,6 +13,19 @@ interface SubmitModalProps {
 
 export default function SubmitModal({ open, onClose }: SubmitModalProps) {
   const [copied, setCopied] = useState(false);
+
+  // Esc to close + lock body scroll while open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
 
   const copyCommand = () => {
     navigator.clipboard.writeText("npx viberank-cli");
@@ -28,18 +41,22 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
         >
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.97, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="relative bg-surface-1 border border-border rounded-lg shadow-xl max-w-sm w-full"
+            exit={{ opacity: 0, scale: 0.97, y: 16 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Submit stats"
+            className="relative bg-surface-1 border border-border border-b-0 sm:border-b rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-sm max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0"
           >
-            <div className="px-4 py-3 flex items-center justify-between border-b border-border">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-border sticky top-0 bg-surface-1">
               <h3 className="font-medium">Submit Stats</h3>
-              <button onClick={onClose} className="p-1 text-muted hover:text-foreground rounded hover:bg-surface-2">
+              <button onClick={onClose} aria-label="Close" className="p-1.5 text-muted hover:text-foreground rounded-md hover:bg-surface-2 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>

@@ -71,15 +71,6 @@ export default async function ProfilePage({ params }: ProfileParams) {
   const daysActive = new Set(allDaily.map((d) => d.date)).size || 1;
   const avgDailyCost = totalCost / daysActive;
 
-  // Per-day chart series (summed across submissions).
-  const dailyMap = allDaily.reduce((acc, d) => {
-    if (!acc[d.date]) acc[d.date] = { date: d.date, cost: 0, tokens: 0 };
-    acc[d.date].cost += d.totalCost;
-    acc[d.date].tokens += d.totalTokens;
-    return acc;
-  }, {} as Record<string, { date: string; cost: number; tokens: number }>);
-  const dailySeries = Object.values(dailyMap);
-
   // Dates can repeat across un-merged submissions (e.g. an unclaimed cli row
   // next to an oauth row), so per-day dollar figures must come from deduped
   // days — prefer the newest submission's row, matching how merge overwrites
@@ -91,6 +82,34 @@ export default async function ProfilePage({ params }: ProfileParams) {
     return true;
   });
   const dedupedSeries = uniqueDaily.map((d) => ({ date: d.date, cost: d.totalCost }));
+
+  // Model-stacked series for the usage chart: top 5 models by total cost keep
+  // their own color; everything else (and legacy days without splits) folds
+  // into "Other".
+  const chartModelTotals = new Map<string, number>();
+  for (const d of uniqueDaily) {
+    for (const mb of d.modelBreakdowns ?? []) {
+      const name = prettyModelName(mb.modelName);
+      chartModelTotals.set(name, (chartModelTotals.get(name) ?? 0) + mb.cost);
+    }
+  }
+  const chartModelKeys = Array.from(chartModelTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name]) => name);
+  const stackedDaily = uniqueDaily.map((d) => {
+    const byModel: Record<string, number> = {};
+    let attributed = 0;
+    for (const mb of d.modelBreakdowns ?? []) {
+      const name = prettyModelName(mb.modelName);
+      const key = chartModelKeys.includes(name) ? name : "Other";
+      byModel[key] = (byModel[key] ?? 0) + mb.cost;
+      attributed += mb.cost;
+    }
+    const rest = d.totalCost - attributed;
+    if (rest > 0.005) byModel["Other"] = (byModel["Other"] ?? 0) + rest;
+    return { date: d.date, total: d.totalCost, byModel };
+  });
 
   // Streaks over days that actually have usage recorded.
   const streaks = computeStreaks(uniqueDaily.map((d) => d.date));
@@ -341,7 +360,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         </div>
 
         {/* Usage chart (client island) */}
-        <UsageChart daily={dailySeries} />
+        <UsageChart daily={stackedDaily} modelKeys={chartModelKeys} />
 
         {/* Activity heatmap */}
         <div className="bg-surface-1 border border-border rounded-lg p-5 mb-4">
@@ -442,16 +461,20 @@ export default async function ProfilePage({ params }: ProfileParams) {
                 </h2>
                 <span className="micro-label">last {monthEntries.length} months</span>
               </div>
-              <div className="flex items-end gap-2 h-32">
-                {monthEntries.map(([month, cost]) => (
-                  <div key={month} className="flex-1 flex flex-col items-center gap-1.5 min-w-0" title={`${monthLabel(month)}: $${formatCurrency(cost)}`}>
-                    <div className="w-full flex-1 flex items-end">
-                      <div
-                        className="w-full bg-accent/80 rounded-t-sm"
-                        style={{ height: `${Math.max((cost / maxMonthCost) * 100, 2)}%` }}
-                      />
-                    </div>
-                    <span className="text-[9px] font-mono text-muted/70 truncate">{monthLabel(month)}</span>
+              <div className="flex items-end gap-1.5 sm:gap-2 h-32">
+                {monthEntries.map(([month, cost], i) => (
+                  <div key={month} className="flex-1 flex flex-col items-center justify-end gap-1.5 min-w-0 h-full" title={`${monthLabel(month)}: $${formatCurrency(cost)}`}>
+                    {/* px heights — % against a flex-sized parent doesn't
+                        resolve reliably, which left these bars invisible */}
+                    <div
+                      className="w-full bg-accent/80 rounded-t-sm"
+                      style={{ height: `${Math.max((cost / maxMonthCost) * 100, 3)}px` }}
+                    />
+                    {/* 12 labels don't fit a phone; show every other one there
+                        (invisible, not hidden, so bar baselines stay aligned) */}
+                    <span className={`text-[9px] font-mono text-muted/70 truncate ${i % 2 === 1 ? "invisible sm:visible" : ""}`}>
+                      {monthLabel(month)}
+                    </span>
                   </div>
                 ))}
               </div>
