@@ -69,6 +69,40 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const ITEMS_PER_PAGE = 25;
   const isDateFiltered = dateFrom && dateTo;
 
+  // Filters ⇄ URL. Parsed once on mount (not useSearchParams — that would
+  // opt the ISR'd home page out of static rendering), then mirrored back via
+  // replaceState so any filtered view is a shareable link.
+  const [urlSynced, setUrlSynced] = useState(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("sort") === "tokens") setSortBy("tokens");
+    const urlTool = p.get("tool");
+    if (urlTool) setTool(urlTool);
+    if (p.get("verified") === "1") setVerifiedOnly(true);
+    const from = p.get("from");
+    const to = p.get("to");
+    if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) setDateFrom(from);
+    if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) setDateTo(to);
+    setUrlSynced(true);
+  }, []);
+
+  useEffect(() => {
+    // urlSynced is still false during the mount commit, which keeps this from
+    // wiping the URL params before the parse above lands in state.
+    if (!urlSynced) return;
+    const p = new URLSearchParams(window.location.search);
+    const write = (key: string, value: string) => (value ? p.set(key, value) : p.delete(key));
+    write("sort", sortBy === "tokens" ? "tokens" : "");
+    write("tool", tool ?? "");
+    write("verified", verifiedOnly ? "1" : "");
+    write("from", dateFrom);
+    write("to", dateTo);
+    const qs = p.toString();
+    if ((qs ? `?${qs}` : "") !== window.location.search) {
+      window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    }
+  }, [urlSynced, sortBy, tool, verifiedOnly, dateFrom, dateTo]);
+
   // The server already rendered page 0 of the default view — don't re-fetch
   // it on mount. The hook only runs for non-default filters or later pages.
   const isSeededDefaultView =

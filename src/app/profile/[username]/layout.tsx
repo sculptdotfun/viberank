@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { computeStreaks } from "@/lib/streaks";
 import { getProfileCached } from "./getProfile";
 
 interface ProfileParams {
@@ -59,9 +60,11 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       // rank is nice-to-have on the card; render without it on failure
     }
     const avatar = profile.submissions.find((s) => s.githubAvatar)?.githubAvatar;
-    const daysActive = new Set(
+    const activeDates = new Set(
       profile.submissions.flatMap((s) => (s.dailyBreakdown ?? []).map((d) => d.date))
-    ).size;
+    );
+    const daysActive = activeDates.size;
+    const { current: streak } = computeStreaks(activeDates);
     const ogParams = new URLSearchParams({
       type: "profile",
       username: profile.githubUsername || profile.username,
@@ -71,7 +74,12 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     if (rank) ogParams.set("rank", String(rank));
     if (avatar) ogParams.set("avatar", avatar);
     if (daysActive > 0) ogParams.set("days", String(daysActive));
+    if (streak > 1) ogParams.set("streak", String(streak));
     if (tools.length > 0) ogParams.set("tools", tools.slice(0, 4).join(","));
+    // Content fingerprint: the URL changes whenever the underlying stats do,
+    // so the OG route can serve versioned responses as immutable and crawlers
+    // still pick up fresh cards after each submission.
+    ogParams.set("v", `${Math.round(totalCost)}-${daysActive}-${rank ?? 0}`);
     const ogImage = `/api/og?${ogParams.toString()}`;
 
     return {
@@ -157,7 +165,9 @@ export default async function ProfileLayout({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // GitHub display names are attacker-controlled free text; a literal
+        // "</script>" inside would break out of this tag, so escape "<".
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       {children}
     </>

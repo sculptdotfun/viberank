@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node test/ccusage.test.mts"
+    "test": "node test/ccusage.test.mts && node test/streaks.test.mts"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

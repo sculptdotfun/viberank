@@ -20,6 +20,7 @@ import type {
   DailyBreakdown,
   ProfileWithSubmissions,
   GlobalStats,
+  SiteStats,
   ClaimStatus,
   ClaimResult,
   DeleteResult,
@@ -1306,6 +1307,18 @@ class SupabaseStatsService implements StatsService {
       isApproximate: true,
       basedOnTop: 500,
     };
+  }
+
+  async getSiteStats(): Promise<SiteStats | null> {
+    // Exact aggregates computed in-database (migration 007). Returns null when
+    // the function isn't deployed yet so callers can fall back to the
+    // approximate getGlobalStats().
+    const { data, error } = await this.client.rpc("get_site_stats");
+    if (error || !data) {
+      if (error) console.error("get_site_stats failed:", error.message);
+      return null;
+    }
+    return data as SiteStats;
   }
 }
 
