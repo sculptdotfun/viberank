@@ -74,6 +74,11 @@ export default function ActivityHeatmap({ daily }: ActivityHeatmapProps) {
       prevMonth = month;
     }
   }
+  // The first column labels a partial month; drop it when the next label is
+  // close enough that the two (each spanning 3 columns) would overlap.
+  if (monthLabels.length >= 2 && monthLabels[1].week - monthLabels[0].week < 3) {
+    monthLabels.shift();
+  }
 
   const activeDays = nonzero.length;
 
