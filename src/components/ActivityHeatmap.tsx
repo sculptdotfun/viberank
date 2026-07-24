@@ -24,6 +24,8 @@ function toIso(utc: number): string {
 /**
  * GitHub-style contribution calendar of the trailing year's daily spend.
  * Server-rendered: plain divs with native title tooltips, no client JS.
+ * Cells are fluid (1fr columns, square cells) so the grid fills the card;
+ * a min-width keeps it readable on phones via horizontal scroll.
  */
 export default function ActivityHeatmap({ daily }: ActivityHeatmapProps) {
   const costByDate = new Map(daily.map((d) => [d.date, d.cost]));
@@ -81,50 +83,50 @@ export default function ActivityHeatmap({ daily }: ActivityHeatmapProps) {
   }
 
   const activeDays = nonzero.length;
+  const weekColumns = `repeat(${weeks}, minmax(0, 1fr))`;
 
   return (
     <div className="overflow-x-auto">
-      <div className="inline-flex flex-col min-w-max">
+      <div className="min-w-[680px]">
         <div
-          className="grid gap-[3px] text-[9px] text-muted/70 font-mono mb-1 ml-[30px]"
-          style={{ gridTemplateColumns: `repeat(${weeks}, 11px)` }}
+          className="grid gap-[3px] text-[9px] text-muted/70 font-mono mb-1"
+          style={{ gridTemplateColumns: `27px ${weekColumns}` }}
         >
           {monthLabels.map(({ label, week }) => (
-            <span key={`${label}-${week}`} style={{ gridColumnStart: week + 1, gridColumnEnd: "span 3" }}>
+            <span key={`${label}-${week}`} style={{ gridColumnStart: week + 2, gridColumnEnd: "span 3" }}>
               {label}
             </span>
           ))}
         </div>
-        <div className="flex gap-[3px]">
-          <div className="grid grid-rows-7 gap-[3px] w-[27px] text-[9px] text-muted/70 font-mono">
-            {WEEKDAY_LABELS.map((label, i) => (
-              <span key={i} className="h-[11px] leading-[11px]">
-                {label}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-rows-7 grid-flow-col gap-[3px]">
-            {cells.map(({ date, cost, level }) =>
-              level < 0 ? (
-                <span key={date} className="w-[11px] h-[11px]" />
-              ) : (
-                <span
-                  key={date}
-                  title={`${date}: $${formatCurrency(cost)}`}
-                  className={`w-[11px] h-[11px] rounded-[2px] ${LEVEL_CLASSES[level]}`}
-                />
-              )
-            )}
-          </div>
+        <div
+          className="grid grid-flow-col gap-[3px]"
+          style={{ gridTemplateColumns: `27px ${weekColumns}`, gridTemplateRows: "repeat(7, minmax(0, 1fr))" }}
+        >
+          {WEEKDAY_LABELS.map((label, i) => (
+            <span key={`wd-${i}`} className="text-[9px] text-muted/70 font-mono leading-none self-center">
+              {label}
+            </span>
+          ))}
+          {cells.map(({ date, cost, level }) =>
+            level < 0 ? (
+              <span key={date} className="w-full aspect-square" />
+            ) : (
+              <span
+                key={date}
+                title={`${date}: $${formatCurrency(cost)}`}
+                className={`w-full aspect-square rounded-[2px] ${LEVEL_CLASSES[level]}`}
+              />
+            )
+          )}
         </div>
-        <div className="flex items-center justify-between mt-2 ml-[30px]">
+        <div className="flex items-center justify-between mt-2 pl-[30px]">
           <span className="text-[11px] text-muted">
             {activeDays} active day{activeDays === 1 ? "" : "s"} in the last year
           </span>
           <div className="flex items-center gap-1 text-[9px] text-muted/70 font-mono">
             <span className="mr-0.5">Less</span>
             {LEVEL_CLASSES.map((cls) => (
-              <span key={cls} className={`w-[11px] h-[11px] rounded-[2px] ${cls}`} />
+              <span key={cls} className={`w-[10px] h-[10px] rounded-[2px] ${cls}`} />
             ))}
             <span className="ml-0.5">More</span>
           </div>
