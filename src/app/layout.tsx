@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Viberank - Claude Code, Codex & AI Coding Usage Leaderboard | Track AI Dev Stats",
-  description: "Track and compare AI coding usage — Claude Code, Codex, Gemini CLI and more — across developers. Upload your ccusage data, view detailed analytics, and see how you rank in the global AI-powered development community.",
-  keywords: ["claude", "claude code", "anthropic", "codex", "gemini cli", "github copilot", "opencode", "ccusage", "ai coding", "ai coding leaderboard", "leaderboard", "developer stats", "code usage", "ai development", "developer ranking", "cc.json", "npx viberank-cli", "vibe coding", "ai pair programming"],
+  description: "The public AI token leaderboard for vibe coding. Track Claude Code, OpenAI Codex, Gemini CLI and more with ccusage data — see real spend, tokens burned, and how your tokenmaxxing ranks against 1,000+ developers.",
+  keywords: ["claude", "claude code", "claude code leaderboard", "anthropic", "codex", "codex leaderboard", "codex token usage", "openai codex", "gemini cli", "github copilot", "opencode", "ccusage", "ai coding", "ai coding leaderboard", "ai token leaderboard", "token leaderboard", "tokenmaxxing", "token maxxing", "leaderboard", "developer stats", "code usage", "token usage tracker", "ai development", "developer ranking", "cc.json", "npx viberank-cli", "vibe coding", "vibe coding leaderboard", "ai pair programming"],
   authors: [{ name: "Viberank Team" }],
   creator: "Viberank",
   publisher: "Viberank",
@@ -79,7 +79,7 @@ export default function RootLayout({
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "Viberank",
-      "description": "Track and compare AI coding usage — Claude Code, Codex, Gemini CLI and more — across developers. View detailed analytics and climb the AI development leaderboard.",
+      "description": "The public AI token leaderboard for vibe coding — track Claude Code, OpenAI Codex, Gemini CLI and more with real ccusage data and see how your tokenmaxxing ranks.",
       "url": "https://www.viberank.app",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Any",

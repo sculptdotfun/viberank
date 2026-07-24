@@ -4,6 +4,8 @@ import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
 const RESOURCES = [
   { name: "Blog", href: "/blog" },
   { name: "Hire AI-native engineers", href: "/hire" },
+  { name: "What is tokenmaxxing?", href: "/blog/what-is-tokenmaxxing" },
+  { name: "Track Codex token usage", href: "/blog/codex-token-usage-leaderboard" },
   { name: "Codex vs Claude Code vs Gemini", href: "/blog/codex-vs-claude-code-vs-gemini-cli" },
   { name: "What Claude Code costs", href: "/blog/how-much-does-claude-code-cost" },
   { name: "Cut your AI coding bill", href: "/blog/reduce-ai-coding-costs" },
