@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
 import { normalizeCcData } from "@/lib/ccusage";
+import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { getCliNotice } from "@/lib/sponsor";
 
 export async function POST(request: NextRequest) {
@@ -138,6 +139,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
+    // Keep the pre-normalization payload for the raw archive (006): once
+    // ccData is reassigned below, the original report shape is gone.
+    const rawPayload = ccData;
+
     // Hand the data layer the canonical shape from here on.
     ccData = {
       totals: normalized.totals,
@@ -184,6 +189,15 @@ export async function POST(request: NextRequest) {
       );
 
       submissionId = await Promise.race([submissionPromise, timeoutPromise]);
+
+      // Archive the original payload for future re-parse/backfill. Best
+      // effort — never blocks or fails an accepted submission.
+      await archiveRawSubmission(rawPayload, {
+        username: githubUsername,
+        source,
+        machineId,
+        cliVersion: cliVersion || undefined,
+      });
     } catch (dbError: any) {
       console.error("Database mutation error:", {
         message: dbError?.message,

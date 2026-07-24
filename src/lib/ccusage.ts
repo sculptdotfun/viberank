@@ -20,6 +20,11 @@
 // ratio checks downstream.
 const TOKEN_SLOP = 1;
 
+// Bump when normalizeCcData's behavior changes. Stored alongside each raw
+// payload in the raw_submissions archive so history can be re-parsed with a
+// newer normalizer and backfilled.
+export const PARSER_VERSION = "viberank-normalize-v1";
+
 /** A daily entry as it arrives from ccusage, before normalization. */
 interface RawDailyEntry {
   date?: string;
