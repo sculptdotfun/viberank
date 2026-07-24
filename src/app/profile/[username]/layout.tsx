@@ -65,6 +65,29 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     );
     const daysActive = activeDates.size;
     const { current: streak } = computeStreaks(activeDates);
+
+    // Mini activity heatmap for the share card: last 112 days as one level
+    // digit (0–4) per day, oldest first. Quartile thresholds over the window's
+    // nonzero days, mirroring the profile page's calendar.
+    const costByDate = new Map<string, number>();
+    for (const s of profile.submissions) {
+      for (const d of s.dailyBreakdown ?? []) {
+        if (!costByDate.has(d.date)) costByDate.set(d.date, d.totalCost);
+      }
+    }
+    const DAY_MS = 86_400_000;
+    const todayUtc = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    const windowCosts: number[] = [];
+    for (let i = 111; i >= 0; i--) {
+      const date = new Date(todayUtc - i * DAY_MS).toISOString().slice(0, 10);
+      windowCosts.push(costByDate.get(date) ?? 0);
+    }
+    const nonzero = windowCosts.filter((c) => c > 0).sort((a, b) => a - b);
+    const q = (p: number) => nonzero[Math.min(nonzero.length - 1, Math.floor(p * nonzero.length))] ?? 0;
+    const [q1, q2, q3] = [q(0.25), q(0.5), q(0.75)];
+    const heatmap = windowCosts
+      .map((c) => (c <= 0 ? 0 : c <= q1 ? 1 : c <= q2 ? 2 : c <= q3 ? 3 : 4))
+      .join("");
     const ogParams = new URLSearchParams({
       type: "profile",
       username: profile.githubUsername || profile.username,
@@ -76,6 +99,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     if (daysActive > 0) ogParams.set("days", String(daysActive));
     if (streak > 1) ogParams.set("streak", String(streak));
     if (tools.length > 0) ogParams.set("tools", tools.slice(0, 4).join(","));
+    if (nonzero.length > 0) ogParams.set("hm", heatmap);
     // Content fingerprint: the URL changes whenever the underlying stats do,
     // so the OG route can serve versioned responses as immutable and crawlers
     // still pick up fresh cards after each submission.
