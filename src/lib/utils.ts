@@ -50,6 +50,14 @@ export function toolBlurb(tool: string): string {
   return FEATURED_TOOLS.find((t) => t.key === tool.toLowerCase())?.blurb ?? `the ${toolLabel(tool)} CLI`;
 }
 
+/** "[openclaw] anthropic/claude-sonnet-4-20250514" → "claude-sonnet-4". */
+export function prettyModelName(raw: string): string {
+  let m = raw.replace(/^\[[^\]]+\]\s*/, ""); // "[openclaw] x/y" → "x/y"
+  m = m.split("/").pop() ?? m; // drop provider path
+  m = m.replace(/-\d{8}$/, ""); // drop date suffix
+  return m;
+}
+
 export function formatCurrency(num: number): string {
   return num.toLocaleString('en-US', {
     minimumFractionDigits: 2,

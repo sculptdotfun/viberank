@@ -11,12 +11,17 @@ import {
   Trophy,
   Cpu,
   Wrench,
+  Flame,
+  Award,
+  BarChart3,
 } from "lucide-react";
-import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl } from "@/lib/utils";
+import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelName } from "@/lib/utils";
 import { getTierProgress } from "@/lib/tiers";
+import { computeStreaks } from "@/lib/streaks";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
+import ActivityHeatmap from "@/components/ActivityHeatmap";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
@@ -75,6 +80,38 @@ export default async function ProfilePage({ params }: ProfileParams) {
   }, {} as Record<string, { date: string; cost: number; tokens: number }>);
   const dailySeries = Object.values(dailyMap);
 
+  // Streaks over days that actually have usage recorded.
+  const streaks = computeStreaks(Object.keys(dailyMap));
+
+  // Spend by weekday (Monday-first) and by calendar month, for the rhythm
+  // charts. Weekday comes from the date string itself (UTC, matching how
+  // ccusage buckets days).
+  const weekdayCost = new Array(7).fill(0) as number[];
+  const monthlyCost = new Map<string, number>();
+  for (const d of dailySeries) {
+    weekdayCost[new Date(`${d.date}T00:00:00Z`).getUTCDay()] += d.cost;
+    const month = d.date.slice(0, 7);
+    monthlyCost.set(month, (monthlyCost.get(month) ?? 0) + d.cost);
+  }
+  const WEEKDAYS = [
+    { label: "Mon", idx: 1 },
+    { label: "Tue", idx: 2 },
+    { label: "Wed", idx: 3 },
+    { label: "Thu", idx: 4 },
+    { label: "Fri", idx: 5 },
+    { label: "Sat", idx: 6 },
+    { label: "Sun", idx: 0 },
+  ];
+  const maxWeekdayCost = Math.max(...weekdayCost, 1);
+  const monthEntries = Array.from(monthlyCost.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-12);
+  const maxMonthCost = Math.max(...monthEntries.map(([, c]) => c), 1);
+  const monthLabel = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]} '${String(y).slice(2)}`;
+  };
+
   // Tools used across the profile (Claude sorts first).
   const tools = Array.from(new Set(submissions.flatMap((s) => s.tools ?? []))).sort();
 
@@ -126,12 +163,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
     return true;
   });
 
-  const prettyModel = (raw: string) => {
-    let m = raw.replace(/^\[[^\]]+\]\s*/, ""); // "[openclaw] x/y" → "x/y"
-    m = m.split("/").pop() ?? m; // drop provider path
-    m = m.replace(/-\d{8}$/, ""); // drop date suffix
-    return m;
-  };
+  const prettyModel = prettyModelName;
 
   const modelCost = new Map<string, number>();
   const modelDays = new Map<string, number>();
@@ -238,7 +270,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
           </div>
 
           {/* Key stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-surface-1 border border-border rounded-lg p-4">
               <p className="flex items-center gap-1.5 micro-label mb-1"><DollarSign className="w-3.5 h-3.5" />Total spent</p>
               <p className="text-xl font-bold font-mono text-accent">${formatNumber(totalCost)}</p>
@@ -258,6 +290,16 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <p className="flex items-center gap-1.5 micro-label mb-1"><Trophy className="w-3.5 h-3.5" />Global rank</p>
               <p className="text-xl font-bold">{globalRank ? `#${globalRank}` : "—"}</p>
               <p className="text-xs text-muted mt-1 truncate">{tools.length ? `${tools.map(toolLabel).slice(0, 2).join(", ")}${tools.length > 2 ? " +" + (tools.length - 2) : ""}` : "by cost"}</p>
+            </div>
+            <div className="bg-surface-1 border border-border rounded-lg p-4">
+              <p className="flex items-center gap-1.5 micro-label mb-1"><Flame className="w-3.5 h-3.5" />Streak</p>
+              <p className="text-xl font-bold font-mono">{streaks.current}<span className="text-sm text-muted font-sans">d</span></p>
+              <p className="text-xs text-muted mt-1">{streaks.current > 0 ? "active now" : "start one today"}</p>
+            </div>
+            <div className="bg-surface-1 border border-border rounded-lg p-4">
+              <p className="flex items-center gap-1.5 micro-label mb-1"><Award className="w-3.5 h-3.5" />Longest streak</p>
+              <p className="text-xl font-bold font-mono">{streaks.longest}<span className="text-sm text-muted font-sans">d</span></p>
+              <p className="text-xs text-muted mt-1">consecutive days</p>
             </div>
           </div>
 
@@ -297,6 +339,15 @@ export default async function ProfilePage({ params }: ProfileParams) {
 
         {/* Usage chart (client island) */}
         <UsageChart daily={dailySeries} />
+
+        {/* Activity heatmap */}
+        <div className="bg-surface-1 border border-border rounded-lg p-5 mb-4">
+          <h2 className="text-base font-medium mb-4 flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-accent" />
+            Activity
+          </h2>
+          <ActivityHeatmap daily={dailySeries} />
+        </div>
 
         {/* Token breakdown + insights */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -351,6 +402,58 @@ export default async function ProfilePage({ params }: ProfileParams) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Rhythm: weekday + monthly spend */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          <div className="bg-surface-1 border border-border rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-medium flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-accent" />
+                Most active days
+              </h2>
+              <span className="micro-label">by spend</span>
+            </div>
+            <div className="space-y-2.5">
+              {WEEKDAYS.map(({ label, idx }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <span className="w-8 text-xs text-muted font-mono">{label}</span>
+                  <div className="flex-1 bg-surface-3 rounded-full h-1.5">
+                    <div
+                      className="bg-accent h-1.5 rounded-full"
+                      style={{ width: `${Math.max((weekdayCost[idx] / maxWeekdayCost) * 100, weekdayCost[idx] > 0 ? 1 : 0)}%` }}
+                    />
+                  </div>
+                  <span className="w-16 text-right font-mono text-xs text-muted">${formatCurrency(weekdayCost[idx])}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {monthEntries.length > 0 && (
+            <div className="bg-surface-1 border border-border rounded-lg p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-medium flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-accent" />
+                  Monthly spend
+                </h2>
+                <span className="micro-label">last {monthEntries.length} months</span>
+              </div>
+              <div className="flex items-end gap-2 h-32">
+                {monthEntries.map(([month, cost]) => (
+                  <div key={month} className="flex-1 flex flex-col items-center gap-1.5 min-w-0" title={`${monthLabel(month)}: $${formatCurrency(cost)}`}>
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className="w-full bg-accent/80 rounded-t-sm"
+                        style={{ height: `${Math.max((cost / maxMonthCost) * 100, 2)}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-mono text-muted/70 truncate">{monthLabel(month)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Model + tool breakdown */}
