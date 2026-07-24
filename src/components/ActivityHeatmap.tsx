@@ -113,7 +113,7 @@ export default function ActivityHeatmap({ daily }: ActivityHeatmapProps) {
             ) : (
               <span
                 key={date}
-                title={`${date}: $${formatCurrency(cost)}`}
+                data-tip={`${date} · $${formatCurrency(cost)}`}
                 className={`w-full aspect-square rounded-[2px] ${LEVEL_CLASSES[level]}`}
               />
             )
