@@ -12,7 +12,7 @@ import Avatar from "./Avatar";
 import SponsorSlot from "./SponsorSlot";
 import TierBadge from "./TierBadge";
 import { TIERS } from "@/lib/tiers";
-import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
+import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, getGitHubAvatarUrl } from "@/lib/utils";
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
@@ -332,16 +332,22 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
               >
                 <div className="relative">
                   <div
-                    className={`rounded-full ${first ? "w-20 h-20" : "w-14 h-14"} overflow-hidden`}
+                    className={`rounded-full ${first ? "w-20 h-20" : "w-14 h-14"} overflow-hidden bg-surface-3`}
                     style={{ boxShadow: `0 0 0 2px ${medal}, 0 0 ${first ? 28 : 16}px ${medal}33` }}
                   >
-                    <Avatar
-                      src={s.githubAvatar}
-                      githubUsername={s.githubUsername}
-                      name={s.githubName || s.username}
-                      size={first ? "lg" : "md"}
-                      priority
-                      className="!w-full !h-full"
+                    {/* Plain img so it fills the medal ring exactly — Avatar
+                        carries its own fixed size classes. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={
+                        s.githubAvatar
+                          ? sizedAvatarUrl(s.githubAvatar, 160)
+                          : getGitHubAvatarUrl(s.githubUsername || s.username, 160)
+                      }
+                      alt={s.githubUsername || s.username}
+                      loading="eager"
+                      decoding="async"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                   <span
