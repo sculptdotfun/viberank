@@ -102,7 +102,7 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
           height="460"
           viewBox="0 0 24 24"
           fill="none"
-          style={{ position: 'absolute', right: -60, bottom: -90, opacity: 0.07 }}
+          style={{ position: 'absolute', right: -170, bottom: -200, opacity: 0.05 }}
         >
           <rect x="3" y="14" width="5" height="7" rx="1" fill={tier.color} opacity="0.5" />
           <rect x="9.5" y="8" width="5" height="13" rx="1" fill={tier.color} opacity="0.75" />
@@ -138,11 +138,19 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                   borderRadius: 14,
                 }}
               >
-                <span style={{ fontSize: 46, fontWeight: 700, color: '#f97316', fontFamily: 'Geist Mono' }}>
+                <span style={{ fontSize: 40, fontWeight: 700, color: '#f97316', fontFamily: 'Geist Mono' }}>
                   #{rank}
                 </span>
-                <span style={{ fontSize: 19, color: '#9a9aa5', fontFamily: 'Geist Mono', letterSpacing: 3 }}>
-                  GLOBAL
+                <span
+                  style={{
+                    fontSize: 40,
+                    fontWeight: 700,
+                    color: '#c4c4cf',
+                    fontFamily: 'Geist Mono',
+                    letterSpacing: 1,
+                  }}
+                >
+                  GLOBAL RANK
                 </span>
               </div>
             )}
