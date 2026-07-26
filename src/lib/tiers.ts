@@ -11,18 +11,24 @@ export interface Tier {
   min: number;
   /** Text color on dark surfaces. */
   color: string;
+  /**
+   * Text color on light surfaces. The dark-surface colors are tuned for
+   * contrast against #0a0a0c, so the brighter tiers — Blaze at #fbbf24,
+   * Supernova at #dbeafe — wash out or vanish on white.
+   */
+  colorOnLight: string;
   /** Translucent badge background. */
   soft: string;
 }
 
 // Ascending order — getTier walks this from the top down.
 export const TIERS: Tier[] = [
-  { key: "spark", name: "Spark", glyph: "✧", min: 0, color: "#9aa0a8", soft: "rgba(154, 160, 168, 0.12)" },
-  { key: "ember", name: "Ember", glyph: "✦", min: 100, color: "#c2703f", soft: "rgba(194, 112, 63, 0.14)" },
-  { key: "flame", name: "Flame", glyph: "◆", min: 1_000, color: "#f97316", soft: "rgba(249, 115, 22, 0.14)" },
-  { key: "blaze", name: "Blaze", glyph: "❖", min: 5_000, color: "#fbbf24", soft: "rgba(251, 191, 36, 0.13)" },
-  { key: "inferno", name: "Inferno", glyph: "✶", min: 15_000, color: "#f87171", soft: "rgba(248, 113, 113, 0.13)" },
-  { key: "supernova", name: "Supernova", glyph: "✺", min: 50_000, color: "#dbeafe", soft: "rgba(191, 219, 254, 0.14)" },
+  { key: "spark", name: "Spark", glyph: "✧", min: 0, color: "#9aa0a8", colorOnLight: "#52525b", soft: "rgba(154, 160, 168, 0.12)" },
+  { key: "ember", name: "Ember", glyph: "✦", min: 100, color: "#c2703f", colorOnLight: "#92400e", soft: "rgba(194, 112, 63, 0.14)" },
+  { key: "flame", name: "Flame", glyph: "◆", min: 1_000, color: "#f97316", colorOnLight: "#c2410c", soft: "rgba(249, 115, 22, 0.14)" },
+  { key: "blaze", name: "Blaze", glyph: "❖", min: 5_000, color: "#fbbf24", colorOnLight: "#b45309", soft: "rgba(251, 191, 36, 0.13)" },
+  { key: "inferno", name: "Inferno", glyph: "✶", min: 15_000, color: "#f87171", colorOnLight: "#dc2626", soft: "rgba(248, 113, 113, 0.13)" },
+  { key: "supernova", name: "Supernova", glyph: "✺", min: 50_000, color: "#dbeafe", colorOnLight: "#1d4ed8", soft: "rgba(191, 219, 254, 0.14)" },
 ];
 
 export function getTier(totalCost: number): Tier {

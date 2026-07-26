@@ -61,6 +61,28 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
   // rendered column-per-week like the profile heatmap.
   const hm = (searchParams.get('hm') || '').replace(/[^0-4]/g, '').slice(0, 112);
   const tier = getTier(cost);
+  // Dark stays the default — the card is mostly seen as a social preview, and
+  // that is what every existing share URL renders. `theme=light` exists so the
+  // same card can sit in a light-mode README without punching an opaque black
+  // rectangle into the page.
+  const light = searchParams.get('theme') === 'light';
+  const c = {
+    bg: light ? '#ffffff' : '#0a0a0c',
+    // Gradient stops fade to the page colour, not to transparent black.
+    bgFade: light ? 'rgba(255,255,255,0)' : 'rgba(10,10,12,0)',
+    fg: light ? '#09090b' : '#fafafa',
+    muted: light ? '#52525b' : '#9a9aa5',
+    badgeLabel: light ? '#3f3f46' : '#c4c4cf',
+    surface: light ? '#f4f4f5' : '#16161a',
+    border: light ? '#e4e4e7' : '#26262d',
+    heatEmpty: light ? '#ebedf0' : '#1e1e23',
+    // orange-500 is only ~3:1 on white, so light mode drops to orange-600.
+    accent: light ? '#ea580c' : '#f97316',
+    accentSoft: light ? 'rgba(234, 88, 12, 0.10)' : 'rgba(249, 115, 22, 0.10)',
+    accentBorder: light ? 'rgba(234, 88, 12, 0.35)' : 'rgba(249, 115, 22, 0.35)',
+    tier: light ? tier.colorOnLight : tier.color,
+    watermark: light ? 0.06 : 0.05,
+  };
   const costLabel =
     cost >= 1000 ? `$${(cost / 1000).toFixed(cost >= 10000 ? 0 : 1)}K` : `$${Math.round(cost)}`;
   const fonts = await getFonts();
@@ -71,7 +93,7 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
       <span
         style={{
           fontSize: 19,
-          color: '#9a9aa5',
+          color: c.muted,
           fontFamily: 'Geist Mono',
           letterSpacing: 3,
           marginTop: 4,
@@ -90,8 +112,8 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
           width: '100%',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: '#0a0a0c',
-          backgroundImage: `radial-gradient(circle at 85% 8%, ${tier.soft.replace('0.1', '0.2')} 0%, rgba(10,10,12,0) 45%), radial-gradient(circle at 0% 100%, rgba(249,115,22,0.10) 0%, rgba(10,10,12,0) 40%)`,
+          backgroundColor: c.bg,
+          backgroundImage: `radial-gradient(circle at 85% 8%, ${tier.soft.replace('0.1', '0.2')} 0%, ${c.bgFade} 45%), radial-gradient(circle at 0% 100%, rgba(249,115,22,0.10) 0%, ${c.bgFade} 40%)`,
           fontFamily: 'Geist',
           position: 'relative',
         }}
@@ -102,11 +124,11 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
           height="460"
           viewBox="0 0 24 24"
           fill="none"
-          style={{ position: 'absolute', right: -170, bottom: -200, opacity: 0.05 }}
+          style={{ position: 'absolute', right: -170, bottom: -200, opacity: c.watermark }}
         >
-          <rect x="3" y="14" width="5" height="7" rx="1" fill={tier.color} opacity="0.5" />
-          <rect x="9.5" y="8" width="5" height="13" rx="1" fill={tier.color} opacity="0.75" />
-          <rect x="16" y="3" width="5" height="18" rx="1" fill={tier.color} />
+          <rect x="3" y="14" width="5" height="7" rx="1" fill={c.tier} opacity="0.5" />
+          <rect x="9.5" y="8" width="5" height="13" rx="1" fill={c.tier} opacity="0.75" />
+          <rect x="16" y="3" width="5" height="18" rx="1" fill={c.tier} />
         </svg>
 
         <div
@@ -122,7 +144,7 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <Logo size={40} />
-              <span style={{ fontSize: 34, fontWeight: 700, color: '#fafafa', fontFamily: 'Geist Mono' }}>
+              <span style={{ fontSize: 34, fontWeight: 700, color: c.fg, fontFamily: 'Geist Mono' }}>
                 viberank
               </span>
             </div>
@@ -133,19 +155,19 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                   alignItems: 'baseline',
                   gap: 12,
                   padding: '10px 30px',
-                  backgroundColor: 'rgba(249, 115, 22, 0.10)',
-                  border: '1px solid rgba(249, 115, 22, 0.35)',
+                  backgroundColor: c.accentSoft,
+                  border: `1px solid ${c.accentBorder}`,
                   borderRadius: 14,
                 }}
               >
-                <span style={{ fontSize: 40, fontWeight: 700, color: '#f97316', fontFamily: 'Geist Mono' }}>
+                <span style={{ fontSize: 40, fontWeight: 700, color: c.accent, fontFamily: 'Geist Mono' }}>
                   #{rank}
                 </span>
                 <span
                   style={{
                     fontSize: 40,
                     fontWeight: 700,
-                    color: '#c4c4cf',
+                    color: c.badgeLabel,
                     fontFamily: 'Geist Mono',
                     letterSpacing: 1,
                   }}
@@ -168,13 +190,13 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                 height={172}
                 style={{
                   borderRadius: 86,
-                  border: `5px solid ${tier.color}`,
+                  border: `5px solid ${c.tier}`,
                   boxShadow: `0 0 60px ${tier.soft.replace('0.1', '0.5')}`,
                 }}
               />
             ) : null}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <span style={{ fontSize: 72, fontWeight: 700, color: '#fafafa', lineHeight: 1 }}>
+              <span style={{ fontSize: 72, fontWeight: 700, color: c.fg, lineHeight: 1 }}>
                 {username}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -184,13 +206,13 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                     padding: '8px 22px',
                     borderRadius: 10,
                     backgroundColor: tier.soft,
-                    border: `1px solid ${tier.color}`,
+                    border: `1px solid ${c.tier}`,
                   }}
                 >
                   <span
                     style={{
                       fontSize: 24,
-                      color: tier.color,
+                      color: c.tier,
                       fontWeight: 700,
                       letterSpacing: 6,
                       fontFamily: 'Geist Mono',
@@ -206,11 +228,11 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                       display: 'flex',
                       padding: '8px 18px',
                       borderRadius: 10,
-                      backgroundColor: '#16161a',
-                      border: '1px solid #26262d',
+                      backgroundColor: c.surface,
+                      border: `1px solid ${c.border}`,
                     }}
                   >
-                    <span style={{ fontSize: 20, color: '#9a9aa5', fontFamily: 'Geist Mono' }}>{t}</span>
+                    <span style={{ fontSize: 20, color: c.muted, fontFamily: 'Geist Mono' }}>{t}</span>
                   </div>
                 ))}
               </div>
@@ -225,11 +247,11 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                     {Array.from({ length: 7 }, (_, d) => {
                       const level = Number(hm[w * 7 + d] ?? 0);
                       const fill = [
-                        '#1e1e23',
+                        c.heatEmpty,
                         'rgba(249,115,22,0.25)',
                         'rgba(249,115,22,0.45)',
                         'rgba(249,115,22,0.7)',
-                        '#f97316',
+                        c.accent,
                       ][level];
                       return (
                         <div
@@ -241,7 +263,7 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                   </div>
                 ))}
               </div>
-              <span style={{ fontSize: 15, color: '#9a9aa5', fontFamily: 'Geist Mono', letterSpacing: 2 }}>
+              <span style={{ fontSize: 15, color: c.muted, fontFamily: 'Geist Mono', letterSpacing: 2 }}>
                 LAST 16 WEEKS
               </span>
             </div>
@@ -251,10 +273,10 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
           {/* stats + CTA */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: streak ? 56 : 72 }}>
-              {stat(costLabel, 'AI CODING USAGE', '#f97316')}
-              {tokens ? stat(tokens, 'TOKENS', '#fafafa') : null}
-              {days ? stat(days, 'ACTIVE DAYS', '#fafafa') : null}
-              {streak ? stat(`${streak}d`, 'STREAK', tier.color) : null}
+              {stat(costLabel, 'AI CODING USAGE', c.accent)}
+              {tokens ? stat(tokens, 'TOKENS', c.fg) : null}
+              {days ? stat(days, 'ACTIVE DAYS', c.fg) : null}
+              {streak ? stat(`${streak}d`, 'STREAK', c.tier) : null}
             </div>
             <div
               style={{
@@ -262,13 +284,13 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                 alignItems: 'center',
                 gap: 10,
                 padding: '12px 24px',
-                backgroundColor: '#16161a',
-                border: '1px solid #26262d',
+                backgroundColor: c.surface,
+                border: `1px solid ${c.border}`,
                 borderRadius: 10,
               }}
             >
-              <span style={{ fontSize: 22, color: '#9a9aa5', fontFamily: 'Geist Mono' }}>$</span>
-              <span style={{ fontSize: 22, color: '#f97316', fontFamily: 'Geist Mono', fontWeight: 700 }}>
+              <span style={{ fontSize: 22, color: c.muted, fontFamily: 'Geist Mono' }}>$</span>
+              <span style={{ fontSize: 22, color: c.accent, fontFamily: 'Geist Mono', fontWeight: 700 }}>
                 npx viberank-cli
               </span>
             </div>
@@ -281,7 +303,7 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
             display: 'flex',
             height: 8,
             width: '100%',
-            backgroundImage: `linear-gradient(90deg, #f97316 0%, ${tier.color} 100%)`,
+            backgroundImage: `linear-gradient(90deg, ${c.accent} 0%, ${c.tier} 100%)`,
           }}
         />
       </div>
