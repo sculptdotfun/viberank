@@ -174,13 +174,16 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
 // SUPABASE SUBMISSIONS SERVICE
 // ============================================================================
 
-class SupabaseSubmissionsService implements SubmissionsService {
+export class SupabaseSubmissionsService implements SubmissionsService {
   private client: SupabaseClient;
-  private rateLimiter: SupabaseRateLimiter;
+  private rateLimiter: Pick<SupabaseRateLimiter, "checkLimit">;
 
-  constructor(client: SupabaseClient) {
+  constructor(
+    client: SupabaseClient,
+    rateLimiter: Pick<SupabaseRateLimiter, "checkLimit"> = new SupabaseRateLimiter(client)
+  ) {
     this.client = client;
-    this.rateLimiter = new SupabaseRateLimiter(client);
+    this.rateLimiter = rateLimiter;
   }
 
   async submit(data: SubmitData): Promise<string> {
@@ -215,7 +218,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     // Check for existing submission with overlapping date range
     // Use ilike for case-insensitive username matching
-    const { data: existingSubmissions } = await this.client
+    const { data: existingSubmissions, error: existingSubmissionsError } = await this.client
       .from("submissions")
       .select("*")
       .ilike("username", data.username)
@@ -224,6 +227,13 @@ class SupabaseSubmissionsService implements SubmissionsService {
         `and(date_range_start.lte.${dateRangeEnd},date_range_end.gte.${dateRangeStart})`
       )
       .limit(1);
+
+    if (existingSubmissionsError) {
+      throw new Error(
+        "Failed to query existing submissions: " + existingSubmissionsError.message
+      );
+    }
+    
 
     // Identify the contributing machine so overlapping dates from distinct
     // machines sum while a same-machine re-submit replaces only its slice (#43).
@@ -256,8 +266,14 @@ class SupabaseSubmissionsService implements SubmissionsService {
       );
     }
 
-    // Update or create profile
-    await this.updateProfile(data, submissionId, !existingSubmissions?.length);
+    // The submission is already durable at this point. A profile projection
+    // failure must be logged, but must not turn an accepted submission into a
+    // client-visible failure that encourages a duplicate retry.
+    try {
+      await this.updateProfile(data, submissionId, !existingSubmissions?.length);
+    } catch (error) {
+      console.error("Profile update failed after submission was accepted:", error);
+    }
 
     return submissionId;
   }
@@ -278,20 +294,23 @@ class SupabaseSubmissionsService implements SubmissionsService {
     tools: string[],
     machineId: string
   ): Promise<string> {
-    // Get existing daily breakdowns
-    const { data: existingDaily } = await this.client
+    const { data: existingDaily, error: existingDailyError } = await this.client
       .from("daily_breakdowns")
       .select("*")
       .eq("submission_id", existing.id);
 
-    // Create a map of existing daily data
+    if (existingDailyError) {
+      throw new Error(
+        "Failed to query existing daily breakdowns: " + existingDailyError.message
+      );
+    }
+
     const dailyMap = new Map<string, DbDailyBreakdown>();
     (existingDaily || []).forEach((day) => dailyMap.set(day.date, day));
 
-    // Fold each incoming day into the existing per-machine map. A day from a new
-    // machine adds a slice (sums); a re-submit from the same machine replaces
-    // only its own slice (no double-count). #43
-    for (const day of data.ccData.daily) {
+    // Build every replacement row in memory, then write the incoming history
+    // in one request against the unique (submission_id, date) constraint.
+    const dailyRows = data.ccData.daily.map((day) => {
       const prior = dailyMap.get(day.date);
       const { contributions, aggregate } = mergeMachineContribution(
         prior?.machine_contributions ?? null,
@@ -314,18 +333,18 @@ class SupabaseSubmissionsService implements SubmissionsService {
         machine_contributions: contributions,
       };
 
-      if (prior) {
-        // Update existing
-        await this.client
-          .from("daily_breakdowns")
-          .update(dailyData)
-          .eq("submission_id", existing.id)
-          .eq("date", day.date);
-      } else {
-        // Insert new
-        await this.client.from("daily_breakdowns").insert(dailyData);
-      }
       dailyMap.set(day.date, dailyData as DbDailyBreakdown);
+      return dailyData;
+    });
+
+    const { error: dailyUpsertError } = await this.client
+      .from("daily_breakdowns")
+      .upsert(dailyRows, { onConflict: "submission_id,date" });
+
+    if (dailyUpsertError) {
+      throw new Error(
+        "Failed to update daily breakdowns: " + dailyUpsertError.message
+      );
     }
 
     // Recalculate totals from all daily data
@@ -362,8 +381,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
       new Set([...(existing.tools || []), ...tools])
     ).sort();
 
-    // Update submission
-    await this.client
+    const { error: submissionUpdateError } = await this.client
       .from("submissions")
       .update({
         github_username: data.githubUsername,
@@ -384,6 +402,12 @@ class SupabaseSubmissionsService implements SubmissionsService {
         source: data.source,
       })
       .eq("id", existing.id);
+
+    if (submissionUpdateError) {
+      throw new Error(
+        "Failed to update existing submission: " + submissionUpdateError.message
+      );
+    }
 
     return existing.id;
   }
@@ -460,14 +484,19 @@ class SupabaseSubmissionsService implements SubmissionsService {
     submissionId: string,
     isNewSubmission: boolean
   ): Promise<void> {
-    const { data: existingProfile } = await this.client
+    const { data: existingProfile, error: profileQueryError } = await this.client
       .from("profiles")
       .select("*")
       .eq("username", data.username)
       .single();
 
+    // PostgREST uses PGRST116 for an expected zero-row .single() result.
+    if (profileQueryError && profileQueryError.code !== "PGRST116") {
+      throw new Error("Failed to query profile: " + profileQueryError.message);
+    }
+
     if (existingProfile) {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         best_submission_id: submissionId,
         github_username: data.githubUsername,
         github_name: data.githubName,
@@ -478,12 +507,16 @@ class SupabaseSubmissionsService implements SubmissionsService {
         updates.total_submissions = existingProfile.total_submissions + 1;
       }
 
-      await this.client
+      const { error: profileUpdateError } = await this.client
         .from("profiles")
         .update(updates)
         .eq("id", existingProfile.id);
+
+      if (profileUpdateError) {
+        throw new Error("Failed to update profile: " + profileUpdateError.message);
+      }
     } else {
-      await this.client.from("profiles").insert({
+      const { error: profileInsertError } = await this.client.from("profiles").insert({
         username: data.username,
         github_username: data.githubUsername,
         github_name: data.githubName,
@@ -491,6 +524,10 @@ class SupabaseSubmissionsService implements SubmissionsService {
         total_submissions: 1,
         best_submission_id: submissionId,
       });
+
+      if (profileInsertError) {
+        throw new Error("Failed to create profile: " + profileInsertError.message);
+      }
     }
   }
 

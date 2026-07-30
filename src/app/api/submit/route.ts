@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       backend,
     });
 
-    // Submit using data layer with timeout handling
+    // Submit using the server-side data layer.
     let submissionId;
     try {
       const dataLayer = await getServerDataLayer();
@@ -172,7 +172,11 @@ export async function POST(request: NextRequest) {
       // uploads and older CLIs omit it and fall back to a shared bucket.
       const machineId = request.headers.get("X-Machine-Id") || undefined;
 
-      const submissionPromise = dataLayer.submissions.submit({
+      // Await the database operation directly. The previous 25-second
+      // Promise.race could report failure while its uncancelled writes kept
+      // running and committed. The merge path is bulked in the data layer so
+      // long histories no longer need a per-day request loop.
+      submissionId = await dataLayer.submissions.submit({
         username: githubUsername,
         githubUsername: githubUsername,
         githubName,
@@ -183,12 +187,6 @@ export async function POST(request: NextRequest) {
         ccData: ccData,
       });
 
-      // Add a timeout of 25 seconds (Vercel has a 30 second timeout for API routes)
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Database operation timed out")), 25000)
-      );
-
-      submissionId = await Promise.race([submissionPromise, timeoutPromise]);
 
       // Archive the original payload for future re-parse/backfill. Best
       // effort — never blocks or fails an accepted submission.
@@ -296,9 +294,6 @@ export async function POST(request: NextRequest) {
         "exceed realistic limits",
         "Cost per token ratio is unrealistic",
         "Token components don't sum correctly",
-        "Failed to query existing submissions",
-        "Failed to update existing submission",
-        "Failed to create new submission"
       ];
 
       if (validationErrors.some(msg => error.message.includes(msg))) {
@@ -309,8 +304,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check for timeout or database-specific errors
-      if (error.message.includes("timeout") || error.message.includes("deadline")) {
+      // Database clients use both "timeout" and "timed out" spellings.
+      if (/timeout|timed out|deadline/i.test(error.message)) {
         return NextResponse.json(
           { error: "Request timed out. Please try again or submit smaller batches of data." },
           { status: 504 }
