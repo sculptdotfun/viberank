@@ -586,16 +586,35 @@ class SupabaseSubmissionsService implements SubmissionsService {
     }
 
     const submissionIds = submissions.map((s) => s.id);
-    const { data: allDailyBreakdowns } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .in("submission_id", submissionIds)
-      .gte("date", params.dateFrom)
-      .lte("date", params.dateTo)
-      .limit(50000);
+
+    // PostgREST caps rows server-side (`db-max-rows`), so a single .limit() is
+    // silently truncated on wider windows. Truncation isn't a partial total —
+    // a submission whose rows fall past the cut ends up with zero daily rows and
+    // is skipped by the `filteredDaily.length === 0` guard below, so the user
+    // disappears from the board entirely. Without an .order() it's also
+    // arbitrary which submissions survive. Page through with a stable order.
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 200; // 200k rows — well past any real range, but bounded
+    const allDailyBreakdowns: DbDailyBreakdown[] = [];
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const from = page * PAGE_SIZE;
+      const { data: rows } = await this.client
+        .from("daily_breakdowns")
+        .select("*")
+        .in("submission_id", submissionIds)
+        .gte("date", params.dateFrom)
+        .lte("date", params.dateTo)
+        .order("submission_id", { ascending: true })
+        .order("date", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (!rows || rows.length === 0) break;
+      allDailyBreakdowns.push(...rows);
+      if (rows.length < PAGE_SIZE) break;
+    }
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    (allDailyBreakdowns || []).forEach((db) => {
+    allDailyBreakdowns.forEach((db) => {
       const existing = dailyBySubmission.get(db.submission_id) || [];
       existing.push(db);
       dailyBySubmission.set(db.submission_id, existing);
