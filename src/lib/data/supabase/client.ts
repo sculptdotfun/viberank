@@ -291,6 +291,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
     // Fold each incoming day into the existing per-machine map. A day from a new
     // machine adds a slice (sums); a re-submit from the same machine replaces
     // only its own slice (no double-count). #43
+    const pendingRows: Record<string, unknown>[] = [];
     for (const day of data.ccData.daily) {
       const prior = dailyMap.get(day.date);
       const { contributions, aggregate } = mergeMachineContribution(
@@ -314,18 +315,22 @@ class SupabaseSubmissionsService implements SubmissionsService {
         machine_contributions: contributions,
       };
 
-      if (prior) {
-        // Update existing
-        await this.client
-          .from("daily_breakdowns")
-          .update(dailyData)
-          .eq("submission_id", existing.id)
-          .eq("date", day.date);
-      } else {
-        // Insert new
-        await this.client.from("daily_breakdowns").insert(dailyData);
-      }
+      // Collect and write once below. Writing per day cost one round-trip per
+      // day, so a long history (270+ days) could exceed the route's timeout.
+      pendingRows.push(dailyData);
       dailyMap.set(day.date, dailyData as DbDailyBreakdown);
+    }
+
+    // One upsert for every day instead of one round-trip each. `daily_breakdowns`
+    // has UNIQUE(submission_id, date), so this covers both the update and the
+    // insert branch. Chunked to keep any single request a reasonable size.
+    const UPSERT_CHUNK = 500;
+    for (let i = 0; i < pendingRows.length; i += UPSERT_CHUNK) {
+      const chunk = pendingRows.slice(i, i + UPSERT_CHUNK);
+      const { error: upsertError } = await this.client
+        .from("daily_breakdowns")
+        .upsert(chunk, { onConflict: "submission_id,date" });
+      if (upsertError) throw upsertError;
     }
 
     // Recalculate totals from all daily data
