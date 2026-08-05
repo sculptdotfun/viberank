@@ -98,6 +98,7 @@ interface DbProfile {
   total_submissions: number;
   best_submission_id: string | null;
   open_to_work: boolean | null;
+  open_to_work_email: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1234,6 +1235,7 @@ export class SupabaseProfilesService implements ProfilesService {
       totalSubmissions: profile.total_submissions,
       bestSubmission: profile.best_submission_id || undefined,
       openToWork: profile.open_to_work || false,
+      openToWorkEmail: profile.open_to_work_email || undefined,
       createdAt: new Date(profile.created_at).getTime(),
       submissions: (submissions || []).map((s) =>
         convertDbSubmissionToSubmission(s, dailyBySubmission.get(s.id) || [])
@@ -1243,11 +1245,15 @@ export class SupabaseProfilesService implements ProfilesService {
 
   async setOpenToWork(
     githubUsername: string,
-    open: boolean
+    open: boolean,
+    workEmail?: string | null
   ): Promise<{ success: boolean; error?: string }> {
     const { data, error } = await this.client
       .from("profiles")
-      .update({ open_to_work: open })
+      .update({
+        open_to_work: open,
+        open_to_work_email: open ? workEmail ?? null : null,
+      })
       .ilike("github_username", githubUsername)
       .select("id");
 
@@ -1299,6 +1305,7 @@ export class SupabaseProfilesService implements ProfilesService {
           tools: best.tools && best.tools.length > 0 ? best.tools : ["claude"],
           rank: costs.length > 0 ? costs.filter((c) => c > bestCost).length + 1 : null,
           verified: best.verified,
+          workEmail: p.open_to_work_email || undefined,
         };
       })
       .sort((a, b) => b.bestCost - a.bestCost);

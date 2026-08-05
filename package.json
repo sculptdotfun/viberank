@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node test/ccusage.test.mts && node test/streaks.test.mts && node --import tsx test/submissions.test.mts"
+    "test": "for f in test/*.test.mts; do echo \"\n--- $f ---\"; node --import tsx \"$f\" || exit 1; done"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

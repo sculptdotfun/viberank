@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Github, BadgeCheck, BriefcaseBusiness } from "lucide-react";
+import { Github, BadgeCheck, BriefcaseBusiness, Mail } from "lucide-react";
 import { getServerDataLayer } from "@/lib/data";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl } from "@/lib/utils";
+import { buildWorkEmailHref } from "@/lib/open-to-work";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import TierBadge from "@/components/TierBadge";
@@ -69,59 +70,83 @@ export default async function HirePage() {
               <div className="hidden sm:block w-28">Tier</div>
               <div className="w-24 text-right">Usage</div>
               <div className="w-20 text-right hidden sm:block">Rank</div>
+              <div className="w-24 text-right">Contact</div>
             </div>
             <div className="divide-y divide-border-subtle">
               {listings.map((l) => (
-                <Link
+                <div
                   key={l.githubUsername}
-                  href={`/profile/${encodeURIComponent(l.githubUsername)}`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors group"
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {l.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={sizedAvatarUrl(l.avatar, 80)}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 rounded-full ring-2 ring-emerald-500/40"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center">
-                        <BriefcaseBusiness className="w-4 h-4 text-muted" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium group-hover:text-accent transition-colors truncate">
-                          {l.githubUsername}
-                        </span>
-                        {l.verified && <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />}
-                        <Github className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {l.tools.map((t) => (
-                          <span key={t} className="text-[10px] font-mono text-muted">
-                            {toolLabel(t)}
+                  <Link
+                    href={`/profile/${encodeURIComponent(l.githubUsername)}`}
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {l.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={sizedAvatarUrl(l.avatar, 80)}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="w-10 h-10 rounded-full ring-2 ring-emerald-500/40"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center">
+                          <BriefcaseBusiness className="w-4 h-4 text-muted" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium group-hover:text-accent transition-colors truncate">
+                            {l.githubUsername}
                           </span>
-                        ))}
+                          {l.verified && <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />}
+                          <Github className="w-3.5 h-3.5 text-muted flex-shrink-0" />
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {l.tools.map((t) => (
+                            <span key={t} className="text-[10px] font-mono text-muted">
+                              {toolLabel(t)}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="hidden sm:block w-28 flex-shrink-0">
-                    <TierBadge totalCost={l.bestCost} size="xs" bare />
-                  </div>
-                  <div className="w-24 text-right flex-shrink-0">
-                    <span className="text-sm font-mono font-semibold text-accent">
-                      ${formatCurrency(l.bestCost)}
-                    </span>
-                    <div className="text-[10px] font-mono text-muted">{formatNumber(l.totalTokens)} tok</div>
-                  </div>
-                  <div className="w-20 text-right flex-shrink-0 hidden sm:block">
-                    {l.rank && <span className="text-sm font-mono text-muted">#{l.rank}</span>}
-                  </div>
-                </Link>
+                    <div className="hidden sm:block w-28 flex-shrink-0">
+                      <TierBadge totalCost={l.bestCost} size="xs" bare />
+                    </div>
+                    <div className="w-24 text-right flex-shrink-0">
+                      <span className="text-sm font-mono font-semibold text-accent">
+                        ${formatCurrency(l.bestCost)}
+                      </span>
+                      <div className="text-[10px] font-mono text-muted">{formatNumber(l.totalTokens)} tok</div>
+                    </div>
+                    <div className="w-20 text-right flex-shrink-0 hidden sm:block">
+                      {l.rank && <span className="text-sm font-mono text-muted">#{l.rank}</span>}
+                    </div>
+                  </Link>
+                  {l.workEmail ? (
+                    <a
+                      href={buildWorkEmailHref(l.workEmail)}
+                      className="inline-flex w-24 flex-shrink-0 items-center justify-end gap-1.5 text-xs font-mono text-emerald-400 transition-colors hover:text-emerald-300"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Email
+                    </a>
+                  ) : (
+                    <a
+                      href={`https://github.com/${l.githubUsername}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-24 flex-shrink-0 items-center justify-end gap-1.5 text-xs font-mono text-muted transition-colors hover:text-accent"
+                    >
+                      <Github className="w-3.5 h-3.5" />
+                      GitHub
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -138,7 +163,7 @@ export default async function HirePage() {
 
         <p className="text-xs text-muted mt-8">
           For engineers: opt in or out anytime from your profile — it&apos;s a single toggle, visible only
-          as this list and a badge. We never share emails; companies reach you via your GitHub.
+          as this list and a badge. Add a contact email if you want companies to skip GitHub DMs.
         </p>
       </div>
 
