@@ -16,6 +16,7 @@ const staticEntries: MetadataRoute.Sitemap = [
   ...toolEntries,
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
+  { url: `${SITE}/calculator`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
   { url: `${SITE}/blog`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
   { url: `${SITE}/blog/what-is-tokenmaxxing`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },
   { url: `${SITE}/blog/codex-token-usage-leaderboard`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },

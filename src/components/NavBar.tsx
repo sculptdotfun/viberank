@@ -41,6 +41,7 @@ export default function NavBar() {
 
   const navItems = [
     { name: "Stats", href: "/stats" },
+    { name: "Calculator", href: "/calculator" },
     { name: "Blog", href: "/blog" },
     { name: "Hire", href: "/hire" },
     ...(isAdmin ? [{ name: "Admin", href: "/admin" }] : []),
