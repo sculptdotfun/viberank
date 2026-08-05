@@ -138,6 +138,14 @@ pnpm dev
 
 Open <http://localhost:3000>.
 
+For local visual QA without a Supabase project, enable the built-in demo data:
+
+```bash
+NEXT_PUBLIC_VIBERANK_DEMO_DATA=1 pnpm dev
+```
+
+Demo data is read-only and only intended to render realistic leaderboard, profile, model-list, and hire-page states during UI review.
+
 ### Useful scripts
 
 | Command | What it does |
@@ -146,7 +154,7 @@ Open <http://localhost:3000>.
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | Run `next lint` |
-| `pnpm test` | Run the ccusage normalization/validation tests (`node test/ccusage.test.mts`; pass a `cc.json` path to also test real data) |
+| `pnpm test` | Run the ccusage and data-layer tests (`node test/ccusage.test.mts`; pass a `cc.json` path to also test real data) |
 | `pnpm exec tsc --noEmit` | Type-check without emitting |
 
 ## Tech stack
