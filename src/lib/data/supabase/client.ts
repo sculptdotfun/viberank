@@ -222,6 +222,41 @@ async function fetchAllPages<T>(
   return all;
 }
 
+/**
+ * `.in("col", ids)` is serialised into the query string, so a large id list
+ * builds a URL the server refuses. Measured against production: ~350 UUIDs is
+ * the ceiling, and past it the request fails outright rather than degrading.
+ *
+ * That failure was invisible — callers destructured `{ data }` and read a
+ * null as "no rows", so `getGlobalStats` silently reported 0 days tracked and
+ * the date-range leaderboard returned an empty board. Chunk well under the
+ * limit and page each chunk.
+ */
+const IN_FILTER_CHUNK = 200;
+
+async function fetchAllByIds<T>(
+  ids: string[],
+  buildPage: (
+    chunk: string[],
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  context: string
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+
+  const all: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_FILTER_CHUNK) {
+    const chunk = ids.slice(i, i + IN_FILTER_CHUNK);
+    const rows = await fetchAllPages<T>(
+      (from, to) => buildPage(chunk, from, to),
+      context
+    );
+    all.push(...rows);
+  }
+  return all;
+}
+
 // ============================================================================
 // SUPABASE SUBMISSIONS SERVICE
 // ============================================================================
@@ -671,29 +706,31 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // covers a submission's full range, not the requested window) so we have
     // to aggregate `daily_breakdowns`. Push the range filter down to the DB:
     // only fetch submissions whose date_range overlaps the requested window.
-    // Hard cap of 5000 is a safety belt — viberank has ~hundreds of rows.
-    const SUBMISSION_CAP = 5000;
-    let query = this.client
-      .from("submissions")
-      .select("*")
-      .lte("date_range_start", params.dateTo)
-      .gte("date_range_end", params.dateFrom);
+    // A `.limit(5000)` here was silently served as 1000 by db-max-rows, so
+    // submissions past the first thousand were never considered at all. Page it.
+    const submissions = await fetchAllPages<DbSubmission>((from, to) => {
+      let query = this.client
+        .from("submissions")
+        .select("*")
+        .lte("date_range_start", params.dateTo)
+        .gte("date_range_end", params.dateFrom);
 
-    if (!includeFlagged) {
-      query = query.or("flagged_for_review.is.null,flagged_for_review.eq.false");
-    }
+      if (!includeFlagged) {
+        query = query.or("flagged_for_review.is.null,flagged_for_review.eq.false");
+      }
 
-    if (params.tool) {
-      query = query.contains("tools", [params.tool]);
-    }
+      if (params.tool) {
+        query = query.contains("tools", [params.tool]);
+      }
 
-    if (params.verifiedOnly) {
-      query = query.eq("verified", true);
-    }
+      if (params.verifiedOnly) {
+        query = query.eq("verified", true);
+      }
 
-    const { data: submissions } = await query.limit(SUBMISSION_CAP);
+      return query.order("id", { ascending: true }).range(from, to);
+    }, "submissions for date range");
 
-    if (!submissions || submissions.length === 0) {
+    if (submissions.length === 0) {
       return { items: [], hasMore: false };
     }
 
@@ -703,12 +740,17 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // because the loop below skips any submission with zero rows in range, the
     // users past the cut vanished from the board rather than showing a partial
     // total. With no ORDER BY it was also arbitrary which ones survived.
-    const allDailyBreakdowns = await fetchAllPages<DbDailyBreakdown>(
-      (from, to) =>
+    //
+    // The id list also has to be chunked: past ~350 ids the `.in()` filter
+    // builds a URL the server rejects, which failed the whole query and
+    // emptied the board for any wide range.
+    const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
+      submissionIds,
+      (chunk, from, to) =>
         this.client
           .from("daily_breakdowns")
           .select("*")
-          .in("submission_id", submissionIds)
+          .in("submission_id", chunk)
           .gte("date", params.dateFrom)
           .lte("date", params.dateTo)
           .order("submission_id", { ascending: true })
@@ -797,14 +839,24 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     if (!submissions) return [];
 
+    // Up to 50 submissions here, but each can carry hundreds of daily rows, so
+    // the total is well past the 1000-row response cap.
     const submissionIds = submissions.map((s) => s.id);
-    const { data: allDailyBreakdowns } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .in("submission_id", submissionIds);
+    const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
+      submissionIds,
+      (chunk, from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("*")
+          .in("submission_id", chunk)
+          .order("submission_id", { ascending: true })
+          .order("date", { ascending: true })
+          .range(from, to),
+      "daily breakdowns for flagged submissions"
+    );
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    (allDailyBreakdowns || []).forEach((db) => {
+    allDailyBreakdowns.forEach((db) => {
       const existing = dailyBySubmission.get(db.submission_id) || [];
       existing.push(db);
       dailyBySubmission.set(db.submission_id, existing);
@@ -885,18 +937,28 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
       )[0];
 
-    // Get all daily breakdowns
+    // Get all daily breakdowns. The merged result is written back as the
+    // surviving submission, so a capped read here would silently discard the
+    // days it failed to see — data loss during a claim, not just a bad view.
     const submissionIds = submissions.map((s) => s.id);
-    const { data: allDailyBreakdowns } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .in("submission_id", submissionIds);
+    const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
+      submissionIds,
+      (chunk, from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("*")
+          .in("submission_id", chunk)
+          .order("submission_id", { ascending: true })
+          .order("date", { ascending: true })
+          .range(from, to),
+      "daily breakdowns for claim merge"
+    );
 
     // Merge daily data (OAuth takes priority)
     const dailyMap = new Map<string, DbDailyBreakdown>();
     for (const submission of submissions) {
       const isOauth = submission.source === "oauth";
-      const daily = (allDailyBreakdowns || []).filter(
+      const daily = allDailyBreakdowns.filter(
         (d) => d.submission_id === submission.id
       );
       for (const day of daily) {
@@ -1139,14 +1201,24 @@ export class SupabaseProfilesService implements ProfilesService {
       .order("submitted_at", { ascending: false })
       .limit(limit);
 
+    // A heavy user's few submissions can still hold thousands of daily rows,
+    // so an uncapped read here truncated the profile's own history.
     const submissionIds = (submissions || []).map((s) => s.id);
-    const { data: allDailyBreakdowns } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .in("submission_id", submissionIds);
+    const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
+      submissionIds,
+      (chunk, from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("*")
+          .in("submission_id", chunk)
+          .order("submission_id", { ascending: true })
+          .order("date", { ascending: true })
+          .range(from, to),
+      "daily breakdowns for profile"
+    );
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    (allDailyBreakdowns || []).forEach((db) => {
+    allDailyBreakdowns.forEach((db) => {
       const existing = dailyBySubmission.get(db.submission_id) || [];
       existing.push(db);
       dailyBySubmission.set(db.submission_id, existing);
@@ -1463,7 +1535,7 @@ export class SupabaseProfilesService implements ProfilesService {
 // SUPABASE STATS SERVICE
 // ============================================================================
 
-class SupabaseStatsService implements StatsService {
+export class SupabaseStatsService implements StatsService {
   private client: SupabaseClient;
 
   constructor(client: SupabaseClient) {
@@ -1492,15 +1564,27 @@ class SupabaseStatsService implements StatsService {
     const modelUsage: Record<string, number> = {};
     let topSubmission: DbSubmission | null = null;
 
-    // Get daily breakdown counts for totalDays
+    // Get daily breakdown counts for totalDays.
+    //
+    // This asked for 500 ids in one `.in()`, which exceeds what the server
+    // will accept in a URL — the request failed, the null was read as "no
+    // rows", and every submission contributed 0 days. The site reported
+    // totalDays: 0 while every other stat looked right.
     const submissionIds = (topByCost || []).map((s) => s.id);
-    const { data: dailyCounts } = await this.client
-      .from("daily_breakdowns")
-      .select("submission_id")
-      .in("submission_id", submissionIds);
+    const dailyCounts = await fetchAllByIds<{ submission_id: string }>(
+      submissionIds,
+      (chunk, from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("submission_id")
+          .in("submission_id", chunk)
+          .order("submission_id", { ascending: true })
+          .range(from, to),
+      "daily counts for global stats"
+    );
 
     const daysPerSubmission = new Map<string, number>();
-    (dailyCounts || []).forEach((d) => {
+    dailyCounts.forEach((d) => {
       daysPerSubmission.set(
         d.submission_id,
         (daysPerSubmission.get(d.submission_id) || 0) + 1
