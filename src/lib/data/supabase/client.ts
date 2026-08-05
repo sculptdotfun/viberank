@@ -28,7 +28,11 @@ import type {
   PatternSearchOptions,
   HireListing,
   ModelBreakdown,
+  TokensService,
+  ApiTokenSummary,
+  TokenOwner,
 } from "../types";
+import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import type { BurnRow } from "@/lib/spend-curve";
 import {
@@ -1708,12 +1712,132 @@ export class SupabaseStatsService implements StatsService {
 // DATA LAYER FACTORY
 // ============================================================================
 
+
+// ============================================================================
+// SUPABASE TOKENS SERVICE
+// ============================================================================
+
+/**
+ * The table is missing because the migration hasn't been applied yet.
+ *
+ * Two codes, because two layers can notice: PostgREST answers PGRST205 when
+ * the table isn't in its schema cache, and Postgres answers 42P01 if a query
+ * does reach it. Checking only the Postgres code was not enough — verified
+ * against the live project, which returns PGRST205 — and missing it would
+ * have turned every submission into a 500 the moment this deployed ahead of
+ * the migration.
+ */
+const MISSING_TABLE_CODES = new Set(["PGRST205", "42P01"]);
+
+export class SupabaseTokensService implements TokensService {
+  constructor(private client: SupabaseClient) {}
+
+  async issue(username: string, githubUsername: string, label: string) {
+    const { plaintext, hash, hint } = generateToken();
+
+    const { data, error } = await this.client
+      .from("api_tokens")
+      .insert({
+        username,
+        github_username: githubUsername,
+        token_hash: hash,
+        label: label.slice(0, 60) || "CLI",
+        hint,
+      })
+      .select("id, label, hint, created_at, last_used_at")
+      .single();
+
+    if (error) throw new Error(`Failed to issue token: ${error.message}`);
+
+    return {
+      // The only time the plaintext exists outside the caller's terminal.
+      plaintext,
+      token: {
+        id: data.id,
+        label: data.label,
+        hint: data.hint,
+        createdAt: new Date(data.created_at).getTime(),
+        lastUsedAt: data.last_used_at ? new Date(data.last_used_at).getTime() : null,
+      },
+    };
+  }
+
+  async list(username: string): Promise<ApiTokenSummary[]> {
+    const { data, error } = await this.client
+      .from("api_tokens")
+      .select("id, label, hint, created_at, last_used_at")
+      .ilike("username", username)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      if (MISSING_TABLE_CODES.has(error.code)) return [];
+      throw new Error(`Failed to list tokens: ${error.message}`);
+    }
+
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      label: row.label,
+      hint: row.hint,
+      createdAt: new Date(row.created_at).getTime(),
+      lastUsedAt: row.last_used_at ? new Date(row.last_used_at).getTime() : null,
+    }));
+  }
+
+  async revoke(username: string, id: string): Promise<boolean> {
+    // Scoped by username as well as id so one user cannot revoke another's
+    // token by guessing a uuid.
+    const { data, error } = await this.client
+      .from("api_tokens")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", id)
+      .ilike("username", username)
+      .is("revoked_at", null)
+      .select("id");
+
+    if (error) throw new Error(`Failed to revoke token: ${error.message}`);
+    return (data ?? []).length > 0;
+  }
+
+  async resolve(plaintext: string): Promise<TokenOwner | null> {
+    if (!looksLikeToken(plaintext)) return null;
+
+    const { data, error } = await this.client
+      .from("api_tokens")
+      .select("id, username, github_username, revoked_at")
+      .eq("token_hash", hashToken(plaintext))
+      .limit(1);
+
+    if (error) {
+      // Deploying the code before applying the migration must not break
+      // submissions — degrade to "no token auth" rather than 500.
+      if (MISSING_TABLE_CODES.has(error.code)) return null;
+      console.error("Token lookup failed:", error.message);
+      return null;
+    }
+
+    const row = (data ?? [])[0];
+    if (!row || row.revoked_at) return null;
+
+    // Best effort: a failed touch must not fail the submission it authorised.
+    void this.client
+      .from("api_tokens")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .then(undefined, () => undefined);
+
+    return { username: row.username, githubUsername: row.github_username };
+  }
+}
+
 class SupabaseDataLayer implements DataLayer {
+  tokens: TokensService;
   submissions: SubmissionsService;
   profiles: ProfilesService;
   stats: StatsService;
 
   constructor(client: SupabaseClient) {
+    this.tokens = new SupabaseTokensService(client);
     this.submissions = new SupabaseSubmissionsService(client);
     this.profiles = new SupabaseProfilesService(client);
     this.stats = new SupabaseStatsService(client);

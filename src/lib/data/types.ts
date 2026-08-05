@@ -342,6 +342,7 @@ export interface StatsService {
 }
 
 export interface DataLayer {
+  tokens: TokensService;
   submissions: SubmissionsService;
   profiles: ProfilesService;
   stats: StatsService;
@@ -352,3 +353,34 @@ export interface DataLayer {
 // ============================================================================
 
 export type DatabaseBackend = "supabase" | "demo";
+
+// ============================================================================
+// API TOKENS
+// ============================================================================
+
+export interface ApiTokenSummary {
+  id: string;
+  label: string;
+  /** Display fragment only — never a working credential. */
+  hint: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}
+
+export interface TokenOwner {
+  username: string;
+  githubUsername: string;
+}
+
+export interface TokensService {
+  /** Mints a token and returns the plaintext exactly once. */
+  issue(username: string, githubUsername: string, label: string): Promise<{ plaintext: string; token: ApiTokenSummary }>;
+  list(username: string): Promise<ApiTokenSummary[]>;
+  revoke(username: string, id: string): Promise<boolean>;
+  /**
+   * Resolves a plaintext token to its owner, or null. Returns null rather
+   * than throwing when the table is absent, so a deploy that precedes the
+   * migration degrades to "no token auth" instead of breaking submissions.
+   */
+  resolve(plaintext: string): Promise<TokenOwner | null>;
+}
