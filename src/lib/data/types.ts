@@ -333,6 +333,8 @@ export interface StatsService {
   getGlobalStats(): Promise<GlobalStats>;
   /** Exact aggregates via get_site_stats() (migration 007); null if the function isn't deployed. */
   getSiteStats(): Promise<SiteStats | null>;
+  /** Raw rows for the /calculator spend curve. */
+  getSpendRows(): Promise<import("@/lib/spend-curve").BurnRow[]>;
 }
 
 export interface DataLayer {
