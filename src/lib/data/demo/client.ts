@@ -316,6 +316,22 @@ function profileFromSubmission(submission: Submission): ProfileWithSubmissions {
 
 export function createDemoDataLayer(): DataLayer {
   return {
+    // The demo backend is read-only and has no accounts, so it mints nothing
+    // and authenticates nobody.
+    tokens: {
+      async issue(): Promise<never> {
+        throw new Error("Demo data is read-only");
+      },
+      async list() {
+        return [];
+      },
+      async revoke() {
+        return false;
+      },
+      async resolve() {
+        return null;
+      },
+    },
     submissions: {
       async submit(_data: SubmitData): Promise<string> {
         throw new Error("Demo data is read-only");

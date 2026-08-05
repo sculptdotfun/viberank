@@ -6,6 +6,7 @@ import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
 import { normalizeCcData } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { getCliNotice } from "@/lib/sponsor";
+import { bearerFrom } from "@/lib/tokens";
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,13 +48,36 @@ export async function POST(request: NextRequest) {
     // Check for authentication
     const session = await getServerSession(authOptions);
 
+    // An API token authenticates a scheduled run, which cannot open a browser
+    // for OAuth. It is checked before the session so an explicit credential
+    // always wins over an ambient cookie, and unlike the X-GitHub-User header
+    // it actually proves the submitter controls the account — so these count
+    // as verified.
+    const bearer = bearerFrom(request.headers.get("authorization"));
+    let tokenOwner: { username: string; githubUsername: string } | null = null;
+    if (bearer) {
+      const dataLayer = await getServerDataLayer();
+      tokenOwner = await dataLayer.tokens.resolve(bearer);
+      if (!tokenOwner) {
+        return NextResponse.json(
+          { error: "Invalid or revoked API token. Run `npx viberank-cli login` to get a new one." },
+          { status: 401 }
+        );
+      }
+    }
+
     let githubUsername: string;
     let source: "oauth" | "cli";
     let verified: boolean;
     let githubName: string | undefined;
     let githubAvatar: string | undefined;
 
-    if (session?.user?.username) {
+    if (tokenOwner) {
+      githubUsername = tokenOwner.githubUsername;
+      source = "cli";
+      verified = true;
+      console.log("Token submission from:", githubUsername);
+    } else if (session?.user?.username) {
       // Authenticated via OAuth
       githubUsername = session.user.username;
       source = "oauth";
