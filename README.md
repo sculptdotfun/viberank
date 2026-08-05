@@ -20,8 +20,13 @@ Live at **[viberank.app](https://www.viberank.app)**.
 - 🎯 **Per-tool boards** — dedicated leaderboards at [`/tool/claude`](https://www.viberank.app/tool/claude), [`/tool/codex`](https://www.viberank.app/tool/codex), [`/tool/gemini`](https://www.viberank.app/tool/gemini), [`/tool/copilot`](https://www.viberank.app/tool/copilot), [`/tool/opencode`](https://www.viberank.app/tool/opencode)
 - 📊 **Profile pages** at `viberank.app/profile/{username}` — global rank, daily charts, token breakdown, tools used
 - ⚡ **Server-rendered** — homepage, profiles, and tool boards are SSR'd with structured data (FAQPage, ProfilePage, BreadcrumbList) for fast paint and full crawlability
-- 🚀 **Three ways to submit**: `npx viberank-cli`, plain `curl`, or signed-in web upload
-- 🔐 **GitHub OAuth** — verified submissions show a blue check; unverified CLI submissions show a `cli` pill
+- 🚀 **Four ways to submit**: `npx viberank-cli`, plain `curl`, signed-in web upload, or MCP
+- ♾️ **Autosubmit** — `viberank login` once, `viberank autosubmit` once, and your rank stays current instead of freezing on the day you first submitted
+- 🔐 **GitHub OAuth + API tokens** — OAuth and token submissions show a blue check; header-only CLI submissions show a `cli` pill
+- 🖥️ **Multi-machine** — a laptop and a desktop sum into one profile instead of overwriting each other
+- 📈 **[`/stats`](https://www.viberank.app/stats)** — site-wide spend curve, monthly trend, and where your burn lands against everyone else
+- 🧮 **[`/calculator`](https://www.viberank.app/calculator)** — which subscription tier your actual usage justifies, based on your real `ccusage` numbers rather than a guess
+- 🎖️ **README badges** — `https://www.viberank.app/api/badge/{username}` for rank, cost, or tokens
 - 🛡️ **Input validation** — one-sided token math (reasoning-token aware), cost/token ratio guard, date sanity, realistic-range ceilings
 - 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
 - ✍️ **Blog** — data-backed posts on AI coding costs at [viberank.app/blog](https://www.viberank.app/blog)
@@ -35,6 +40,15 @@ npx viberank-cli
 ```
 
 This generates a fresh `cc.json` via `ccusage daily --json` (the aggregate report across **all** your detected tools) and POSTs it to `/api/submit`. It picks up your GitHub username from your git remote / `git config user.name`.
+
+**Set it and forget it.** A one-off submission freezes your rank on the day you ran it. Mint a token at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), then:
+
+```bash
+npx viberank-cli login       # paste the token once
+npx viberank-cli autosubmit  # daily background submission
+```
+
+`autosubmit` registers with your platform's own scheduler — launchd, systemd user timers, or Task Scheduler — rather than running a daemon of its own, so it survives reboots and catches up after a missed run. `npx viberank-cli status` shows the token and schedule state; `autosubmit off` removes it. Token submissions are verified, so they carry a blue check without a browser sign-in.
 
 ### Option 2: curl
 
@@ -88,7 +102,16 @@ If you submit via the CLI before signing in, the row lands on the leaderboard as
 3. Merges daily breakdowns — overlapping dates take the OAuth version
 4. Recomputes totals, sets `verified: true`, deletes the duplicates
 
-**Known limitation:** submitting from multiple machines with overlapping dates currently overwrites instead of summing daily data — see [#43](https://github.com/sculptdotfun/viberank/issues/43). Submit from one machine at a time until that's resolved.
+## Submitting from more than one machine
+
+Supported — a laptop and a desktop sum into one profile rather than overwriting each other ([#43](https://github.com/sculptdotfun/viberank/issues/43)).
+
+Each machine generates an anonymous random UUID on first run, stored at `~/.viberank/machine-id`. The server keeps usage as a **per-machine slice** and re-sums them, so re-submitting from one machine replaces only that machine's contribution and leaves the others intact. No hardware or identifying information is involved.
+
+Two consequences worth knowing:
+
+- **A machine's totals never silently decrease.** If a re-submission reports *less* than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install, a partial export — the higher prior figure is retained instead. Deleting local transcripts doesn't erase your rank.
+- **Genuine deletion is still recorded.** The CLI reports per-month file and byte counts of your transcript corpus, and the server classifies a shrink as *deleted* vs *rewritten* rather than guessing ([#112](https://github.com/sculptdotfun/viberank/issues/112)). Counts only — no transcript content ever leaves your machine.
 
 ## Development
 
@@ -127,10 +150,20 @@ Apply the schema:
 # Run the SQL in supabase/migrations/ in order against your project,
 # either via the Supabase SQL editor or the supabase CLI:
 #   001_initial_schema.sql
-#   002_multi_tool.sql      # adds submissions.tools[] + daily_breakdowns.agents[]
+#   002_multi_tool.sql          # submissions.tools[] + daily_breakdowns.agents[]
+#   003_open_to_work.sql        # hire-me flags on profiles
+#   004_model_breakdowns.sql    # per-model token/cost split
+#   005_machine_contributions.sql  # per-machine slices (#43)
+#   006_raw_submissions.sql     # raw payload archive
+#   007_site_stats.sql          # cached site-wide aggregates
+#   008_site_stats_monthly_tiers.sql
+#   009_open_to_work_email.sql
+#   010_api_tokens.sql          # hashed CLI tokens
+#   011_efficiency.sql          # cost-per-token, generated column
+#   012_corpus_observations.sql # per-month corpus counts for drift (#112)
 ```
 
-> **Deploying v2 to an existing instance:** apply `002_multi_tool.sql` **before** deploying the app code. The migration is additive (new columns default to `'{}'`), so it's safe to run ahead of the deploy.
+> **Applying migrations to an existing instance:** apply the SQL **before** deploying the app code. Every migration is additive — new columns default to empty and new tables are created `IF NOT EXISTS` — so each is safe to run ahead of its deploy.
 
 Run the dev server:
 
@@ -156,7 +189,7 @@ Demo data is read-only and only intended to render realistic leaderboard, profil
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | Run `next lint` |
-| `pnpm test` | Run the ccusage and data-layer tests (`node test/ccusage.test.mts`; pass a `cc.json` path to also test real data) |
+| `pnpm test` | Run every `test/*.test.mts` suite — ccusage parsing, data layer, submissions, tokens, badges, corpus scanning, drift classification, plan comparison. Exits on the first failure. `node --import tsx test/ccusage.test.mts <path-to-cc.json>` additionally tests against real data |
 | `pnpm exec tsc --noEmit` | Type-check without emitting |
 
 ## Tech stack
@@ -176,6 +209,14 @@ Submit usage data. Authenticated submissions (with a NextAuth session cookie) ar
 
 **Body**: contents of `cc.json` (output of `npx ccusage@latest daily --json`).
 
+**Auth**, in precedence order:
+
+| | Verified | Notes |
+|---|---|---|
+| `Authorization: Bearer vbr_…` | ✅ | API token; works headlessly, which is what `autosubmit` uses |
+| NextAuth session cookie | ✅ | Web upload |
+| `X-GitHub-User: <name>` | ❌ | Unauthenticated; anyone can set it, so the row shows a `cli` pill |
+
 **Response**:
 
 ```json
@@ -190,6 +231,22 @@ Submit usage data. Authenticated submissions (with a NextAuth session cookie) ar
 ### `POST /api/claim`
 
 Authenticated — merges unverified CLI submissions into the caller's verified profile. Username is taken from the session, not the request body. Returns 401 without a session.
+
+### `GET|POST /api/tokens`, `DELETE /api/tokens/{id}`
+
+Authenticated (session only — a token cannot mint another token). Lists, creates and revokes API tokens for the signed-in user. Only the SHA-256 of a token is stored; the plaintext is shown once at creation and is unrecoverable afterwards. Revocation is soft, so `last_used_at` stays auditable after a suspected leak. UI at [`/settings/tokens`](https://www.viberank.app/settings/tokens).
+
+### `GET /api/badge/{username}`
+
+Public, unauthenticated. Returns a shields-style SVG for a README:
+
+```markdown
+![viberank](https://www.viberank.app/api/badge/your-github-username)
+![spend](https://www.viberank.app/api/badge/your-github-username?metric=cost)
+![tokens](https://www.viberank.app/api/badge/your-github-username?metric=tokens)
+```
+
+`metric` is `rank` (default), `cost`, or `tokens`. Hand-built SVG rather than a rasterised image so it stays a few hundred bytes and sits crisply next to shields.io badges; cached at the edge with `stale-while-revalidate`.
 
 ### `POST /api/admin/flag`
 
