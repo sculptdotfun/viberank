@@ -10,6 +10,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import prompts from 'prompts';
 import fetch from 'node-fetch';
+import { getToken, getMachineId, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
+import * as autosubmit from './lib/autosubmit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,27 +20,128 @@ const __dirname = path.dirname(__filename);
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const CLI_VERSION = packageJson.version;
 
-// Stable, anonymous per-machine id so the server can sum usage submitted from
-// multiple machines under one account instead of overwriting it, while still
-// treating a re-submission from this machine as a replace (issue #43). It's a
-// random UUID — no hardware/identifying info — persisted under ~/.viberank.
-function getMachineId() {
-  const dir = path.join(os.homedir(), '.viberank');
-  const idFile = path.join(dir, 'machine-id');
+
+const SITE = 'https://www.viberank.app';
+
+function help() {
+  console.log(`
+${chalk.yellow.bold('viberank')} — submit your AI coding usage
+
+  ${chalk.bold('npx viberank-cli')}                 submit now (interactive)
+  ${chalk.bold('npx viberank-cli login')}           save an API token
+  ${chalk.bold('npx viberank-cli logout')}          forget the saved token
+  ${chalk.bold('npx viberank-cli autosubmit')}      submit once a day in the background
+  ${chalk.bold('npx viberank-cli autosubmit off')}  stop submitting automatically
+  ${chalk.bold('npx viberank-cli status')}          show token and schedule state
+
+Most people run ${chalk.bold('login')} once, then ${chalk.bold('autosubmit')} once, and never think
+about it again — your rank stays current instead of freezing on the day you
+first submitted.
+`);
+}
+
+async function login() {
+  const url = `${SITE}/settings/tokens`;
+  console.log(chalk.yellow.bold('\nConnect this machine to viberank\n'));
+  console.log(`  1. Open ${chalk.cyan(url)}`);
+  console.log('  2. Sign in with GitHub and click ' + chalk.bold('Create token'));
+  console.log('  3. Paste it below\n');
+
+  // Best effort — a headless box just uses the printed URL.
   try {
-    return fs.readFileSync(idFile, 'utf8').trim();
+    const opener = process.platform === 'darwin' ? 'open'
+      : process.platform === 'win32' ? 'start' : 'xdg-open';
+    execSync(`${opener} ${url}`, { stdio: 'ignore' });
   } catch {
-    // Not created yet (or unreadable) — generate and persist one.
+    // No browser available; the URL above is enough.
   }
-  const id = crypto.randomUUID();
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(idFile, id, { mode: 0o600 });
-  } catch {
-    // Read-only home dir: fall back to an ephemeral id for this run. Worst case
-    // a future run gets a new id and that day sums once — never data loss.
+
+  const { token } = await prompts({
+    type: 'password',
+    name: 'token',
+    message: 'Token:',
+    validate: (v) => looksLikeToken(v.trim()) || 'That does not look like a viberank token (vbr_…)'
+  });
+
+  if (!token) {
+    console.log(chalk.red('\nNo token entered.'));
+    process.exit(1);
   }
-  return id;
+
+  // Prove it works before saving, so a typo fails here rather than silently
+  // at 9am tomorrow inside a scheduler.
+  const spinner = ora('Verifying…').start();
+  const res = await fetch(`${SITE}/api/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
+    body: '{}'
+  });
+
+  if (res.status === 401) {
+    spinner.fail('That token was rejected — it may be revoked or mistyped.');
+    process.exit(1);
+  }
+  // Any other status means the token authenticated and the empty body was
+  // then rejected on its own merits, which is what we want.
+  spinner.succeed('Token verified');
+
+  writeConfig({ token: token.trim() });
+  console.log(chalk.green(`\n✓ Saved to ${CONFIG_DIR}/config.json (owner-only)\n`));
+  console.log(`Next: ${chalk.bold('npx viberank-cli autosubmit')} to keep your rank current.\n`);
+}
+
+function logout() {
+  clearToken();
+  console.log(chalk.green('\n✓ Token removed. Scheduled submissions will stop working.\n'));
+}
+
+function showStatus() {
+  const token = getToken();
+  const s = autosubmit.status();
+
+  console.log(chalk.yellow.bold('\nviberank status\n'));
+  console.log(`  token       ${token ? chalk.green('saved') : chalk.gray('none — run `viberank login`')}`);
+  console.log(`  autosubmit  ${s.enabled ? chalk.green(`on (${s.scheduler})`) : chalk.gray('off')}`);
+  console.log(`  machine id  ${getMachineId()}`);
+
+  if (s.log.length) {
+    console.log(chalk.gray('\n  recent runs:'));
+    for (const line of s.log) console.log(chalk.gray(`    ${line}`));
+  }
+  console.log();
+}
+
+async function autosubmitCommand(arg) {
+  if (arg === 'off' || arg === 'disable') {
+    autosubmit.disable();
+    console.log(chalk.green('\n✓ Automatic submission disabled.\n'));
+    return;
+  }
+
+  if (!autosubmit.platform()) {
+    console.log(chalk.red(`\nNo supported scheduler on ${process.platform}.`));
+    console.log('Run `npx viberank-cli submit` from your own cron instead.\n');
+    process.exit(1);
+  }
+
+  if (!getToken()) {
+    console.log(chalk.yellow('\nA scheduled run cannot sign in through a browser, so it needs a token first.'));
+    console.log(`Run ${chalk.bold('npx viberank-cli login')}, then try again.\n`);
+    process.exit(1);
+  }
+
+  const { hour } = await prompts({
+    type: 'number',
+    name: 'hour',
+    message: 'Hour of day to submit (0-23):',
+    initial: 9,
+    validate: (v) => (v >= 0 && v <= 23) || '0-23'
+  });
+
+  const result = autosubmit.enable(hour ?? 9);
+  console.log(chalk.green(`\n✓ Submitting daily at ${String(result.hour).padStart(2, '0')}:00 via ${result.scheduler}.`));
+  console.log(chalk.gray(`  ${result.path}`));
+  console.log(chalk.gray('  Turn it off with: npx viberank-cli autosubmit off\n'));
 }
 
 async function main() {
@@ -182,9 +285,13 @@ async function main() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // The header is a claim anyone can make; the token is proof. Sending
+          // both keeps older servers working and lets a token-authenticated
+          // submission come back verified.
           'X-GitHub-User': githubUser,
           'X-CLI-Version': CLI_VERSION,
-          'X-Machine-Id': getMachineId()
+          'X-Machine-Id': getMachineId(),
+          ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
         },
         body: JSON.stringify(ccData)
       });
@@ -308,7 +415,37 @@ async function main() {
   console.log(chalk.green('\nDone! 🎉'));
 }
 
-main().catch(error => {
-  console.error(chalk.red('Unexpected error:', error.message));
+const [command, arg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const QUIET = process.argv.includes('--quiet');
+
+const run = async () => {
+  switch (command) {
+    case undefined:
+    case 'submit':
+      return main();
+    case 'login':
+      return login();
+    case 'logout':
+      return logout();
+    case 'status':
+      return showStatus();
+    case 'autosubmit':
+      return autosubmitCommand(arg);
+    case 'help':
+    case '--help':
+    case '-h':
+      return help();
+    default:
+      console.error(chalk.red(`Unknown command: ${command}`));
+      help();
+      process.exit(1);
+  }
+};
+
+run().catch(error => {
+  // A scheduled run logs to a file nobody watches, so stamp it — an
+  // undated stack trace is close to useless when it turns up weeks later.
+  const stamp = QUIET ? `[${new Date().toISOString()}] ` : '';
+  console.error(chalk.red(`${stamp}Unexpected error: ${error.message}`));
   process.exit(1);
 });
