@@ -256,6 +256,18 @@ export interface DeleteResult {
     username?: string;
     createdAt: number;
   }>;
+  /**
+   * Rows removed per table. A profile is only the account record — the
+   * leaderboard itself reads `submissions`, and `raw_submissions` holds the
+   * archived payload with no FK to either. Reporting the breakdown makes a
+   * partial delete visible instead of silently leaving the entry on the board.
+   */
+  deletedRows: {
+    profiles: number;
+    submissions: number;
+    dailyBreakdowns: number;
+    rawSubmissions: number;
+  };
 }
 
 export interface FindProfilesResult {

@@ -63,6 +63,9 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const { data: session } = useSession();
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
+  // Latches on the first real filter change and never resets — see
+  // isSeededDefaultView below.
+  const hasChangedFilters = useRef(false);
   const { data: liveStats } = useGlobalStats();
   const globalStats = liveStats ?? initialStats;
 
@@ -105,7 +108,14 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
 
   // The server already rendered page 0 of the default view — don't re-fetch
   // it on mount. The hook only runs for non-default filters or later pages.
+  //
+  // The seed is only valid until the user touches a filter: the effect below
+  // clears `allItems` on every filter change, so returning to the default view
+  // (filter on, then off) would otherwise match here again, skip the fetch and
+  // leave the board permanently empty. `initialItems` never empties, so it
+  // can't tell "not yet interacted" from "back at the default".
   const isSeededDefaultView =
+    !hasChangedFilters.current &&
     (initialItems?.length ?? 0) > 0 &&
     page === 0 &&
     sortBy === "cost" &&
@@ -139,6 +149,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
       firstRender.current = false;
       return;
     }
+    hasChangedFilters.current = true;
     setAllItems([]);
     setPage(0);
   }, [sortBy, dateFrom, dateTo, tool, verifiedOnly]);

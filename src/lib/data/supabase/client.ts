@@ -171,16 +171,74 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
 }
 
 // ============================================================================
+// PAGINATION
+// ============================================================================
+
+/**
+ * PostgREST caps every response at the project's `db-max-rows` (1000 by
+ * default), and it does so *silently* — a larger `.limit()` is not an error,
+ * it just returns the cap. Truncation here is worse than a partial result:
+ * callers that group rows by submission see a submission with zero rows and
+ * skip it entirely, so a user disappears rather than showing a low total.
+ *
+ * Page explicitly instead. The caller supplies a builder so the ordering is
+ * applied to its own query — a stable order is what makes paging correct, and
+ * without one it is arbitrary which rows survive.
+ */
+const PAGE_SIZE = 1000;
+const MAX_ROWS = 200_000;
+
+async function fetchAllPages<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  context: string
+): Promise<T[]> {
+  const all: T[] = [];
+
+  while (all.length < MAX_ROWS) {
+    const { data, error } = await buildPage(all.length, all.length + PAGE_SIZE - 1);
+
+    // A failed page must not look like the end of the data. Silently breaking
+    // here would reintroduce the truncation this helper exists to prevent.
+    if (error) {
+      throw new Error(`Failed to query ${context}: ${error.message}`);
+    }
+    if (!data || data.length === 0) break;
+
+    // Advance by what the server actually returned, and stop only on an empty
+    // page. Stopping at `length < PAGE_SIZE` would assume `db-max-rows` is at
+    // least PAGE_SIZE — if it were configured lower, every page would come
+    // back short and we'd silently truncate at the first one. The cost is one
+    // extra empty request per query, which is the right trade for a helper
+    // whose entire job is to not lose rows.
+    all.push(...data);
+  }
+
+  if (all.length >= MAX_ROWS) {
+    console.error(
+      `fetchAllPages hit the ${MAX_ROWS}-row ceiling for ${context}; results are truncated.`
+    );
+  }
+
+  return all;
+}
+
+// ============================================================================
 // SUPABASE SUBMISSIONS SERVICE
 // ============================================================================
 
-class SupabaseSubmissionsService implements SubmissionsService {
-  private client: SupabaseClient;
-  private rateLimiter: SupabaseRateLimiter;
+/** The slice of the rate limiter this service needs — injectable for tests. */
+type RateLimitChecker = Pick<SupabaseRateLimiter, "checkLimit">;
 
-  constructor(client: SupabaseClient) {
+export class SupabaseSubmissionsService implements SubmissionsService {
+  private client: SupabaseClient;
+  private rateLimiter: RateLimitChecker;
+
+  constructor(
+    client: SupabaseClient,
+    rateLimiter: RateLimitChecker = new SupabaseRateLimiter(client)
+  ) {
     this.client = client;
-    this.rateLimiter = new SupabaseRateLimiter(client);
+    this.rateLimiter = rateLimiter;
   }
 
   async submit(data: SubmitData): Promise<string> {
@@ -215,7 +273,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
 
     // Check for existing submission with overlapping date range
     // Use ilike for case-insensitive username matching
-    const { data: existingSubmissions } = await this.client
+    const { data: existingSubmissions, error: existingSubmissionsError } = await this.client
       .from("submissions")
       .select("*")
       .ilike("username", data.username)
@@ -224,6 +282,12 @@ class SupabaseSubmissionsService implements SubmissionsService {
         `and(date_range_start.lte.${dateRangeEnd},date_range_end.gte.${dateRangeStart})`
       )
       .limit(1);
+
+    if (existingSubmissionsError) {
+      throw new Error(
+        `Failed to query existing submissions: ${existingSubmissionsError.message}`
+      );
+    }
 
     // Identify the contributing machine so overlapping dates from distinct
     // machines sum while a same-machine re-submit replaces only its slice (#43).
@@ -256,8 +320,18 @@ class SupabaseSubmissionsService implements SubmissionsService {
       );
     }
 
-    // Update or create profile
-    await this.updateProfile(data, submissionId, !existingSubmissions?.length);
+    // The submission is durable by this point. The profile row is a projection
+    // of it, so a failure here must be logged rather than raised: turning an
+    // accepted submission into a client-visible error is what pushes users to
+    // retry a write that already landed (#93).
+    try {
+      await this.updateProfile(data, submissionId, !existingSubmissions?.length);
+    } catch (profileError) {
+      console.error(
+        "Profile update failed after the submission was accepted:",
+        profileError
+      );
+    }
 
     return submissionId;
   }
@@ -278,20 +352,31 @@ class SupabaseSubmissionsService implements SubmissionsService {
     tools: string[],
     machineId: string
   ): Promise<string> {
-    // Get existing daily breakdowns
-    const { data: existingDaily } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .eq("submission_id", existing.id);
+    // Totals below are recomputed from this map and written back to the parent
+    // row, so a truncated read would silently shrink the user's totals. Page it.
+    const existingDaily = await fetchAllPages<DbDailyBreakdown>(
+      (from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("*")
+          .eq("submission_id", existing.id)
+          .order("date", { ascending: true })
+          .range(from, to),
+      "existing daily breakdowns"
+    );
 
     // Create a map of existing daily data
     const dailyMap = new Map<string, DbDailyBreakdown>();
-    (existingDaily || []).forEach((day) => dailyMap.set(day.date, day));
+    existingDaily.forEach((day) => dailyMap.set(day.date, day));
 
     // Fold each incoming day into the existing per-machine map. A day from a new
     // machine adds a slice (sums); a re-submit from the same machine replaces
     // only its own slice (no double-count). #43
-    for (const day of data.ccData.daily) {
+    //
+    // Build every row first, then write them in one request. This used to be a
+    // round-trip per day, which put a multi-year history past the request
+    // budget even though each individual write was fast (#93).
+    const dailyRows = data.ccData.daily.map((day) => {
       const prior = dailyMap.get(day.date);
       const { contributions, aggregate } = mergeMachineContribution(
         prior?.machine_contributions ?? null,
@@ -314,18 +399,22 @@ class SupabaseSubmissionsService implements SubmissionsService {
         machine_contributions: contributions,
       };
 
-      if (prior) {
-        // Update existing
-        await this.client
-          .from("daily_breakdowns")
-          .update(dailyData)
-          .eq("submission_id", existing.id)
-          .eq("date", day.date);
-      } else {
-        // Insert new
-        await this.client.from("daily_breakdowns").insert(dailyData);
-      }
       dailyMap.set(day.date, dailyData as DbDailyBreakdown);
+      return dailyData;
+    });
+
+    // Upserting on the UNIQUE(submission_id, date) constraint collapses the old
+    // insert-or-update branch: the constraint decides, not a prior read.
+    if (dailyRows.length > 0) {
+      const { error: dailyUpsertError } = await this.client
+        .from("daily_breakdowns")
+        .upsert(dailyRows, { onConflict: "submission_id,date" });
+
+      if (dailyUpsertError) {
+        throw new Error(
+          `Failed to update daily breakdowns: ${dailyUpsertError.message}`
+        );
+      }
     }
 
     // Recalculate totals from all daily data
@@ -363,7 +452,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
     ).sort();
 
     // Update submission
-    await this.client
+    const { error: submissionUpdateError } = await this.client
       .from("submissions")
       .update({
         github_username: data.githubUsername,
@@ -384,6 +473,12 @@ class SupabaseSubmissionsService implements SubmissionsService {
         source: data.source,
       })
       .eq("id", existing.id);
+
+    if (submissionUpdateError) {
+      throw new Error(
+        `Failed to update existing submission: ${submissionUpdateError.message}`
+      );
+    }
 
     return existing.id;
   }
@@ -460,14 +555,21 @@ class SupabaseSubmissionsService implements SubmissionsService {
     submissionId: string,
     isNewSubmission: boolean
   ): Promise<void> {
-    const { data: existingProfile } = await this.client
+    const { data: existingProfile, error: profileQueryError } = await this.client
       .from("profiles")
       .select("*")
       .eq("username", data.username)
       .single();
 
+    // PGRST116 is PostgREST's "no rows" for .single() — expected for a first
+    // submission, so it falls through to the insert below. Anything else is a
+    // real failure and must not be mistaken for "this profile doesn't exist".
+    if (profileQueryError && profileQueryError.code !== "PGRST116") {
+      throw new Error(`Failed to query profile: ${profileQueryError.message}`);
+    }
+
     if (existingProfile) {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         best_submission_id: submissionId,
         github_username: data.githubUsername,
         github_name: data.githubName,
@@ -478,19 +580,29 @@ class SupabaseSubmissionsService implements SubmissionsService {
         updates.total_submissions = existingProfile.total_submissions + 1;
       }
 
-      await this.client
+      const { error: profileUpdateError } = await this.client
         .from("profiles")
         .update(updates)
         .eq("id", existingProfile.id);
+
+      if (profileUpdateError) {
+        throw new Error(`Failed to update profile: ${profileUpdateError.message}`);
+      }
     } else {
-      await this.client.from("profiles").insert({
-        username: data.username,
-        github_username: data.githubUsername,
-        github_name: data.githubName,
-        avatar: data.githubAvatar,
-        total_submissions: 1,
-        best_submission_id: submissionId,
-      });
+      const { error: profileInsertError } = await this.client
+        .from("profiles")
+        .insert({
+          username: data.username,
+          github_username: data.githubUsername,
+          github_name: data.githubName,
+          avatar: data.githubAvatar,
+          total_submissions: 1,
+          best_submission_id: submissionId,
+        });
+
+      if (profileInsertError) {
+        throw new Error(`Failed to create profile: ${profileInsertError.message}`);
+      }
     }
   }
 
@@ -586,16 +698,27 @@ class SupabaseSubmissionsService implements SubmissionsService {
     }
 
     const submissionIds = submissions.map((s) => s.id);
-    const { data: allDailyBreakdowns } = await this.client
-      .from("daily_breakdowns")
-      .select("*")
-      .in("submission_id", submissionIds)
-      .gte("date", params.dateFrom)
-      .lte("date", params.dateTo)
-      .limit(50000);
+
+    // The previous `.limit(50000)` was silently capped at `db-max-rows`, and
+    // because the loop below skips any submission with zero rows in range, the
+    // users past the cut vanished from the board rather than showing a partial
+    // total. With no ORDER BY it was also arbitrary which ones survived.
+    const allDailyBreakdowns = await fetchAllPages<DbDailyBreakdown>(
+      (from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("*")
+          .in("submission_id", submissionIds)
+          .gte("date", params.dateFrom)
+          .lte("date", params.dateTo)
+          .order("submission_id", { ascending: true })
+          .order("date", { ascending: true })
+          .range(from, to),
+      "daily breakdowns for date range"
+    );
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    (allDailyBreakdowns || []).forEach((db) => {
+    allDailyBreakdowns.forEach((db) => {
       const existing = dailyBySubmission.get(db.submission_id) || [];
       existing.push(db);
       dailyBySubmission.set(db.submission_id, existing);
@@ -987,7 +1110,7 @@ class SupabaseSubmissionsService implements SubmissionsService {
 // SUPABASE PROFILES SERVICE
 // ============================================================================
 
-class SupabaseProfilesService implements ProfilesService {
+export class SupabaseProfilesService implements ProfilesService {
   private client: SupabaseClient;
 
   constructor(client: SupabaseClient) {
@@ -1115,9 +1238,20 @@ class SupabaseProfilesService implements ProfilesService {
   ): Promise<DeleteResult> {
     const { searchField = "githubUsername", caseSensitive = false, dryRun = false } = options;
 
-    const { data: allProfiles } = await this.client.from("profiles").select("*");
+    // Matching happens in memory, so a capped read would silently narrow the
+    // match set — a delete that quietly skips accounts is worse than one that
+    // errors. Page the scan.
+    const allProfiles = await fetchAllPages<DbProfile>(
+      (from, to) =>
+        this.client
+          .from("profiles")
+          .select("*")
+          .order("id", { ascending: true })
+          .range(from, to),
+      "profiles for delete"
+    );
 
-    const matchingProfiles = (allProfiles || []).filter((profile) => {
+    const matchingProfiles = allProfiles.filter((profile) => {
       const githubUsername = profile.github_username || "";
       const username = profile.username || "";
 
@@ -1139,20 +1273,122 @@ class SupabaseProfilesService implements ProfilesService {
       });
     });
 
-    let deletedCount = 0;
+    // Removing a profile alone does not remove the user from the site. The
+    // leaderboard reads `submissions`, and `raw_submissions` archives the
+    // original payload with no FK to either table — so a profile-only delete
+    // leaves the entry ranked and the raw data stored. Collect every row that
+    // belongs to these accounts, then delete children before parents.
+    const usernames = matchingProfiles.map((p) => p.username);
+
+    const ownedSubmissions = usernames.length
+      ? await fetchAllPages<DbSubmission>(
+          (from, to) =>
+            this.client
+              .from("submissions")
+              .select("*")
+              .in("username", usernames)
+              .order("id", { ascending: true })
+              .range(from, to),
+          "submissions for delete"
+        )
+      : [];
+    const submissionIds = ownedSubmissions.map((s) => s.id);
+
+    const ownedDaily = submissionIds.length
+      ? await fetchAllPages<DbDailyBreakdown>(
+          (from, to) =>
+            this.client
+              .from("daily_breakdowns")
+              .select("*")
+              .in("submission_id", submissionIds)
+              .order("id", { ascending: true })
+              .range(from, to),
+          "daily breakdowns for delete"
+        )
+      : [];
+
+    const ownedRaw = usernames.length
+      ? await fetchAllPages<{ id: string }>(
+          (from, to) =>
+            this.client
+              .from("raw_submissions")
+              .select("id")
+              .in("username", usernames)
+              .order("id", { ascending: true })
+              .range(from, to),
+          "raw submissions for delete"
+        )
+      : [];
+
+    const deletedRows = {
+      profiles: 0,
+      submissions: 0,
+      dailyBreakdowns: 0,
+      rawSubmissions: 0,
+    };
+
     if (!dryRun) {
+      if (submissionIds.length > 0) {
+        // daily_breakdowns is ON DELETE CASCADE, but delete it explicitly so a
+        // failure surfaces here rather than being assumed.
+        const { error: dailyError } = await this.client
+          .from("daily_breakdowns")
+          .delete()
+          .in("submission_id", submissionIds);
+        if (dailyError) {
+          throw new Error(`Failed to delete daily breakdowns: ${dailyError.message}`);
+        }
+        deletedRows.dailyBreakdowns = ownedDaily.length;
+
+        const { error: submissionError } = await this.client
+          .from("submissions")
+          .delete()
+          .in("id", submissionIds);
+        if (submissionError) {
+          throw new Error(`Failed to delete submissions: ${submissionError.message}`);
+        }
+        deletedRows.submissions = submissionIds.length;
+      }
+
+      if (ownedRaw.length > 0) {
+        const { error: rawError } = await this.client
+          .from("raw_submissions")
+          .delete()
+          .in("id", ownedRaw.map((r) => r.id));
+        if (rawError) {
+          throw new Error(`Failed to delete raw submissions: ${rawError.message}`);
+        }
+        deletedRows.rawSubmissions = ownedRaw.length;
+      }
+
       for (const profile of matchingProfiles) {
-        await this.client.from("profiles").delete().eq("id", profile.id);
-        deletedCount++;
+        const { error: profileError } = await this.client
+          .from("profiles")
+          .delete()
+          .eq("id", profile.id);
+        if (profileError) {
+          throw new Error(`Failed to delete profile: ${profileError.message}`);
+        }
+        deletedRows.profiles++;
       }
     }
 
+    const wouldDelete = {
+      profiles: matchingProfiles.length,
+      submissions: submissionIds.length,
+      dailyBreakdowns: ownedDaily.length,
+      rawSubmissions: ownedRaw.length,
+    };
+    const summary = (counts: typeof wouldDelete) =>
+      `${counts.profiles} profiles, ${counts.submissions} submissions, ` +
+      `${counts.dailyBreakdowns} daily rows, ${counts.rawSubmissions} archived payloads`;
+
     return {
       message: dryRun
-        ? `Dry run: Would delete ${matchingProfiles.length} profiles`
-        : `Successfully deleted ${deletedCount} profiles`,
+        ? `Dry run: would delete ${summary(wouldDelete)}`
+        : `Deleted ${summary(deletedRows)}`,
       matchedCount: matchingProfiles.length,
-      deletedCount: dryRun ? 0 : deletedCount,
+      deletedCount: dryRun ? 0 : deletedRows.profiles,
       dryRun,
       patterns,
       searchField,
@@ -1162,6 +1398,7 @@ class SupabaseProfilesService implements ProfilesService {
         username: p.username,
         createdAt: new Date(p.created_at).getTime(),
       })),
+      deletedRows: dryRun ? { profiles: 0, submissions: 0, dailyBreakdowns: 0, rawSubmissions: 0 } : deletedRows,
     };
   }
 
@@ -1171,9 +1408,20 @@ class SupabaseProfilesService implements ProfilesService {
   ): Promise<FindProfilesResult> {
     const { searchField = "githubUsername", caseSensitive = false } = options;
 
-    const { data: allProfiles } = await this.client.from("profiles").select("*");
+    // This is the preview for deleteByPattern. It must page for the same
+    // reason the delete does — a capped preview would show fewer accounts
+    // than the delete goes on to remove.
+    const allProfiles = await fetchAllPages<DbProfile>(
+      (from, to) =>
+        this.client
+          .from("profiles")
+          .select("*")
+          .order("id", { ascending: true })
+          .range(from, to),
+      "profiles for search"
+    );
 
-    const matchingProfiles = (allProfiles || []).filter((profile) => {
+    const matchingProfiles = allProfiles.filter((profile) => {
       const githubUsername = profile.github_username || "";
       const username = profile.username || "";
 

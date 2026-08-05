@@ -172,7 +172,13 @@ export async function POST(request: NextRequest) {
       // uploads and older CLIs omit it and fall back to a shared bucket.
       const machineId = request.headers.get("X-Machine-Id") || undefined;
 
-      const submissionPromise = dataLayer.submissions.submit({
+      // Awaited directly, not raced against a timer. A rejected race did not
+      // cancel the underlying writes, so a slow merge reported failure while
+      // its data committed anyway — and the CLI then told the user to fix a
+      // cc.json that was never the problem (#93). The merge path is bulk-
+      // written in the data layer now, so long histories no longer approach
+      // the request budget in the first place.
+      submissionId = await dataLayer.submissions.submit({
         username: githubUsername,
         githubUsername: githubUsername,
         githubName,
@@ -182,13 +188,6 @@ export async function POST(request: NextRequest) {
         machineId,
         ccData: ccData,
       });
-
-      // Add a timeout of 25 seconds (Vercel has a 30 second timeout for API routes)
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Database operation timed out")), 25000)
-      );
-
-      submissionId = await Promise.race([submissionPromise, timeoutPromise]);
 
       // Archive the original payload for future re-parse/backfill. Best
       // effort — never blocks or fails an accepted submission.
@@ -287,7 +286,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Handle validation errors with 400 status
+      // Handle validation errors with 400 status. Only genuine problems with
+      // the submitted payload belong here — a "Failed to query/update/create"
+      // is our fault, not the user's, and telling them to fix cc.json for it
+      // sends them chasing a file that was always valid (#93).
       const validationErrors = [
         "Token totals don't match",
         "Invalid date format",
@@ -296,9 +298,6 @@ export async function POST(request: NextRequest) {
         "exceed realistic limits",
         "Cost per token ratio is unrealistic",
         "Token components don't sum correctly",
-        "Failed to query existing submissions",
-        "Failed to update existing submission",
-        "Failed to create new submission"
       ];
 
       if (validationErrors.some(msg => error.message.includes(msg))) {
@@ -309,11 +308,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check for timeout or database-specific errors
-      if (error.message.includes("timeout") || error.message.includes("deadline")) {
+      // Database clients spell this both ways ("timeout" and "timed out");
+      // matching only the first let genuine timeouts fall through to the
+      // generic 500 that blames the user's file.
+      if (/timeout|timed out|deadline/i.test(error.message)) {
         return NextResponse.json(
           { error: "Request timed out. Please try again or submit smaller batches of data." },
           { status: 504 }
+        );
+      }
+
+      // Our own data-layer failures are retryable infrastructure errors. This
+      // is checked before the looser "mutation"/"query" substring match below,
+      // which would otherwise catch "Failed to query …" and report it as a 500.
+      if (error.message.includes("Failed to query") ||
+          error.message.includes("Failed to update") ||
+          error.message.includes("Failed to create")) {
+        // Don't echo the raw DB message — it can leak schema/table names.
+        console.error("Database operation error:", error.message);
+        return NextResponse.json(
+          { error: "Database operation failed. Please try again later." },
+          { status: 503 }
         );
       }
 
@@ -344,16 +359,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "Database operation failed. Please try again later." },
           { status: 500 }
-        );
-      }
-
-      // Handle database-specific errors
-      if (error.message.includes("Failed to query") ||
-          error.message.includes("Failed to update") ||
-          error.message.includes("Failed to create")) {
-        return NextResponse.json(
-          { error: "Database operation failed. Please try again later." },
-          { status: 503 }
         );
       }
     }
