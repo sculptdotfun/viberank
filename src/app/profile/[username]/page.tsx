@@ -22,6 +22,7 @@ import { computeStreaks } from "@/lib/streaks";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
+import BadgeSnippet from "./BadgeSnippet";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
@@ -568,6 +569,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
             )}
           </div>
         )}
+      </div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10">
+        <BadgeSnippet username={profileData.username} />
       </div>
       <Footer />
     </div>
