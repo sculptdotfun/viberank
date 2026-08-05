@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
 
 const RESOURCES = [
+  { name: "Cost calculator", href: "/calculator" },
   { name: "Blog", href: "/blog" },
   { name: "Hire AI-native engineers", href: "/hire" },
   { name: "What is tokenmaxxing?", href: "/blog/what-is-tokenmaxxing" },
