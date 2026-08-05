@@ -23,7 +23,13 @@ export const metadata: Metadata = {
       "Total spend, tokens burned, and the most used models across every coding agent tracked on Viberank.",
     url: "https://www.viberank.app/stats",
     siteName: "Viberank",
+    // Without an explicit image here the page-level openGraph object replaces
+    // the layout's default and the page shares as a bare link.
+    images: [
+      `/api/og?title=${encodeURIComponent("The state of the board")}&description=${encodeURIComponent("Aggregate AI coding spend, tokens and models across every developer on Viberank")}`,
+    ],
   },
+  twitter: { card: "summary_large_image" },
 };
 
 function StatTile({
