@@ -3,6 +3,52 @@ import { getTier } from '@/lib/tiers';
 
 export const runtime = 'edge';
 
+
+/**
+ * Live headline figures for the default share card.
+ *
+ * These were hardcoded as "1000+ / $50K+ / 100M+". The board passed those
+ * numbers long ago — it is at $8.5M and 9.2T tokens — so every link shared to
+ * Twitter or Slack was underselling the site by more than two orders of
+ * magnitude. Read them from the same site-stats function /stats uses.
+ *
+ * Best effort: the card must still render if the call fails, so a failure
+ * falls back to conservative floors rather than throwing.
+ */
+async function loadSiteStats(): Promise<{ users: string; spend: string; tokens: string }> {
+  const fallback = { users: '1000+', spend: '$8M+', tokens: '9T+' };
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return fallback;
+
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/get_site_stats`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}',
+      // Share cards are fetched by crawlers far more often than the data
+      // changes; an hour of staleness is invisible and keeps this cheap.
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return fallback;
+    const s = await res.json();
+
+    const compact = (n: number) =>
+      n >= 1e12 ? `${(n / 1e12).toFixed(1)}T`
+      : n >= 1e9 ? `${(n / 1e9).toFixed(0)}B`
+      : n >= 1e6 ? `${(n / 1e6).toFixed(0)}M`
+      : `${Math.round(n / 1e3)}K`;
+
+    return {
+      users: `${Number(s.totalUsers || 0).toLocaleString('en-US')}`,
+      spend: `$${compact(Number(s.totalCost || 0))}`,
+      tokens: compact(Number(s.totalTokens || 0)),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 const Logo = ({ size = 72 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <rect x="3" y="14" width="5" height="7" rx="1" fill="#f97316" opacity="0.5" />
@@ -242,7 +288,11 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
 
           {/* stats + CTA */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: streak ? 56 : 72 }}>
+            {/* With four stats the row outgrew the canvas and pushed the CTA
+                off the right edge — on the profile card, which is the one
+                people actually share. Tighten the gap and stop the CTA from
+                being the thing that gets squeezed out. */}
+            <div style={{ display: 'flex', gap: streak ? 28 : 64, minWidth: 0 }}>
               {stat(costLabel, 'AI CODING USAGE', '#f97316')}
               {tokens ? stat(tokens, 'TOKENS', '#fafafa') : null}
               {days ? stat(days, 'ACTIVE DAYS', '#fafafa') : null}
@@ -257,6 +307,7 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
                 backgroundColor: '#16161a',
                 border: '1px solid #26262d',
                 borderRadius: 10,
+                flexShrink: 0,
               }}
             >
               <span style={{ fontSize: 22, color: '#9a9aa5', fontFamily: 'Geist Mono' }}>$</span>
@@ -301,6 +352,7 @@ export async function GET(request: Request) {
 
     const title = searchParams.get('title') || 'Viberank';
     const description = searchParams.get('description') || 'Claude Code, Codex & AI Coding Leaderboard';
+    const siteStats = await loadSiteStats();
 
     return new ImageResponse(
       (
@@ -324,10 +376,15 @@ export async function GET(request: Request) {
             </svg>
             <h1
               style={{
-                fontSize: 72,
+                // A fixed 72px clipped anything longer than ~30 characters —
+                // both the logo and the closing character ran off the canvas.
+                fontSize: title.length > 44 ? 44 : title.length > 30 ? 56 : 72,
                 fontWeight: 'bold',
                 color: '#fafafa',
                 margin: 0,
+                textAlign: 'center',
+                maxWidth: 1000,
+                lineHeight: 1.15,
               }}
             >
               {title}
@@ -356,15 +413,15 @@ export async function GET(request: Request) {
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>1000+</div>
+              <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>{siteStats.users}</div>
               <div style={{ fontSize: 20, color: '#a1a1aa' }}>Developers</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>$50K+</div>
+              <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>{siteStats.spend}</div>
               <div style={{ fontSize: 20, color: '#a1a1aa' }}>Total Spent</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>100M+</div>
+              <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>{siteStats.tokens}</div>
               <div style={{ fontSize: 20, color: '#a1a1aa' }}>Tokens Used</div>
             </div>
           </div>

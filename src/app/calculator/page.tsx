@@ -25,7 +25,11 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: "https://www.viberank.app/calculator",
     siteName: "Viberank",
+    images: [
+      `/api/og?title=${encodeURIComponent("Are you overpaying for AI coding?")}&description=${encodeURIComponent("88% of developers burn more than $200/month in API-equivalent cost. Find out where you land.")}`,
+    ],
   },
+  twitter: { card: "summary_large_image" },
 };
 
 export default async function CalculatorPage() {
