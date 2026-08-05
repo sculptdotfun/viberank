@@ -45,19 +45,19 @@ type Errors = Record<string, FakeError>;
  * silently truncates responses, which is the bug class these tests guard.
  */
 class FakeQuery implements PromiseLike<{ data: unknown; error: FakeError | null }> {
-  private operation: Call["operation"] = "select";
+  protected operation: Call["operation"] = "select";
   private payload: unknown;
   private options: unknown;
-  private rangeFrom = 0;
-  private rangeTo = Infinity;
+  protected rangeFrom = 0;
+  protected rangeTo = Infinity;
   private isSingle = false;
 
   constructor(
-    private readonly table: string,
-    private readonly calls: Call[],
-    private readonly rows: Rows,
-    private readonly errors: Errors,
-    private readonly maxRows: number
+    protected readonly table: string,
+    protected readonly calls: Call[],
+    protected readonly rows: Rows,
+    protected readonly errors: Errors,
+    protected readonly maxRows: number
   ) {}
 
   select(): this { this.operation = "select"; return this; }
@@ -117,9 +117,9 @@ class FakeClient {
   readonly calls: Call[] = [];
 
   constructor(
-    private readonly rows: Rows,
-    private readonly errors: Errors = {},
-    private readonly maxRows = 1000
+    protected readonly rows: Rows,
+    protected readonly errors: Errors = {},
+    protected readonly maxRows = 1000
   ) {}
 
   from(table: string): FakeQuery {
@@ -381,6 +381,77 @@ const deletionRows = () => ({
   assert.equal(result.matchedCount, 1);
   assert.match(result.message, /would delete 1 profiles, 1 submissions, 2 daily rows, 2 archived payloads/);
   check("dry run reports the full blast radius without deleting");
+}
+
+// ---------------------------------------------------------------------------
+// Large id lists must be chunked — `.in()` fails outright past ~350 uuids
+// ---------------------------------------------------------------------------
+
+const { SupabaseStatsService } = await import("../src/lib/data/supabase/client.ts");
+
+{
+  // Model the real server: reject any request whose `.in()` list is too long,
+  // the way production does past ~350 ids.
+  const IN_LIMIT = 350;
+  const submissions = Array.from({ length: 500 }, (_, i) => ({
+    id: `sub-${i}`,
+    username: `user-${i}`,
+    total_cost: 10,
+    total_tokens: 100,
+    models_used: ["claude-opus-4"],
+    tools: ["claude"],
+  }));
+  // One daily row per submission, so a working query yields 500 days total.
+  const dailyRows = submissions.map((s, i) => ({ id: `d-${i}`, submission_id: s.id }));
+
+  class UrlLimitedQuery extends FakeQuery {
+    private inIds: string[] | null = null;
+    in(_col: string, ids: string[]) {
+      this.inIds = ids;
+      return this;
+    }
+    then(onfulfilled?: never, onrejected?: never) {
+      // Too many ids in the URL: the server rejects the whole request.
+      if (this.inIds && this.inIds.length > IN_LIMIT) {
+        return Promise.resolve({ data: null, error: { message: "Bad Request" } }).then(
+          onfulfilled,
+          onrejected
+        );
+      }
+      // Otherwise actually honour the filter, so chunks return disjoint rows
+      // rather than the whole table each time.
+      if (this.inIds) {
+        const wanted = new Set(this.inIds);
+        const all = (this.rows[this.table] as Array<{ submission_id?: string }>) ?? [];
+        const matched = all.filter((r) => wanted.has(r.submission_id!));
+        const windowed = matched.slice(this.rangeFrom, this.rangeTo + 1).slice(0, this.maxRows);
+        return Promise.resolve({ data: windowed, error: null }).then(onfulfilled, onrejected);
+      }
+      return super.then(onfulfilled, onrejected);
+    }
+  }
+
+  class UrlLimitedClient extends FakeClient {
+    from(table: string) {
+      const q = new UrlLimitedQuery(table, this.calls, this.rows, this.errors, this.maxRows);
+      return q;
+    }
+  }
+
+  const client = new UrlLimitedClient(
+    { submissions, daily_breakdowns: dailyRows },
+    {},
+    1000
+  );
+  const stats = new SupabaseStatsService(client as never);
+  const result = await stats.getGlobalStats();
+
+  assert.equal(
+    result.totalDays,
+    500,
+    `totalDays came back ${result.totalDays} — an over-long .in() failed and the null was read as "no rows"`
+  );
+  check("global stats chunks large id lists instead of reporting 0 days");
 }
 
 console.log(`\n${passed} passed, 0 failed`);
