@@ -30,6 +30,7 @@ import type {
   ModelBreakdown,
 } from "../types";
 import { SupabaseRateLimiter } from "./rate-limiter";
+import type { BurnRow } from "@/lib/spend-curve";
 import {
   validateCcData,
   inferToolFromModel,
@@ -1651,6 +1652,34 @@ export class SupabaseStatsService implements StatsService {
       return null;
     }
     return data as SiteStats;
+  }
+
+  async getSpendRows(): Promise<BurnRow[]> {
+    // Only the four columns the spend curve needs, paged. The whole table is
+    // ~1k rows and /calculator is ISR-cached hourly, so this is cheaper than
+    // the aggregates /stats already runs — no RPC or migration required.
+    const rows = await fetchAllPages<{
+      username: string;
+      total_cost: number;
+      date_range_start: string;
+      date_range_end: string;
+    }>(
+      (from, to) =>
+        this.client
+          .from("submissions")
+          .select("username,total_cost,date_range_start,date_range_end")
+          .or("flagged_for_review.is.null,flagged_for_review.eq.false")
+          .order("id", { ascending: true })
+          .range(from, to),
+      "submissions for spend curve"
+    );
+
+    return rows.map((r) => ({
+      username: r.username,
+      totalCost: Number(r.total_cost),
+      start: r.date_range_start,
+      end: r.date_range_end,
+    }));
   }
 }
 

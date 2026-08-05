@@ -65,6 +65,20 @@ export function formatCurrency(num: number): string {
   });
 }
 
+/**
+ * Money with the symbol attached, and cents only where they carry meaning.
+ * `formatCurrency` deliberately omits the symbol because the leaderboard
+ * styles it separately; this is the plain-prose counterpart.
+ */
+export function formatUsd(num: number): string {
+  const value = Number.isFinite(num) ? num : 0;
+  const cents = Math.abs(value) < 100;
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: cents ? 2 : 0,
+  })}`;
+}
+
 export function formatLargeNumber(num: number): string {
   return num.toLocaleString('en-US');
 }
