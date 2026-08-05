@@ -1,121 +1,151 @@
 /**
- * Subscription-vs-API comparison for Claude Code usage.
+ * Subscription-vs-API comparison for AI coding usage.
  *
  * ccusage reports what your usage *would* cost at API list prices. Almost
  * nobody actually pays that — most people are on a flat subscription. The gap
  * between those two numbers is the thing this file computes, and it is the
  * single most useful thing viberank's data can tell an individual developer.
  *
- * Prices verified 2026-08-05 against claude.com/pricing and the Max plan help
- * centre article. They are monthly-billing list prices in USD.
+ * Every price here is a monthly-billing list price in USD, checked against the
+ * vendor's own pricing page on 2026-08-05. They are asserted in the tests, so
+ * an unsourced edit fails CI rather than quietly misinforming someone.
  */
 
 export interface Plan {
   id: string;
   name: string;
-  /** Monthly price in USD, billed monthly. */
   monthly: number;
-  /** What the plan is for, in one line. */
   blurb: string;
   /**
-   * Rough ceiling on sustainable API-equivalent burn, expressed as a multiple
-   * of Pro. Anthropic publishes Max as "5x" and "20x" Pro usage rather than a
-   * dollar figure, so this is a relative capacity hint, not a billing cap.
+   * Usage capacity relative to the tool's entry paid plan, when the vendor
+   * publishes one. `null` means they don't, and we must not invent it — see
+   * `coversBurn` for what that changes.
    */
-  usageMultiple: number;
+  usageMultiple: number | null;
 }
 
-export const PLANS: Plan[] = [
+export interface ToolPlans {
+  id: string;
+  /** Matches the `tools` values stored on a submission. */
+  label: string;
+  plans: Plan[];
+  /**
+   * API-equivalent burn the entry paid plan is sized for. An estimate — every
+   * vendor states capacity relative to their own tiers, never in dollars — so
+   * it only ever picks which plan to *suggest*. No saving figure depends on it.
+   */
+  entryPlanBurn: number;
+  /** Shown verbatim on the page so the numbers are auditable. */
+  source: string;
+  /** Set when the vendor publishes no comparable usage tiers. */
+  capacityUnknownNote?: string;
+}
+
+export const TOOL_PLANS: ToolPlans[] = [
   {
-    id: "pro",
-    name: "Claude Pro",
-    monthly: 20,
-    blurb: "Everyday coding, a few hours a day.",
-    usageMultiple: 1,
+    id: "claude",
+    label: "Claude Code",
+    entryPlanBurn: 100,
+    source: "claude.com/pricing and the Max plan help centre article",
+    plans: [
+      { id: "pro", name: "Claude Pro", monthly: 20, blurb: "Everyday coding, a few hours a day.", usageMultiple: 1 },
+      { id: "max5", name: "Claude Max 5x", monthly: 100, blurb: "Most of a working day in Claude Code.", usageMultiple: 5 },
+      { id: "max20", name: "Claude Max 20x", monthly: 200, blurb: "All day, every day, plus parallel agents.", usageMultiple: 20 },
+    ],
   },
   {
-    id: "max5",
-    name: "Claude Max 5x",
-    monthly: 100,
-    blurb: "Most of a working day in Claude Code.",
-    usageMultiple: 5,
+    id: "codex",
+    label: "Codex",
+    entryPlanBurn: 100,
+    source: "learn.chatgpt.com/docs/pricing",
+    plans: [
+      { id: "go", name: "ChatGPT Go", monthly: 8, blurb: "Lightweight coding tasks.", usageMultiple: 0.4 },
+      { id: "plus", name: "ChatGPT Plus", monthly: 20, blurb: "A few focused coding sessions a week.", usageMultiple: 1 },
+      // OpenAI states Pro as "5x higher rate limits than Plus".
+      { id: "pro", name: "ChatGPT Pro", monthly: 100, blurb: "5× the rate limits of Plus.", usageMultiple: 5 },
+      { id: "pro200", name: "ChatGPT Pro ($200 tier)", monthly: 200, blurb: "Highest limits, plus unlimited voice.", usageMultiple: 5 },
+    ],
   },
   {
-    id: "max20",
-    name: "Claude Max 20x",
-    monthly: 200,
-    blurb: "All day, every day, plus parallel agents.",
-    usageMultiple: 20,
+    id: "copilot",
+    label: "GitHub Copilot",
+    entryPlanBurn: 100,
+    source: "github.com/features/copilot/plans",
+    capacityUnknownNote:
+      "GitHub does not publish usage tiers as multiples of each other, so no plan is marked as too small — only the break-even arithmetic is shown.",
+    plans: [
+      { id: "pro", name: "Copilot Pro", monthly: 10, blurb: "Individual developers.", usageMultiple: null },
+      { id: "proplus", name: "Copilot Pro+", monthly: 39, blurb: "Heavier agent use.", usageMultiple: null },
+      { id: "max", name: "Copilot Max", monthly: 100, blurb: "Sustained, high-volume agent workflows.", usageMultiple: null },
+    ],
   },
 ];
 
-/** Anthropic API list prices, USD per million tokens. Verified 2026-08-05. */
-export const API_PRICES = [
-  { model: "Claude Opus 5", input: 5, output: 25 },
-  { model: "Claude Sonnet 5", input: 3, output: 15 },
-  { model: "Claude Haiku 4.5", input: 1, output: 5 },
-] as const;
+export const DEFAULT_TOOL = TOOL_PLANS[0];
 
-export interface PlanVerdict {
-  /** The cheapest plan whose usage tier plausibly covers this burn. */
-  recommended: Plan;
-  /** Monthly saving vs paying API list prices for the same usage. */
-  savingVsApi: number;
-  /** How many times over the plan pays for itself. Infinity guarded to 0 burn. */
-  multiple: number;
-  /**
-   * True when burn is high enough that even the largest plan's usage limits
-   * are likely to bind. The saving is still real, but so are the rate limits.
-   */
-  exceedsTopPlan: boolean;
+export function toolPlansFor(toolId: string): ToolPlans {
+  return TOOL_PLANS.find((tool) => tool.id === toolId) ?? DEFAULT_TOOL;
 }
-
-/**
- * Pro is sized for roughly this much API-equivalent burn per month. Derived
- * from viberank's own distribution rather than published limits: Anthropic
- * states Max as a multiple of Pro, never as a dollar figure, so any absolute
- * number here is an estimate. Used only to pick which plan to *suggest* — the
- * saving figure below never depends on it.
- */
-const PRO_EQUIVALENT_BURN = 100;
 
 /**
  * Whether a plan's usage tier plausibly carries this much burn.
  *
  * This is what stops the comparison table from lying. Raw arithmetic says the
- * cheapest plan always "saves" the most — Pro appears to save more than Max
+ * cheapest plan always "saves" the most — Claude Pro appears to beat Max
  * against a $1,300/month burn, because it costs less. But Pro would rate-limit
  * that user at a fraction of their usage, so presenting it as the bigger
- * saving is nonsense. The table has to show capacity alongside price.
+ * saving is nonsense.
+ *
+ * When a vendor publishes no usage multiples we return `true` rather than
+ * guess: showing an invented "too small" label would be a different kind of
+ * lie from the one we're fixing.
  */
-export function coversBurn(plan: Plan, monthlyApiCost: number): boolean {
-  return monthlyApiCost <= PRO_EQUIVALENT_BURN * plan.usageMultiple;
+export function coversBurn(tool: ToolPlans, plan: Plan, monthlyApiCost: number): boolean {
+  if (plan.usageMultiple === null) return true;
+  return monthlyApiCost <= tool.entryPlanBurn * plan.usageMultiple;
 }
 
-/**
- * Given an API-equivalent monthly burn, work out which plan to be on and what
- * it saves. `monthlyApiCost` is what ccusage says the month would cost at list
- * prices.
- */
-export function comparePlans(monthlyApiCost: number): PlanVerdict {
+export interface PlanVerdict {
+  /**
+   * `null` when the vendor publishes no usage tiers. Picking the cheapest plan
+   * in that case would claim a $10 seat carries $1,300/month of usage — the
+   * same lie the capacity check exists to prevent, just from the other side.
+   * Better to show the prices and decline to rank them.
+   */
+  recommended: Plan | null;
+  /** Monthly saving vs paying API list prices for the same usage. */
+  savingVsApi: number;
+  multiple: number;
+  /** Burn exceeds what even the largest plan is sized for. */
+  exceedsTopPlan: boolean;
+}
+
+export function comparePlans(tool: ToolPlans, monthlyApiCost: number): PlanVerdict {
   const burn = Number.isFinite(monthlyApiCost) && monthlyApiCost > 0 ? monthlyApiCost : 0;
+  const top = tool.plans[tool.plans.length - 1];
+  const ranked = tool.plans.some((plan) => plan.usageMultiple !== null);
 
-  const recommended =
-    PLANS.find((plan) => burn <= PRO_EQUIVALENT_BURN * plan.usageMultiple) ??
-    PLANS[PLANS.length - 1];
+  const recommended = ranked
+    ? tool.plans.find((plan) => coversBurn(tool, plan, burn)) ?? top
+    : null;
 
-  // The saving is burn minus the subscription price — not clamped at zero,
-  // because a negative number is the honest answer for light users: below
-  // ~$20/month of usage, the API is genuinely the cheaper option and the tool
-  // should say so rather than manufacture a win.
-  const savingVsApi = burn - recommended.monthly;
+  // Not clamped at zero: below the price of the cheapest plan the API is
+  // genuinely cheaper, and the tool should say so rather than manufacture a
+  // win. A calculator that can never tell you "don't buy this" isn't useful.
+  const savingVsApi = recommended ? burn - recommended.monthly : 0;
 
   return {
     recommended,
     savingVsApi,
-    multiple: recommended.monthly > 0 ? burn / recommended.monthly : 0,
-    exceedsTopPlan: burn > PRO_EQUIVALENT_BURN * PLANS[PLANS.length - 1].usageMultiple,
+    multiple: recommended && recommended.monthly > 0 ? burn / recommended.monthly : 0,
+    exceedsTopPlan:
+      top.usageMultiple !== null && burn > tool.entryPlanBurn * top.usageMultiple,
   };
+}
+
+/** Whether this tool publishes enough to rank its plans by capacity. */
+export function hasCapacityData(tool: ToolPlans): boolean {
+  return tool.plans.some((plan) => plan.usageMultiple !== null);
 }
 
 /**
