@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { FEATURED_TOOLS } from "@/lib/utils";
+import { fetchAllPages } from "@/lib/data/supabase/client";
 
 const SITE = "https://www.viberank.app";
 
@@ -43,14 +44,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // by the unique `github_username` constraint. The data-layer's
     // `getLeaderboard` caps pageSize at 50 to protect the leaderboard UI,
     // which isn't useful for sitemap generation.
+    // `.limit(45000)` here was silently served as 1000 by PostgREST's
+    // db-max-rows, so every profile past the first thousand was missing from
+    // the sitemap entirely — the same silent cap fixed in the data layer.
+    // Page through with the same helper rather than a second implementation.
     const client = createClient(supabaseUrl, serviceKey);
-    const { data: profiles } = await client
-      .from("profiles")
-      .select("username, github_username, updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(45000); // Google's per-sitemap ceiling is 50k URLs.
+    const profiles = await fetchAllPages<{
+      username: string;
+      github_username: string | null;
+      updated_at: string | null;
+    }>(
+      (from, to) =>
+        client
+          .from("profiles")
+          .select("username, github_username, updated_at")
+          .order("updated_at", { ascending: false })
+          .order("username", { ascending: true })
+          .range(from, to),
+      "profiles for sitemap"
+    );
 
-    const profileEntries: MetadataRoute.Sitemap = (profiles ?? []).flatMap((p) => {
+    const profileEntries: MetadataRoute.Sitemap = profiles.flatMap((p) => {
       const handle = p.github_username || p.username;
       if (!handle) return [];
       return [{

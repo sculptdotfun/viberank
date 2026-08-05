@@ -189,7 +189,7 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 200_000;
 
-async function fetchAllPages<T>(
+export async function fetchAllPages<T>(
   buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   context: string
 ): Promise<T[]> {
