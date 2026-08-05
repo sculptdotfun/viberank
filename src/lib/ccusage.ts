@@ -209,7 +209,14 @@ function aggregateContributions(
 export function mergeMachineContribution(
   existing: Record<string, MachineContribution> | null | undefined,
   machineId: string,
-  incoming: MachineContribution
+  incoming: MachineContribution,
+  /**
+   * Accept a lower re-report for this day instead of holding the high-water
+   * mark. Set when the corpus shows the user deleted history for the month
+   * (#112) — preserving a figure they deliberately erased is the one case
+   * where the high-water mark is wrong.
+   */
+  acceptLower = false
 ): {
   contributions: Record<string, MachineContribution>;
   aggregate: DailyAggregate;
@@ -244,7 +251,7 @@ export function mergeMachineContribution(
     // Compared on cost and swapped whole rather than per-field: taking the max
     // of each field independently would synthesise a slice that was never
     // actually observed, with tokens from one run and cost from another.
-    if (prior && prior.totalCost > incoming.totalCost) {
+    if (!acceptLower && prior && prior.totalCost > incoming.totalCost) {
       contributions = { ...idSlices, [machineId]: prior };
       retainedPrior = true;
     } else {

@@ -33,6 +33,7 @@ import type {
   TokenOwner,
 } from "../types";
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
+import { monthsUserDeleted, monthOfDate, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import type { BurnRow } from "@/lib/spend-curve";
 import {
@@ -394,6 +395,70 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     validateCcData(data.ccData as Parameters<typeof validateCcData>[0]);
   }
 
+  /**
+   * Compare the client's per-month corpus against what this machine last
+   * reported, and return the months whose lower totals should be honoured.
+   *
+   * Best effort throughout: a client that sends no corpus, or a table that
+   * isn't migrated yet, yields an empty set — which is #111's behaviour, so
+   * the worst case is the status quo rather than a failed submission.
+   */
+  private async classifyCorpusDrift(
+    data: SubmitData,
+    machineId: string
+  ): Promise<Set<string>> {
+    const incoming = data.corpus;
+    if (!incoming || Object.keys(incoming).length === 0) return new Set();
+
+    try {
+      const { data: rows, error } = await this.client
+        .from("corpus_observations")
+        .select("month, files, bytes")
+        .ilike("username", data.username)
+        .eq("machine_id", machineId);
+
+      if (error) {
+        if (MISSING_TABLE_CODES.has(error.code)) return new Set();
+        console.error("Corpus lookup failed:", error.message);
+        return new Set();
+      }
+
+      const prior: Record<string, CorpusSize> = {};
+      for (const row of rows ?? []) {
+        prior[row.month] = { files: Number(row.files), bytes: Number(row.bytes) };
+      }
+
+      const deleted = monthsUserDeleted(prior, incoming);
+
+      // Record the new observation so the next submission has something to
+      // compare against. Upsert on the natural key rather than delete-insert,
+      // so a failure here cannot leave the machine with no history at all.
+      const { error: upsertError } = await this.client.from("corpus_observations").upsert(
+        Object.entries(incoming).map(([month, size]) => ({
+          username: data.username,
+          machine_id: machineId,
+          month,
+          files: Math.max(0, Math.trunc(Number(size.files) || 0)),
+          bytes: Math.max(0, Math.trunc(Number(size.bytes) || 0)),
+          observed_at: new Date().toISOString(),
+        })),
+        { onConflict: "username,machine_id,month" }
+      );
+      if (upsertError) console.error("Corpus observation upsert failed:", upsertError.message);
+
+      if (deleted.size > 0) {
+        console.warn(
+          `Corpus shrank for ${data.username} (machine ${machineId}) in ${[...deleted].join(", ")} — honouring the lower totals rather than holding the high-water mark (#112).`
+        );
+      }
+
+      return deleted;
+    } catch (error) {
+      console.error("Corpus classification failed:", error);
+      return new Set();
+    }
+  }
+
   private async mergeWithExisting(
     existing: DbSubmission,
     data: SubmitData,
@@ -427,6 +492,12 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // Build every row first, then write them in one request. This used to be a
     // round-trip per day, which put a multi-year history past the request
     // budget even though each individual write was fast (#93).
+    // Which months the user actually cleared, as opposed to months the runtime
+    // rewrote (#112). Only the first should be allowed to lower a stored
+    // total; #111 held the high-water mark for both, which meant a deliberate
+    // deletion left behind a figure the user meant to erase.
+    const deletedMonths = await this.classifyCorpusDrift(data, machineId);
+
     // Days where a re-report came in lower than what we already had, i.e.
     // Claude Code rewrote its own transcript between runs (#83). Counted so
     // the submission response can tell the user rather than silently keeping
@@ -438,7 +509,9 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       const { contributions, aggregate, retainedPrior } = mergeMachineContribution(
         prior?.machine_contributions ?? null,
         machineId,
-        dailyEntryToContribution(day)
+        dailyEntryToContribution(day),
+        // A day inside a month the user cleared takes the lower number.
+        deletedMonths.has(monthOfDate(day.date) ?? "")
       );
       if (retainedPrior) driftedDays.push(day.date);
 

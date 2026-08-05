@@ -12,6 +12,7 @@ import prompts from 'prompts';
 import fetch from 'node-fetch';
 import { getToken, getMachineId, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
 import * as autosubmit from './lib/autosubmit.js';
+import { collectCorpus } from './lib/corpus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -287,6 +288,16 @@ async function main() {
     
     try {
       const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
+
+      // Per-month corpus size, so the server can tell a transcript the runtime
+      // rewrote from history the user deleted (#112). Best effort: a scan that
+      // fails must never block a submission.
+      try {
+        const corpus = collectCorpus();
+        if (corpus) ccData.drift = { corpus };
+      } catch {
+        // No corpus block; the server falls back to holding the high-water mark.
+      }
       
       const response = await fetch('https://www.viberank.app/api/submit', {
         method: 'POST',
