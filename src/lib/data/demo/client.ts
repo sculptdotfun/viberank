@@ -435,6 +435,11 @@ export function createDemoDataLayer(): DataLayer {
       async getSiteStats(): Promise<SiteStats | null> {
         return null;
       },
+      // The demo backend has no cohort to rank against; an empty list makes
+      // /calculator render its no-cohort state rather than invent a curve.
+      async getSpendRows() {
+        return [];
+      },
       async getGlobalStats(): Promise<GlobalStats> {
         const ranked = sortSubmissions(submissions, "cost");
         const totalCost = submissions.reduce((sum, submission) => sum + submission.totalCost, 0);
