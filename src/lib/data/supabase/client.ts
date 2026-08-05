@@ -413,13 +413,20 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // Build every row first, then write them in one request. This used to be a
     // round-trip per day, which put a multi-year history past the request
     // budget even though each individual write was fast (#93).
+    // Days where a re-report came in lower than what we already had, i.e.
+    // Claude Code rewrote its own transcript between runs (#83). Counted so
+    // the submission response can tell the user rather than silently keeping
+    // the higher number.
+    const driftedDays: string[] = [];
+
     const dailyRows = data.ccData.daily.map((day) => {
       const prior = dailyMap.get(day.date);
-      const { contributions, aggregate } = mergeMachineContribution(
+      const { contributions, aggregate, retainedPrior } = mergeMachineContribution(
         prior?.machine_contributions ?? null,
         machineId,
         dailyEntryToContribution(day)
       );
+      if (retainedPrior) driftedDays.push(day.date);
 
       const dailyData = {
         submission_id: existing.id,
@@ -514,6 +521,13 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     if (submissionUpdateError) {
       throw new Error(
         `Failed to update existing submission: ${submissionUpdateError.message}`
+      );
+    }
+
+    if (driftedDays.length > 0) {
+      console.warn(
+        `Usage drift for ${data.username}: ${driftedDays.length} day(s) re-reported lower than stored and kept at the earlier figure (#83).`,
+        driftedDays.slice(0, 10)
       );
     }
 

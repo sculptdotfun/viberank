@@ -210,16 +210,49 @@ export function mergeMachineContribution(
   existing: Record<string, MachineContribution> | null | undefined,
   machineId: string,
   incoming: MachineContribution
-): { contributions: Record<string, MachineContribution>; aggregate: DailyAggregate } {
+): {
+  contributions: Record<string, MachineContribution>;
+  aggregate: DailyAggregate;
+  /** True when a lower re-report was rejected in favour of the stored slice. */
+  retainedPrior: boolean;
+} {
   let contributions: Record<string, MachineContribution>;
+  let retainedPrior = false;
+
   if (machineId === DEFAULT_MACHINE_ID) {
     // No-id submission: unattributable, so it owns the whole day.
     contributions = { [DEFAULT_MACHINE_ID]: incoming };
   } else {
     const { [DEFAULT_MACHINE_ID]: _unattributed, ...idSlices } = existing ?? {};
-    contributions = { ...idSlices, [machineId]: incoming };
+    const prior = idSlices[machineId];
+
+    // High-water mark per (day, machine).
+    //
+    // Claude Code rewrites its own session JSONLs on resume/compact, so a
+    // later run can report *less* for a day that already happened. #83 has two
+    // independent confirmations: a month-to-date total falling 11% between
+    // submissions 16h apart while the file count rose, and 5 assistant
+    // messages vanishing from one transcript between scans. Replacing the
+    // slice unconditionally meant the board silently took the lower number
+    // and a user's total decayed through no fault of their own.
+    //
+    // A past day can only ever be under-reported by a rewrite, never
+    // over-reported by one, so keeping the larger observation is the accurate
+    // choice rather than a generous one. Today's day still grows normally,
+    // because a later run legitimately reports more and simply wins.
+    //
+    // Compared on cost and swapped whole rather than per-field: taking the max
+    // of each field independently would synthesise a slice that was never
+    // actually observed, with tokens from one run and cost from another.
+    if (prior && prior.totalCost > incoming.totalCost) {
+      contributions = { ...idSlices, [machineId]: prior };
+      retainedPrior = true;
+    } else {
+      contributions = { ...idSlices, [machineId]: incoming };
+    }
   }
-  return { contributions, aggregate: aggregateContributions(contributions) };
+
+  return { contributions, aggregate: aggregateContributions(contributions), retainedPrior };
 }
 
 export interface NormalizedCcData {
