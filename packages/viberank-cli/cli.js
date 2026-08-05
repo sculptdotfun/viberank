@@ -141,6 +141,13 @@ async function autosubmitCommand(arg) {
   const result = autosubmit.enable(hour ?? 9);
   console.log(chalk.green(`\n✓ Submitting daily at ${String(result.hour).padStart(2, '0')}:00 via ${result.scheduler}.`));
   console.log(chalk.gray(`  ${result.path}`));
+  if (!result.durable) {
+    // Scheduled through `npx -y` because this copy lives in npm's throwaway
+    // cache. Say so, rather than let someone wonder why a background job
+    // reaches the network.
+    console.log(chalk.gray('  Runs via npx, so it stays on the latest version.'));
+    console.log(chalk.gray('  For an offline-capable job: npm i -g viberank-cli, then re-run this.'));
+  }
   console.log(chalk.gray('  Turn it off with: npx viberank-cli autosubmit off\n'));
 }
 

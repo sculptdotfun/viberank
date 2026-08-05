@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { CONFIG_DIR } from './config.js';
 
 /**
@@ -33,14 +34,38 @@ const plistPath = () =>
   path.join(os.homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`);
 const systemdDir = () => path.join(os.homedir(), '.config', 'systemd', 'user');
 
-/** Absolute node + CLI paths: a scheduler runs with a minimal PATH. */
+/**
+ * The argv a scheduler should run. Absolute, because a launchd or systemd job
+ * starts with a minimal PATH.
+ *
+ * The subtlety is *which* absolute path. `npx viberank-cli autosubmit` runs
+ * this file out of npm's `_npx` cache, which npm garbage-collects — baking
+ * that path into a plist produces a job that works today and silently stops
+ * firing weeks later, which is worse than not scheduling at all because
+ * nothing announces the failure.
+ *
+ * So: use the direct path only when this copy lives somewhere durable (a
+ * global install, or a project's own node_modules). Otherwise schedule
+ * `npx -y viberank-cli@latest`, which re-resolves on every run. That costs a
+ * registry round-trip once a day and keeps the job self-updating.
+ */
 function invocation() {
-  const cli = path.resolve(new URL('../cli.js', import.meta.url).pathname);
-  return { node: process.execPath, cli };
+  const cli = fileURLToPath(new URL('../cli.js', import.meta.url));
+  const ephemeral = cli.includes(`${path.sep}_npx${path.sep}`);
+
+  if (!ephemeral) return { argv: [process.execPath, cli], durable: true };
+
+  // Resolve npx next to the running node so the scheduler doesn't need PATH.
+  const npx = path.join(path.dirname(process.execPath), 'npx');
+  const runner = fs.existsSync(npx) ? npx : 'npx';
+  return { argv: [runner, '-y', 'viberank-cli@latest'], durable: false };
 }
 
 function plist(hour) {
-  const { node, cli } = invocation();
+  const { argv } = invocation();
+  const args = [...argv, 'submit', '--quiet']
+    .map((a) => `    <string>${a}</string>`)
+    .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -48,10 +73,7 @@ function plist(hour) {
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${node}</string>
-    <string>${cli}</string>
-    <string>submit</string>
-    <string>--quiet</string>
+${args}
   </array>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>0</integer></dict>
@@ -66,14 +88,15 @@ function plist(hour) {
 }
 
 function systemdUnits(hour) {
-  const { node, cli } = invocation();
+  const { argv } = invocation();
+  const exec = [...argv, 'submit', '--quiet'].join(' ');
   return {
     service: `[Unit]
 Description=Submit AI coding usage to viberank
 
 [Service]
 Type=oneshot
-ExecStart=${node} ${cli} submit --quiet
+ExecStart=${exec}
 `,
     timer: `[Unit]
 Description=Daily viberank submission
@@ -103,7 +126,7 @@ export function enable(hour = 9) {
     // than failing with "already loaded".
     try { execFileSync('launchctl', ['unload', file], { stdio: 'ignore' }); } catch { /* not loaded */ }
     execFileSync('launchctl', ['load', file], { stdio: 'ignore' });
-    return { scheduler: 'launchd', path: file, hour };
+    return { scheduler: 'launchd', path: file, hour, durable: invocation().durable };
   }
 
   if (target === 'systemd') {
@@ -114,16 +137,17 @@ export function enable(hour = 9) {
     fs.writeFileSync(path.join(dir, 'viberank.timer'), units.timer);
     execFileSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'ignore' });
     execFileSync('systemctl', ['--user', 'enable', '--now', 'viberank.timer'], { stdio: 'ignore' });
-    return { scheduler: 'systemd', path: dir, hour };
+    return { scheduler: 'systemd', path: dir, hour, durable: invocation().durable };
   }
 
-  const { node, cli } = invocation();
+  const { argv } = invocation();
+  const tr = [...argv, 'submit', '--quiet'].map((a) => `"${a}"`).join(' ');
   execFileSync('schtasks', [
     '/Create', '/F', '/TN', 'viberank-autosubmit',
-    '/TR', `"${node}" "${cli}" submit --quiet`,
+    '/TR', tr,
     '/SC', 'DAILY', '/ST', `${String(hour).padStart(2, '0')}:00`,
   ], { stdio: 'ignore' });
-  return { scheduler: 'schtasks', path: 'viberank-autosubmit', hour };
+  return { scheduler: 'schtasks', path: 'viberank-autosubmit', hour, durable: invocation().durable };
 }
 
 export function disable() {
