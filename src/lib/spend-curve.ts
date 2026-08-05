@@ -65,6 +65,34 @@ export function buildSpendCurve(rows: BurnRow[]): SpendCurve {
   };
 }
 
+/**
+ * 101 thresholds, p0 through p100.
+ *
+ * The page needs to place an arbitrary burn on the curve in the browser.
+ * Shipping the raw cohort to do that meant serialising a float per developer
+ * into the RSC payload — a thousand of them today, growing with the board,
+ * and all of it parsed before the page becomes interactive. This is a fixed
+ * 101 numbers that answers the same question to the nearest percentile.
+ */
+export function percentileLadder(sorted: number[]): number[] {
+  // An empty cohort must produce an empty ladder, not 101 zeros. A zero-filled
+  // ladder ranks every positive burn at p100 — "you out-spend 100% of
+  // developers" on the basis of no developers at all.
+  if (sorted.length === 0) return [];
+  return Array.from({ length: 101 }, (_, p) => quantile(sorted, p / 100));
+}
+
+/**
+ * Percentile for a burn, from the ladder above. Counts thresholds strictly
+ * below the burn so the cheapest developer lands at p0.
+ */
+export function percentileFromLadder(ladder: number[], burn: number): number {
+  if (ladder.length === 0) return 0;
+  let p = 0;
+  while (p < ladder.length && ladder[p] < burn) p++;
+  return Math.min(p, 100);
+}
+
 /** Linear-interpolated quantile. Returns 0 for an empty cohort. */
 export function quantile(sorted: number[], q: number): number {
   if (sorted.length === 0) return 0;

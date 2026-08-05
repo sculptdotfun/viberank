@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getServerDataLayer } from "@/lib/data";
-import { buildSpendCurve } from "@/lib/spend-curve";
+import { buildSpendCurve, percentileLadder } from "@/lib/spend-curve";
 import { formatUsd } from "@/lib/utils";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
@@ -12,9 +12,9 @@ import CalculatorClient from "./CalculatorClient";
 // keeps it rare, matching /stats.
 export const revalidate = 3600;
 
-const TITLE = "Claude Code Cost Calculator — Subscription vs API | Viberank";
+const TITLE = "AI Coding Cost Calculator — Subscription vs API | Viberank";
 const DESCRIPTION =
-  "ccusage tells you what your Claude Code usage would cost at API prices. This tells you whether Pro, Max 5x or Max 20x is cheaper — and how your spend compares to 1,000+ real developers.";
+  "ccusage tells you what your Claude Code, Codex or Copilot usage would cost at API prices. This tells you which subscription plan is actually cheaper — and how your spend compares to 1,000+ real developers.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -51,8 +51,8 @@ export default async function CalculatorPage() {
       a: "ccusage prices your token usage at Anthropic's published API rates. If you are on a Pro or Max subscription you did not pay that — it is the counterfactual cost of the same work through the API. The gap between the two is what this page measures.",
     },
     {
-      q: "Does a Max plan really cover that much usage?",
-      a: "Anthropic describes Max as 5x and 20x Pro usage rather than a dollar ceiling, and heavy sessions can hit rate limits. Treat the saving as the value of the usage, not a guarantee that any volume fits inside one seat.",
+      q: "Does the recommended plan really cover that much usage?",
+      a: "Vendors describe capacity relative to their own tiers — Anthropic as 5x and 20x Pro, OpenAI as 5x Plus — never as a dollar ceiling, and heavy sessions can hit rate limits. Treat the saving as the value of the usage, not a guarantee that any volume fits inside one seat. Where a vendor publishes no comparable tiers, no plan is marked too small.",
     },
     {
       q: "Where does the comparison cohort come from?",
@@ -75,7 +75,7 @@ export default async function CalculatorPage() {
 
         <p className="micro-label mb-3">Free tool</p>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3">
-          Are you overpaying for Claude Code?
+          Are you overpaying for AI coding?
         </h1>
         <p className="text-muted leading-relaxed mb-8">
           {curve.cohortSize > 0 ? (
@@ -99,7 +99,7 @@ export default async function CalculatorPage() {
         </p>
 
         <CalculatorClient
-          cohort={curve.sorted}
+          ladder={percentileLadder(curve.sorted)}
           cohortSize={curve.cohortSize}
           medianBurn={median}
         />
@@ -117,8 +117,11 @@ export default async function CalculatorPage() {
         </section>
 
         <p className="text-xs text-muted mt-10 leading-relaxed">
-          Plan prices checked against claude.com/pricing on 2026-08-05 and are monthly-billing list
-          prices in USD. viberank is not affiliated with Anthropic.
+          Plan prices were checked against each vendor&apos;s own pricing page on 2026-08-05 and are
+          monthly-billing list prices in USD; the source is shown alongside each tool&apos;s plans.
+          Gemini CLI is not covered yet — Google does not publish comparable monthly prices for the
+          tiers that include it, and guessing would be worse than omitting it. viberank is not
+          affiliated with Anthropic, OpenAI or GitHub.
         </p>
       </main>
 
