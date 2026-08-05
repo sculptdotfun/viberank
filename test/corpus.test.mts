@@ -108,5 +108,48 @@ fs.writeFileSync(path.join(root, "proj-a", "notes.txt"), "not a transcript");
   check("unparseable transcripts are skipped, not fatal");
 }
 
+{
+  // Edge-reading is an optimisation, not a definition of the corpus. A file
+  // whose first timestamp sits past the 64KB head must still be counted —
+  // skipping it undercounts exactly the way a non-recursive walk does, and it
+  // dropped 17 of 922 files on a real corpus before the fallback existed.
+  const deepRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vb-deep-"));
+  const padding = JSON.stringify({ type: "summary", note: "x".repeat(200) });
+  const lines = Array.from({ length: 700 }, () => padding);
+  lines.push(JSON.stringify({ timestamp: "2026-07-09T12:00:00Z", type: "assistant" }));
+  fs.writeFileSync(path.join(deepRoot, "late.jsonl"), lines.join("\n"));
+
+  assert.ok(
+    fs.statSync(path.join(deepRoot, "late.jsonl")).size > 64 * 1024,
+    "fixture must exceed the head window or it proves nothing"
+  );
+
+  const c = collectCorpus(deepRoot);
+  assert.ok(c, "a file with a late first timestamp must not be dropped");
+  assert.deepEqual(Object.keys(c!), ["2026-07"]);
+  assert.equal(c!["2026-07"].files, 1);
+  fs.rmSync(deepRoot, { recursive: true });
+  check("a timestamp beyond the head window is still found");
+}
+
+{
+  // A large file must not be read whole just to bound it.
+  const bigRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vb-big-"));
+  const mid = Array.from({ length: 4000 }, (_, i) =>
+    JSON.stringify({ timestamp: `2026-07-${String((i % 27) + 1).padStart(2, "0")}T00:00:00Z`, pad: "y".repeat(300) })
+  );
+  fs.writeFileSync(path.join(bigRoot, "big.jsonl"), mid.join("\n"));
+  const size = fs.statSync(path.join(bigRoot, "big.jsonl")).size;
+  assert.ok(size > 1_000_000, "fixture should be over a megabyte");
+
+  const before = process.memoryUsage().rss;
+  const c = collectCorpus(bigRoot)!;
+  const grew = process.memoryUsage().rss - before;
+  assert.ok(Object.keys(c).length >= 1);
+  assert.ok(grew < size, `should not hold the whole file: grew ${grew} for a ${size}-byte file`);
+  fs.rmSync(bigRoot, { recursive: true });
+  check("a large transcript is bounded without being read whole");
+}
+
 fs.rmSync(root, { recursive: true });
 console.log(`\n${passed} passed, 0 failed`);
