@@ -191,6 +191,16 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
  * applied to its own query — a stable order is what makes paging correct, and
  * without one it is arbitrary which rows survive.
  */
+/**
+ * Minimum lifetime spend before a submission is ranked on tokens-per-dollar.
+ *
+ * Measured against the live board: unfiltered, the top of the efficiency
+ * ranking was a $0.01 submission at 7M tokens/$ against a median of 1.2M —
+ * the ratio of a rounding error, not a way of working. At $100 the ranking
+ * spans real usage ($112 to $11K of spend) and reads as a genuine second axis.
+ */
+export const EFFICIENCY_MIN_COST = 100;
+
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 200_000;
 
@@ -671,9 +681,13 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     let query = this.client
       .from("submissions")
       .select("*", { count: "exact" })
-      .order(sortBy === "cost" ? "total_cost" : "total_tokens", {
-        ascending: false,
-      })
+      // Efficiency is ranked on the stored tokens_per_dollar column (011) with
+      // a spend floor. Without the floor the board is topped by rounding noise:
+      // a $0.01 submission scored 7M tokens/$ against a median of 1.2M.
+      .order(
+        sortBy === "cost" ? "total_cost" : sortBy === "efficiency" ? "tokens_per_dollar" : "total_tokens",
+        { ascending: false, nullsFirst: false }
+      )
       .range(offset, offset + pageSize - 1);
 
     if (!includeFlagged) {
@@ -687,6 +701,13 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     if (params.verifiedOnly) {
       query = query.eq("verified", true);
+    }
+
+    // The spend floor is part of what the efficiency board *means*: below it
+    // the ratio is rounding noise rather than a signal about how someone
+    // works. Applied as a filter so the count and hasMore agree with the rows.
+    if (sortBy === "efficiency") {
+      query = query.gte("total_cost", EFFICIENCY_MIN_COST);
     }
 
     const { data: submissions, count, error } = await query;

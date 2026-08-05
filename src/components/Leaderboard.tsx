@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2 } from "lucide-react";
+import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2, Gauge } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -17,7 +17,7 @@ import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useS
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 
-type SortBy = "cost" | "tokens";
+type SortBy = "cost" | "tokens" | "efficiency";
 
 interface LeaderboardProps {
   // Server-fetched first page + stats so the board renders in the SSR HTML.
@@ -78,7 +78,8 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const [urlSynced, setUrlSynced] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    if (p.get("sort") === "tokens") setSortBy("tokens");
+    const urlSort = p.get("sort");
+    if (urlSort === "tokens" || urlSort === "efficiency") setSortBy(urlSort);
     const urlTool = p.get("tool");
     if (urlTool) setTool(urlTool);
     if (p.get("verified") === "1") setVerifiedOnly(true);
@@ -90,12 +91,18 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   }, []);
 
   useEffect(() => {
+    // Applying a date filter while on efficiency would otherwise leave the
+    // toggle lit over a cost-ranked board.
+    if (isDateFiltered && sortBy === "efficiency") setSortBy("cost");
+  }, [isDateFiltered, sortBy]);
+
+  useEffect(() => {
     // urlSynced is still false during the mount commit, which keeps this from
     // wiping the URL params before the parse above lands in state.
     if (!urlSynced) return;
     const p = new URLSearchParams(window.location.search);
     const write = (key: string, value: string) => (value ? p.set(key, value) : p.delete(key));
-    write("sort", sortBy === "tokens" ? "tokens" : "");
+    write("sort", sortBy === "cost" ? "" : sortBy);
     write("tool", tool ?? "");
     write("verified", verifiedOnly ? "1" : "");
     write("from", dateFrom);
@@ -133,7 +140,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
 
   const { data: dateFilteredResult } = useLeaderboardByDateRange(
     isDateFiltered
-      ? { dateFrom, dateTo, sortBy, limit: 100, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
+      ? { dateFrom, dateTo, sortBy: sortBy === "efficiency" ? "cost" : sortBy, limit: 100, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
       : "skip"
   );
 
@@ -290,6 +297,28 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
               <Zap className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Tokens</span>
             </button>
+            <button
+              onClick={() => !isDateFiltered && setSortBy("efficiency")}
+              disabled={Boolean(isDateFiltered)}
+              title={
+                isDateFiltered
+                  // The date-range board aggregates daily rows and has no
+                  // stored ratio to order by, so offering the toggle here
+                  // would show a cost ranking under an efficiency label.
+                  ? "Efficiency ranks lifetime totals, so it doesn't combine with a date filter"
+                  : "Tokens per dollar, among developers who have spent at least $100"
+              }
+              className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
+                sortBy === "efficiency"
+                  ? "bg-accent text-white"
+                  : isDateFiltered
+                    ? "text-muted/40 cursor-not-allowed"
+                    : "text-muted hover:text-foreground hover:bg-surface-2"
+              }`}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Efficiency</span>
+            </button>
           </div>
         </div>
 
@@ -376,6 +405,11 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                     <>
                       {formatNumber(s.totalTokens)}
                       <span className="text-muted text-[10px] font-normal"> tok</span>
+                    </>
+                  ) : sortBy === "efficiency" ? (
+                    <>
+                      {formatNumber(Math.round(s.totalTokens / Math.max(s.totalCost, 1)))}
+                      <span className="text-muted text-[10px] font-normal"> tok/$</span>
                     </>
                   ) : (
                     <>${formatNumber(s.totalCost)}</>

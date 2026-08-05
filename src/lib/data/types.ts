@@ -96,7 +96,7 @@ export interface ProfileWithSubmissions extends Profile {
 // ============================================================================
 
 export interface LeaderboardParams {
-  sortBy?: "cost" | "tokens";
+  sortBy?: "cost" | "tokens" | "efficiency";
   page?: number;
   pageSize?: number;
   includeFlagged?: boolean;

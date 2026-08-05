@@ -250,7 +250,16 @@ const submissions: Submission[] = [
 
 const openToWork = new Set(["B-EtterDigital", "azamara", "dprvda"]);
 
-function sortSubmissions(items: Submission[], sortBy: "cost" | "tokens" = "cost") {
+function sortSubmissions(
+  items: Submission[],
+  sortBy: "cost" | "tokens" | "efficiency" = "cost"
+) {
+  if (sortBy === "efficiency") {
+    // Mirrors the real backend: spend floor first, then tokens per dollar.
+    return items
+      .filter((item) => item.totalCost >= 100)
+      .sort((a, b) => b.totalTokens / b.totalCost - a.totalTokens / a.totalCost);
+  }
   return [...items].sort((a, b) =>
     sortBy === "tokens" ? b.totalTokens - a.totalTokens : b.totalCost - a.totalCost
   );
