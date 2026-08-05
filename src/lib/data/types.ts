@@ -351,4 +351,4 @@ export interface DataLayer {
 // DATABASE BACKEND TYPE
 // ============================================================================
 
-export type DatabaseBackend = "supabase";
+export type DatabaseBackend = "supabase" | "demo";
