@@ -49,3 +49,6 @@ next-env.d.ts
 
 # local research docs (contain user data — keep out of public repo)
 /research/
+
+# supabase CLI local link state (project ref, service versions)
+supabase/.temp/
