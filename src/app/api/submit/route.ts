@@ -272,6 +272,17 @@ export async function POST(request: NextRequest) {
       profileUrl: `https://viberank.app/profile/${githubUsername}`,
       // Optional sponsor line the CLI prints after a successful submission.
       notice: getCliNotice(),
+      // Only for submissions that did not carry a token — i.e. someone who
+      // has no way to submit on a schedule yet. It disappears the moment they
+      // set one up, so it nags exactly once per person rather than forever.
+      //
+      // This is the only channel that reaches people who already submitted:
+      // 94% of them never return to the site, and 70% never signed in, so
+      // there is no email and no session to reach them through. Running the
+      // CLI is the one moment they are addressable.
+      hint: tokenOwner
+        ? null
+        : "Tip: run `npx viberank-cli login` then `npx viberank-cli autosubmit` to keep this updated automatically.",
     });
 
   } catch (error) {

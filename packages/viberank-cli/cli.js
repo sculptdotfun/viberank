@@ -363,6 +363,9 @@ async function main() {
       if (result.success) {
         submitSpinner.succeed('Successfully submitted to Viberank!');
         console.log(`\nView your profile at: ${chalk.green(result.profileUrl)}\n`);
+        if (result.hint) {
+          console.log(chalk.yellow(result.hint) + '\n');
+        }
         if (result.notice) {
           console.log(chalk.gray(result.notice) + '\n');
         }
