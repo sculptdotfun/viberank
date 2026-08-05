@@ -330,4 +330,57 @@ const mergeRows = () => ({
   check("post-commit profile errors do not turn success into failure");
 }
 
+// ---------------------------------------------------------------------------
+// Deleting an account must remove it from the board, not just its profile row
+// ---------------------------------------------------------------------------
+
+const { SupabaseProfilesService } = await import("../src/lib/data/supabase/client.ts");
+
+const deletionRows = () => ({
+  profiles: [{ id: "profile-1", username: "spammer", github_username: "spammer", created_at: "2026-01-01T00:00:00Z" }],
+  submissions: [{ id: "submission-1", username: "spammer" }],
+  daily_breakdowns: [{ id: "day-1", submission_id: "submission-1" }, { id: "day-2", submission_id: "submission-1" }],
+  raw_submissions: [{ id: "raw-1" }, { id: "raw-2" }],
+});
+
+{
+  const client = new FakeClient(deletionRows());
+  const profiles = new SupabaseProfilesService(client as never);
+  const result = await profiles.deleteByPattern(["spammer"], { searchField: "username" });
+
+  const deletedTables = client.calls
+    .filter((c) => c.operation === "delete")
+    .map((c) => c.table);
+
+  assert.ok(
+    deletedTables.includes("submissions"),
+    "deleting an account must delete its submissions — the leaderboard reads that table, not profiles"
+  );
+  assert.ok(deletedTables.includes("raw_submissions"), "the archived payload must go too");
+  assert.ok(deletedTables.includes("profiles"), "the profile row must go");
+
+  assert.deepEqual(result.deletedRows, {
+    profiles: 1,
+    submissions: 1,
+    dailyBreakdowns: 2,
+    rawSubmissions: 2,
+  });
+  check("account delete removes submissions and archive, not just the profile");
+}
+
+{
+  const client = new FakeClient(deletionRows());
+  const profiles = new SupabaseProfilesService(client as never);
+  const result = await profiles.deleteByPattern(["spammer"], { searchField: "username", dryRun: true });
+
+  assert.equal(
+    client.calls.filter((c) => c.operation === "delete").length,
+    0,
+    "a dry run must not delete anything"
+  );
+  assert.equal(result.matchedCount, 1);
+  assert.match(result.message, /would delete 1 profiles, 1 submissions, 2 daily rows, 2 archived payloads/);
+  check("dry run reports the full blast radius without deleting");
+}
+
 console.log(`\n${passed} passed, 0 failed`);

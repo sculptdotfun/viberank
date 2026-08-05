@@ -1238,9 +1238,20 @@ export class SupabaseProfilesService implements ProfilesService {
   ): Promise<DeleteResult> {
     const { searchField = "githubUsername", caseSensitive = false, dryRun = false } = options;
 
-    const { data: allProfiles } = await this.client.from("profiles").select("*");
+    // Matching happens in memory, so a capped read would silently narrow the
+    // match set — a delete that quietly skips accounts is worse than one that
+    // errors. Page the scan.
+    const allProfiles = await fetchAllPages<DbProfile>(
+      (from, to) =>
+        this.client
+          .from("profiles")
+          .select("*")
+          .order("id", { ascending: true })
+          .range(from, to),
+      "profiles for delete"
+    );
 
-    const matchingProfiles = (allProfiles || []).filter((profile) => {
+    const matchingProfiles = allProfiles.filter((profile) => {
       const githubUsername = profile.github_username || "";
       const username = profile.username || "";
 
@@ -1262,20 +1273,122 @@ export class SupabaseProfilesService implements ProfilesService {
       });
     });
 
-    let deletedCount = 0;
+    // Removing a profile alone does not remove the user from the site. The
+    // leaderboard reads `submissions`, and `raw_submissions` archives the
+    // original payload with no FK to either table — so a profile-only delete
+    // leaves the entry ranked and the raw data stored. Collect every row that
+    // belongs to these accounts, then delete children before parents.
+    const usernames = matchingProfiles.map((p) => p.username);
+
+    const ownedSubmissions = usernames.length
+      ? await fetchAllPages<DbSubmission>(
+          (from, to) =>
+            this.client
+              .from("submissions")
+              .select("*")
+              .in("username", usernames)
+              .order("id", { ascending: true })
+              .range(from, to),
+          "submissions for delete"
+        )
+      : [];
+    const submissionIds = ownedSubmissions.map((s) => s.id);
+
+    const ownedDaily = submissionIds.length
+      ? await fetchAllPages<DbDailyBreakdown>(
+          (from, to) =>
+            this.client
+              .from("daily_breakdowns")
+              .select("*")
+              .in("submission_id", submissionIds)
+              .order("id", { ascending: true })
+              .range(from, to),
+          "daily breakdowns for delete"
+        )
+      : [];
+
+    const ownedRaw = usernames.length
+      ? await fetchAllPages<{ id: string }>(
+          (from, to) =>
+            this.client
+              .from("raw_submissions")
+              .select("id")
+              .in("username", usernames)
+              .order("id", { ascending: true })
+              .range(from, to),
+          "raw submissions for delete"
+        )
+      : [];
+
+    const deletedRows = {
+      profiles: 0,
+      submissions: 0,
+      dailyBreakdowns: 0,
+      rawSubmissions: 0,
+    };
+
     if (!dryRun) {
+      if (submissionIds.length > 0) {
+        // daily_breakdowns is ON DELETE CASCADE, but delete it explicitly so a
+        // failure surfaces here rather than being assumed.
+        const { error: dailyError } = await this.client
+          .from("daily_breakdowns")
+          .delete()
+          .in("submission_id", submissionIds);
+        if (dailyError) {
+          throw new Error(`Failed to delete daily breakdowns: ${dailyError.message}`);
+        }
+        deletedRows.dailyBreakdowns = ownedDaily.length;
+
+        const { error: submissionError } = await this.client
+          .from("submissions")
+          .delete()
+          .in("id", submissionIds);
+        if (submissionError) {
+          throw new Error(`Failed to delete submissions: ${submissionError.message}`);
+        }
+        deletedRows.submissions = submissionIds.length;
+      }
+
+      if (ownedRaw.length > 0) {
+        const { error: rawError } = await this.client
+          .from("raw_submissions")
+          .delete()
+          .in("id", ownedRaw.map((r) => r.id));
+        if (rawError) {
+          throw new Error(`Failed to delete raw submissions: ${rawError.message}`);
+        }
+        deletedRows.rawSubmissions = ownedRaw.length;
+      }
+
       for (const profile of matchingProfiles) {
-        await this.client.from("profiles").delete().eq("id", profile.id);
-        deletedCount++;
+        const { error: profileError } = await this.client
+          .from("profiles")
+          .delete()
+          .eq("id", profile.id);
+        if (profileError) {
+          throw new Error(`Failed to delete profile: ${profileError.message}`);
+        }
+        deletedRows.profiles++;
       }
     }
 
+    const wouldDelete = {
+      profiles: matchingProfiles.length,
+      submissions: submissionIds.length,
+      dailyBreakdowns: ownedDaily.length,
+      rawSubmissions: ownedRaw.length,
+    };
+    const summary = (counts: typeof wouldDelete) =>
+      `${counts.profiles} profiles, ${counts.submissions} submissions, ` +
+      `${counts.dailyBreakdowns} daily rows, ${counts.rawSubmissions} archived payloads`;
+
     return {
       message: dryRun
-        ? `Dry run: Would delete ${matchingProfiles.length} profiles`
-        : `Successfully deleted ${deletedCount} profiles`,
+        ? `Dry run: would delete ${summary(wouldDelete)}`
+        : `Deleted ${summary(deletedRows)}`,
       matchedCount: matchingProfiles.length,
-      deletedCount: dryRun ? 0 : deletedCount,
+      deletedCount: dryRun ? 0 : deletedRows.profiles,
       dryRun,
       patterns,
       searchField,
@@ -1285,6 +1398,7 @@ export class SupabaseProfilesService implements ProfilesService {
         username: p.username,
         createdAt: new Date(p.created_at).getTime(),
       })),
+      deletedRows: dryRun ? { profiles: 0, submissions: 0, dailyBreakdowns: 0, rawSubmissions: 0 } : deletedRows,
     };
   }
 
@@ -1294,9 +1408,20 @@ export class SupabaseProfilesService implements ProfilesService {
   ): Promise<FindProfilesResult> {
     const { searchField = "githubUsername", caseSensitive = false } = options;
 
-    const { data: allProfiles } = await this.client.from("profiles").select("*");
+    // This is the preview for deleteByPattern. It must page for the same
+    // reason the delete does — a capped preview would show fewer accounts
+    // than the delete goes on to remove.
+    const allProfiles = await fetchAllPages<DbProfile>(
+      (from, to) =>
+        this.client
+          .from("profiles")
+          .select("*")
+          .order("id", { ascending: true })
+          .range(from, to),
+      "profiles for search"
+    );
 
-    const matchingProfiles = (allProfiles || []).filter((profile) => {
+    const matchingProfiles = allProfiles.filter((profile) => {
       const githubUsername = profile.github_username || "";
       const username = profile.username || "";
 
