@@ -6,7 +6,8 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createRequestGate } from "./requestGate";
 import type {
   Submission,
   LeaderboardParams,
@@ -29,13 +30,19 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
   const [supabaseData, setSupabaseData] = useState<LeaderboardResult | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<Error | null>(null);
+  const gate = useRef(createRequestGate());
 
   useEffect(() => {
     if (params === "skip") {
+      // Discard anything in flight so a late arrival can't repaint after we
+      // have deliberately cleared the data.
+      gate.current.abandon();
       setSupabaseData(undefined);
       return;
     }
 
+    const g = gate.current;
+    const token = g.begin();
     setSupabaseLoading(true);
     setSupabaseError(null);
 
@@ -44,9 +51,12 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.getLeaderboard(params);
       })
-      .then(setSupabaseData)
-      .catch(setSupabaseError)
-      .finally(() => setSupabaseLoading(false));
+      .then((result) => { if (g.isCurrent(token)) setSupabaseData(result); })
+        .catch((e) => { if (g.isCurrent(token)) setSupabaseError(e as Error); })
+      .finally(() => { if (g.isCurrent(token)) setSupabaseLoading(false); });
+
+    // Unmount (or a param change) abandons whatever is still in flight.
+    return () => g.abandon();
   }, [JSON.stringify(params)]);
 
   return {
@@ -63,13 +73,19 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
   const [supabaseData, setSupabaseData] = useState<DateRangeLeaderboardResult | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<Error | null>(null);
+  const gate = useRef(createRequestGate());
 
   useEffect(() => {
     if (params === "skip") {
+      // Discard anything in flight so a late arrival can't repaint after we
+      // have deliberately cleared the data.
+      gate.current.abandon();
       setSupabaseData(undefined);
       return;
     }
 
+    const g = gate.current;
+    const token = g.begin();
     setSupabaseLoading(true);
     setSupabaseError(null);
 
@@ -78,9 +94,12 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.getLeaderboardByDateRange(params);
       })
-      .then(setSupabaseData)
-      .catch(setSupabaseError)
-      .finally(() => setSupabaseLoading(false));
+      .then((result) => { if (g.isCurrent(token)) setSupabaseData(result); })
+        .catch((e) => { if (g.isCurrent(token)) setSupabaseError(e as Error); })
+      .finally(() => { if (g.isCurrent(token)) setSupabaseLoading(false); });
+
+    // Unmount (or a param change) abandons whatever is still in flight.
+    return () => g.abandon();
   }, [JSON.stringify(params)]);
 
   return {
@@ -134,13 +153,19 @@ export function useSubmit() {
 export function useSubmission(id: string | undefined) {
   const [supabaseData, setSupabaseData] = useState<Submission | null | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const gate = useRef(createRequestGate());
 
   useEffect(() => {
     if (!id) {
+      // Discard anything in flight so a late arrival can't repaint after we
+      // have deliberately cleared the data.
+      gate.current.abandon();
       setSupabaseData(undefined);
       return;
     }
 
+    const g = gate.current;
+    const token = g.begin();
     setSupabaseLoading(true);
 
     import("../supabase/client")
@@ -148,8 +173,11 @@ export function useSubmission(id: string | undefined) {
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.getSubmission(id);
       })
-      .then(setSupabaseData)
-      .finally(() => setSupabaseLoading(false));
+      .then((result) => { if (g.isCurrent(token)) setSupabaseData(result); })
+      .finally(() => { if (g.isCurrent(token)) setSupabaseLoading(false); });
+
+    // Unmount (or a param change) abandons whatever is still in flight.
+    return () => g.abandon();
   }, [id]);
 
   return {
@@ -164,14 +192,19 @@ export function useSubmission(id: string | undefined) {
 export function useFlaggedSubmissions(limit?: number, enabled: boolean = true) {
   const [supabaseData, setSupabaseData] = useState<Submission[] | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const gate = useRef(createRequestGate());
 
   useEffect(() => {
     // Don't fetch for non-admin visitors — the data is public-readable but
     // there's no reason to pull it for everyone who lands on /admin.
     if (!enabled) {
+      gate.current.abandon();
       setSupabaseData(undefined);
       return;
     }
+
+    const g = gate.current;
+    const token = g.begin();
     setSupabaseLoading(true);
 
     import("../supabase/client")
@@ -179,8 +212,10 @@ export function useFlaggedSubmissions(limit?: number, enabled: boolean = true) {
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.getFlaggedSubmissions(limit);
       })
-      .then(setSupabaseData)
-      .finally(() => setSupabaseLoading(false));
+      .then((result) => { if (g.isCurrent(token)) setSupabaseData(result); })
+      .finally(() => { if (g.isCurrent(token)) setSupabaseLoading(false); });
+
+    return () => g.abandon();
   }, [limit, enabled]);
 
   return {
@@ -232,13 +267,19 @@ export function useUpdateFlagStatus() {
 export function useCheckClaimableSubmissions(githubUsername: string | undefined) {
   const [supabaseData, setSupabaseData] = useState<ClaimStatus | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const gate = useRef(createRequestGate());
 
   useEffect(() => {
     if (!githubUsername) {
+      // Discard anything in flight so a late arrival can't repaint after we
+      // have deliberately cleared the data.
+      gate.current.abandon();
       setSupabaseData(undefined);
       return;
     }
 
+    const g = gate.current;
+    const token = g.begin();
     setSupabaseLoading(true);
 
     import("../supabase/client")
@@ -246,8 +287,11 @@ export function useCheckClaimableSubmissions(githubUsername: string | undefined)
         const dataLayer = createSupabaseDataLayer();
         return dataLayer.submissions.checkClaimableSubmissions(githubUsername);
       })
-      .then(setSupabaseData)
-      .finally(() => setSupabaseLoading(false));
+      .then((result) => { if (g.isCurrent(token)) setSupabaseData(result); })
+      .finally(() => { if (g.isCurrent(token)) setSupabaseLoading(false); });
+
+    // Unmount (or a param change) abandons whatever is still in flight.
+    return () => g.abandon();
   }, [githubUsername]);
 
   return {
