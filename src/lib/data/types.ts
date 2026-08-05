@@ -130,6 +130,11 @@ export interface SubmitData {
   // older CLIs; the data layer falls back to a shared "default" bucket. Used to
   // sum overlapping dates across machines without double-counting re-submits (#43).
   machineId?: string;
+  /**
+   * Per-month corpus size from the client (#112), used to tell a deliberate
+   * deletion from a transcript the runtime rewrote. Absent for older CLIs.
+   */
+  corpus?: Record<string, { files: number; bytes: number }>;
   ccData: {
     totals: {
       inputTokens: number;

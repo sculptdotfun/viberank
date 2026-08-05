@@ -8,6 +8,30 @@ import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { getCliNotice } from "@/lib/sponsor";
 import { bearerFrom } from "@/lib/tokens";
 
+/**
+ * `{ "2026-07": { files, bytes } }` from the submission body, or undefined.
+ *
+ * Anything malformed is dropped entirely rather than partially accepted: this
+ * decides whether a user's stored total can go down, so a half-parsed block is
+ * worse than none.
+ */
+function readCorpus(payload: unknown): Record<string, { files: number; bytes: number }> | undefined {
+  const raw = (payload as { drift?: { corpus?: unknown } })?.drift?.corpus;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+
+  const out: Record<string, { files: number; bytes: number }> = {};
+  for (const [month, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}$/.test(month)) continue;
+    const size = value as { files?: unknown; bytes?: unknown };
+    const files = Number(size?.files);
+    const bytes = Number(size?.bytes);
+    if (!Number.isFinite(files) || !Number.isFinite(bytes) || files < 0 || bytes < 0) continue;
+    out[month] = { files: Math.trunc(files), bytes: Math.trunc(bytes) };
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const backend = getDatabaseBackend();
@@ -196,6 +220,11 @@ export async function POST(request: NextRequest) {
       // uploads and older CLIs omit it and fall back to a shared bucket.
       const machineId = request.headers.get("X-Machine-Id") || undefined;
 
+      // Per-month corpus size (#112). Validated here rather than trusted: it
+      // comes from a client and decides whether a stored total may be lowered,
+      // so a malformed block must be ignored, not half-read.
+      const corpus = readCorpus(rawPayload);
+
       // Awaited directly, not raced against a timer. A rejected race did not
       // cancel the underlying writes, so a slow merge reported failure while
       // its data committed anyway — and the CLI then told the user to fix a
@@ -210,6 +239,7 @@ export async function POST(request: NextRequest) {
         source: source,
         verified: verified,
         machineId,
+        corpus,
         ccData: ccData,
       });
 
