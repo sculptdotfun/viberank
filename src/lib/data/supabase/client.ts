@@ -33,7 +33,7 @@ import type {
   TokenOwner,
 } from "../types";
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
-import { monthsUserDeleted, monthOfDate, type CorpusSize } from "@/lib/drift";
+import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import type { BurnRow } from "@/lib/spend-curve";
 import {
@@ -510,8 +510,12 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         prior?.machine_contributions ?? null,
         machineId,
         dailyEntryToContribution(day),
-        // A day inside a month the user cleared takes the lower number.
-        deletedMonths.has(monthOfDate(day.date) ?? "")
+        // A day inside a month the user cleared takes the lower number — but
+        // only if the corpus is evidence about that day. The scan covers
+        // ~/.claude/projects alone, so a Codex or Gemini day in the same month
+        // keeps its high-water mark regardless of what happened to Claude's
+        // transcripts.
+        deletedMonths.has(monthOfDate(day.date) ?? "") && corpusCoversDay(day.agents)
       );
       if (retainedPrior) driftedDays.push(day.date);
 
