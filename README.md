@@ -161,9 +161,12 @@ Apply the schema:
 #   010_api_tokens.sql          # hashed CLI tokens
 #   011_efficiency.sql          # cost-per-token, generated column
 #   012_corpus_observations.sql # per-month corpus counts for drift (#112)
+#   013_reload_schema_cache.sql # refresh PostgREST's cached schema
 ```
 
 > **Applying migrations to an existing instance:** apply the SQL **before** deploying the app code. Every migration is additive — new columns default to empty and new tables are created `IF NOT EXISTS` — so each is safe to run ahead of its deploy.
+>
+> Run `013_reload_schema_cache.sql` last, and again after any future migration that adds a column. PostgREST serves a cached copy of the schema, so a newly added column is invisible to the API until that cache is reloaded — writes to it fail with `PGRST204: Could not find the '<column>' column of '<table>' in the schema cache` even though the column exists.
 
 Run the dev server:
 

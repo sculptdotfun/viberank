@@ -1,0 +1,25 @@
+-- Migration 013: tell PostgREST to reload its schema cache.
+--
+-- Every migration here is DDL, and PostgREST caches the schema it serves.
+-- Until that cache is reloaded, any column added by an earlier migration is
+-- invisible to the API even though it exists in the table, and a write to it
+-- fails with PGRST204:
+--
+--   Could not find the 'open_to_work_email' column of 'profiles'
+--   in the schema cache
+--
+-- That is what /hire currently returns when a profile owner saves a contact
+-- email: 009 added the column, the app writes it, PostgREST does not know it
+-- yet. The column is not missing — the cache is stale.
+--
+-- Supabase reloads on its own eventually, and the dashboard SQL editor
+-- usually triggers it, but a migration applied through the CLI or a direct
+-- psql connection does not. Making the reload explicit removes the
+-- difference between those paths.
+--
+-- Kept as its own migration rather than a line appended to 009, because the
+-- cache is global: one reload republishes every column from every earlier
+-- migration, so this fixes any other stale column at the same time. Safe to
+-- re-run, and harmless on an instance whose cache is already current.
+
+NOTIFY pgrst, 'reload schema';
