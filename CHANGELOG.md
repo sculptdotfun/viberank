@@ -1,5 +1,13 @@
 # Changelog
 
+## CLI v1.6.0 — Windows submissions work again (August 2026)
+
+### Fixed
+- **`npx viberank-cli` died on Windows** with `Error: spawnSync C:\Program Files\nodejs\npx.cmd EINVAL`, submitting nothing (#137). v1.5.0 started resolving npx next to the running node binary so scheduled jobs wouldn't need PATH — but on Windows the only thing on disk named npx is `npx.cmd`, and Node has refused to spawn a batch shim without `shell: true` since the CVE-2024-27980 fix (18.20.2 / 20.12.2 / 21.7.3). Every Windows run that regenerated `cc.json` hit it. npx is now invoked as npm's own `npx-cli.js` through the already-running node binary: absolute, shell-free, and identical on every platform (`packages/viberank-cli/lib/npx.js`).
+- **Autosubmit on Windows scheduled `npx` as a program**, which Task Scheduler cannot launch either; the daily and logon tasks now carry the same node + `npx-cli.js` argv.
+- **Autosubmit under Homebrew node was PATH-dependent on macOS.** Homebrew keeps npm outside the node keg and links the two with a symlinked shim, whose `/usr/bin/env node` shebang a launchd job with a minimal PATH cannot satisfy. The shim is now followed to the real `npx-cli.js`.
+- `viberank login` opens the token page with `start "" "<url>"` on Windows — `start` reads its first quoted argument as a window title.
+
 ## CLI v1.5.0 — autosubmit actually submits (August 2026)
 
 ### Fixed

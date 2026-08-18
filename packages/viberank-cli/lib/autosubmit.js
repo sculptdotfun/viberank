@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CONFIG_DIR } from './config.js';
+import { resolveNpxArgv } from './npx.js';
 
 /**
  * Daily background submission via the platform's own scheduler.
@@ -56,9 +57,9 @@ function invocation() {
   if (!ephemeral) return { argv: [process.execPath, cli], durable: true };
 
   // Resolve npx next to the running node so the scheduler doesn't need PATH.
-  const npx = path.join(path.dirname(process.execPath), 'npx');
-  const runner = fs.existsSync(npx) ? npx : 'npx';
-  return { argv: [runner, '-y', 'viberank-cli@latest'], durable: false };
+  // On Windows that means node's own npx-cli.js rather than the `npx.cmd`
+  // shim, which Task Scheduler cannot launch as a program either (#137).
+  return { argv: [...resolveNpxArgv().argv, '-y', 'viberank-cli@latest'], durable: false };
 }
 
 function plist(hour) {

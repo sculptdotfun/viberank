@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync, execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -13,6 +13,7 @@ import fetch from 'node-fetch';
 import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus } from './lib/corpus.js';
+import { runNpx } from './lib/npx.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,12 +36,11 @@ function looksLikeGithubHandle(value) {
 
 /** Generate a fresh ccusage report to `dest` without relying on PATH or a
  * shell redirect — a launchd/schtasks job runs with a minimal PATH that has
- * no node or npx on it, so resolve npx next to the running node binary the
- * same way lib/autosubmit.js does. */
+ * no node or npx on it. lib/npx.js resolves the npx entrypoint next to the
+ * running node binary; going through node rather than the `npx.cmd` shim is
+ * also what keeps this from throwing EINVAL on Windows (#137). */
 function generateCcJson(dest) {
-  const npxLocal = path.join(path.dirname(process.execPath), process.platform === 'win32' ? 'npx.cmd' : 'npx');
-  const npx = fs.existsSync(npxLocal) ? npxLocal : 'npx';
-  const out = execFileSync(npx, ['-y', 'ccusage@latest', 'daily', '--json'], {
+  const out = runNpx(['-y', 'ccusage@latest', 'daily', '--json'], {
     encoding: 'utf8',
     maxBuffer: 256 * 1024 * 1024,
   });
@@ -80,9 +80,12 @@ async function login() {
 
   // Best effort — a headless box just uses the printed URL.
   try {
-    const opener = process.platform === 'darwin' ? 'open'
-      : process.platform === 'win32' ? 'start' : 'xdg-open';
-    execSync(`${opener} ${url}`, { stdio: 'ignore' });
+    // `start` is a cmd builtin and reads its first quoted argument as a
+    // window title, hence the empty one before the URL.
+    const command = process.platform === 'darwin' ? `open "${url}"`
+      : process.platform === 'win32' ? `start "" "${url}"`
+      : `xdg-open "${url}"`;
+    execSync(command, { stdio: 'ignore', windowsHide: true });
   } catch {
     // No browser available; the URL above is enough.
   }
