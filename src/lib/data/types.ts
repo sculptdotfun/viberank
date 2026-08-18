@@ -235,6 +235,26 @@ export interface SiteStats {
   modelSpend: { model: string; cost: number }[];
 }
 
+/**
+ * One month's exact aggregates from get_month_stats() (migration 013), for
+ * the /stats/monthly report pages. Note: perTool costs attribute a day's
+ * whole spend to every agent active that day, so they can sum past `cost`.
+ */
+export interface MonthStats {
+  month: string;
+  cost: number;
+  tokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  users: number;
+  activeDays: number;
+  medianUserCost: number;
+  p90UserCost: number;
+  topSpenders: { username: string; cost: number; tokens: number; activeDays: number }[];
+  perTool: { tool: string; cost: number; users: number }[];
+  perModel: { model: string; cost: number }[];
+}
+
 export interface ClaimStatus {
   actionNeeded: "claim" | "merge" | null;
   actionText: string;
@@ -342,6 +362,8 @@ export interface StatsService {
   getGlobalStats(): Promise<GlobalStats>;
   /** Exact aggregates via get_site_stats() (migration 007); null if the function isn't deployed. */
   getSiteStats(): Promise<SiteStats | null>;
+  /** One month's aggregates via get_month_stats() (migration 013); null if unavailable. */
+  getMonthStats(month: string): Promise<MonthStats | null>;
   /** Raw rows for the /calculator spend curve. */
   getSpendRows(): Promise<import("@/lib/spend-curve").BurnRow[]>;
 }

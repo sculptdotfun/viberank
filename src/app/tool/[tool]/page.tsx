@@ -14,6 +14,14 @@ interface ToolParams {
 
 const SITE = "https://www.viberank.app";
 
+// Per-tool "how to check usage" guides — the query family these boards
+// surface for in search ("<tool> check usage") deserves a one-click answer.
+const TOOL_GUIDES: Record<string, { href: string; label: string }> = {
+  claude: { href: "/blog/how-to-check-claude-code-usage", label: "How to check your Claude Code usage" },
+  codex: { href: "/blog/codex-token-usage-leaderboard", label: "How to check your Codex usage (/status + ccusage)" },
+  opencode: { href: "/blog/how-to-check-opencode-usage", label: "How to check your OpenCode usage" },
+};
+
 // Regenerate per-tool boards hourly.
 export const revalidate = 3600;
 
@@ -125,6 +133,15 @@ export default async function ToolPage({ params }: ToolParams) {
           Developers ranked by their {label} usage ({toolBlurb(tool)}) — by cost and tokens, from real{" "}
           <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ccusage</a>{" "}
           data. Submit yours with <code className="font-mono text-accent">npx viberank-cli</code>.
+          {TOOL_GUIDES[tool] && (
+            <>
+              {" "}New here?{" "}
+              <Link href={TOOL_GUIDES[tool].href} className="text-accent hover:underline">
+                {TOOL_GUIDES[tool].label}
+              </Link>
+              .
+            </>
+          )}
         </p>
 
         {/* Browse other tools */}

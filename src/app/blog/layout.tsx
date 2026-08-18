@@ -5,9 +5,9 @@ import Footer from "@/components/Footer";
 export const metadata: Metadata = {
   title: {
     template: '%s | Viberank Blog',
-    default: 'Blog | Viberank',
+    default: 'AI Coding Costs, Limits & Usage Data — the Viberank Blog',
   },
-  description: 'Insights on AI-powered development, Claude Code, vibe coding, and the future of programming.',
+  description: 'Data-backed writing on what AI coding actually costs: Claude Code and Codex usage limits, real spend benchmarks from 1,100+ developers, and how to measure your own.',
 };
 
 export default function BlogLayout({

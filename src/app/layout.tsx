@@ -63,6 +63,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.viberank.app"),
   alternates: {
     canonical: "https://www.viberank.app",
+    languages: {
+      en: "https://www.viberank.app/",
+      ko: "https://www.viberank.app/ko",
+      "x-default": "https://www.viberank.app/",
+    },
     types: {
       "application/rss+xml": [{ url: "/feed.xml", title: "Viberank Blog" }],
     },

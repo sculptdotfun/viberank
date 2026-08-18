@@ -8,6 +8,7 @@ import type {
   FindProfilesResult,
   GlobalStats,
   SiteStats,
+  MonthStats,
   HireListing,
   LeaderboardParams,
   LeaderboardResult,
@@ -458,6 +459,10 @@ export function createDemoDataLayer(): DataLayer {
       // The demo backend has no site-wide rollup table; returning null is the
       // documented "not available" signal and callers already handle it.
       async getSiteStats(): Promise<SiteStats | null> {
+        return null;
+      },
+      // Same "not available" signal as getSiteStats — demo has no daily rollup.
+      async getMonthStats(): Promise<MonthStats | null> {
         return null;
       },
       // The demo backend has no cohort to rank against; an empty list makes
