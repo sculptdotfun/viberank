@@ -1,4 +1,4 @@
--- Migration 013: tell PostgREST to reload its schema cache.
+-- Migration 014: tell PostgREST to reload its schema cache.
 --
 -- Every migration here is DDL, and PostgREST caches the schema it serves.
 -- Until that cache is reloaded, any column added by an earlier migration is
@@ -8,9 +8,10 @@
 --   Could not find the 'open_to_work_email' column of 'profiles'
 --   in the schema cache
 --
--- That is what /hire currently returns when a profile owner saves a contact
--- email: 009 added the column, the app writes it, PostgREST does not know it
--- yet. The column is not missing — the cache is stale.
+-- The /hire contact-email failure that motivated this turned out to be the
+-- column genuinely missing in production (009 had not been applied there —
+-- since fixed). But the stale-cache failure mode is real for any migration
+-- applied over psql or the management API, so the explicit reload stays.
 --
 -- Supabase reloads on its own eventually, and the dashboard SQL editor
 -- usually triggers it, but a migration applied through the CLI or a direct
