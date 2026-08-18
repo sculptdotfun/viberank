@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
   description: "Learn how to extend Claude Code with MCP (Model Context Protocol) servers. Connect to GitHub, PostgreSQL, Slack, and build custom integrations for AI-powered development.",
   keywords: ["mcp servers", "model context protocol", "claude code mcp", "claude code github", "claude code database", "anthropic mcp", "ai integrations", "claude code plugins"],
+  alternates: { canonical: "https://www.viberank.app/blog/mcp-servers-guide" },
   openGraph: {
     title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
     description: "Extend Claude Code with MCP servers. Connect to GitHub, databases, Slack, and more.",

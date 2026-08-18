@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Vibe Coding Explained: What Karpathy's Viral Term Really Means",
   description: "Understand vibe coding—from Andrej Karpathy's viral tweet to how developers use Claude Code, Cursor, and Conductor to build without reading diffs. Learn what it means for the future of software development.",
+  alternates: { canonical: "https://www.viberank.app/blog/vibe-coding-revolution" },
   openGraph: {
     title: "Vibe Coding Explained: What Karpathy's Viral Term Really Means",
     description: "From Karpathy's viral tweet to Claude Code and Cursor—understand what vibe coding really means for developers.",
