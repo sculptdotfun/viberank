@@ -123,6 +123,20 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      // The header is unauthenticated and its upstream default is
+      // `git config user.name`, which has held shell fragments that became
+      // public profile pages and sitemap entries (#119). Only a plausible
+      // GitHub handle may create a profile this way; token and OAuth
+      // identities above come from GitHub itself and need no check.
+      if (!/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(githubUsername)) {
+        return NextResponse.json(
+          {
+            error: `"${githubUsername.slice(0, 60)}" is not a valid GitHub username (1-39 letters, digits, single hyphens). Pass your GitHub handle in X-GitHub-User, or run npx viberank-cli login to submit with a token.`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if ccData is null or undefined
