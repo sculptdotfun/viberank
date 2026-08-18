@@ -166,7 +166,12 @@ export default async function StatsPage() {
             Gemini CLI, Copilot and every agent ccusage tracks.
             {site?.firstDate && site?.lastDate && (
               <> Tracking {site.firstDate} → {site.lastDate}.</>
-            )}
+            )}{" "}
+            Prefer it month by month? See the{" "}
+            <Link href="/stats/monthly" className="text-accent hover:underline">
+              monthly spend reports
+            </Link>
+            .
           </p>
           {!exact && (
             <p className="text-xs text-muted/70 mt-2">

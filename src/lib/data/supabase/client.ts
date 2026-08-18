@@ -21,6 +21,7 @@ import type {
   ProfileWithSubmissions,
   GlobalStats,
   SiteStats,
+  MonthStats,
   ClaimStatus,
   ClaimResult,
   DeleteResult,
@@ -1775,6 +1776,18 @@ export class SupabaseStatsService implements StatsService {
       return null;
     }
     return data as SiteStats;
+  }
+
+  async getMonthStats(month: string): Promise<MonthStats | null> {
+    // Exact per-month aggregates (migration 013). The function validates the
+    // month format server-side; invalid input returns an empty-month object.
+    if (!/^\d{4}-\d{2}$/.test(month)) return null;
+    const { data, error } = await this.client.rpc("get_month_stats", { p_month: month });
+    if (error || !data) {
+      if (error) console.error("get_month_stats failed:", error.message);
+      return null;
+    }
+    return data as MonthStats;
   }
 
   async getSpendRows(): Promise<BurnRow[]> {
