@@ -77,9 +77,11 @@ ${args}
   </array>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>0</integer></dict>
-  <!-- Fire on wake if the machine was asleep at the scheduled time, so a
-       laptop that is shut overnight still submits. -->
-  <key>RunAtLoad</key><false/>
+  <!-- launchd coalesces a missed StartCalendarInterval on wake from sleep,
+       but not across a power-off: a laptop shut down overnight would skip
+       the day entirely. RunAtLoad fires at login instead; the CLI's quiet
+       path skips within 20h of a success, so this never double-submits. -->
+  <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>${LOG_FILE}</string>
   <key>StandardErrorPath</key><string>${LOG_FILE}</string>
 </dict>
@@ -147,6 +149,16 @@ export function enable(hour = 9) {
     '/TR', tr,
     '/SC', 'DAILY', '/ST', `${String(hour).padStart(2, '0')}:00`,
   ], { stdio: 'ignore' });
+  // A DAILY trigger does not catch up if the machine was off at the scheduled
+  // time. A second ONLOGON task covers that; the CLI's 20-hour guard keeps
+  // the pair from double-submitting.
+  try {
+    execFileSync('schtasks', [
+      '/Create', '/F', '/TN', 'viberank-autosubmit-logon',
+      '/TR', tr,
+      '/SC', 'ONLOGON',
+    ], { stdio: 'ignore' });
+  } catch { /* logon trigger can need elevation on some setups; daily still works */ }
   return { scheduler: 'schtasks', path: 'viberank-autosubmit', hour, durable: invocation().durable };
 }
 
@@ -167,7 +179,9 @@ export function disable() {
     return true;
   }
   if (target === 'schtasks') {
-    try { execFileSync('schtasks', ['/Delete', '/F', '/TN', 'viberank-autosubmit'], { stdio: 'ignore' }); } catch { /* not present */ }
+    for (const tn of ['viberank-autosubmit', 'viberank-autosubmit-logon']) {
+      try { execFileSync('schtasks', ['/Delete', '/F', '/TN', tn], { stdio: 'ignore' }); } catch { /* not present */ }
+    }
     return true;
   }
   return false;
