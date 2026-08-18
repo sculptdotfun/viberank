@@ -22,6 +22,10 @@ import type {
   GlobalStats,
   SiteStats,
   MonthStats,
+  UserMonthStats,
+  League,
+  LeagueBoardRow,
+  LeaguesService,
   ClaimStatus,
   ClaimResult,
   DeleteResult,
@@ -747,6 +751,35 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         throw new Error(`Failed to create profile: ${profileInsertError.message}`);
       }
     }
+  }
+
+  async deleteOwn(username: string, submissionId: string): Promise<boolean> {
+    // Ownership check and delete in one statement: the filter is the guard.
+    // Covers rows submitted as this user and unverified rows they claimed.
+    const { data, error } = await this.client
+      .from("submissions")
+      .delete()
+      .eq("id", submissionId)
+      .or(`username.eq.${username},claimed_by.eq.${username}`)
+      .select("id, username");
+    if (error) throw new Error(`deleteOwn failed: ${error.message}`);
+    if (!data || data.length === 0) return false;
+
+    // Keep the profile's cached rollups honest.
+    const owner = data[0].username;
+    const { data: remaining } = await this.client
+      .from("submissions")
+      .select("id, total_cost")
+      .eq("username", owner)
+      .order("total_cost", { ascending: false });
+    await this.client
+      .from("profiles")
+      .update({
+        total_submissions: remaining?.length ?? 0,
+        best_submission_id: remaining?.[0]?.id ?? null,
+      })
+      .eq("username", owner);
+    return true;
   }
 
   async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
@@ -1790,6 +1823,20 @@ export class SupabaseStatsService implements StatsService {
     return data as MonthStats;
   }
 
+  async getUserMonthStats(month: string, username: string): Promise<UserMonthStats | null> {
+    if (!/^\d{4}-\d{2}$/.test(month)) return null;
+    const { data, error } = await this.client.rpc("get_user_month_stats", {
+      p_month: month,
+      p_username: username,
+    });
+    if (error || !data) {
+      if (error) console.error("get_user_month_stats failed:", error.message);
+      return null;
+    }
+    const stats = data as UserMonthStats;
+    return stats.activeDays > 0 ? stats : null;
+  }
+
   async getSpendRows(): Promise<BurnRow[]> {
     // Only the four columns the spend curve needs, paged. The whole table is
     // ~1k rows and /calculator is ISR-cached hourly, so this is cheaper than
@@ -1941,17 +1988,181 @@ export class SupabaseTokensService implements TokensService {
   }
 }
 
+
+class SupabaseLeaguesService implements LeaguesService {
+  constructor(private client: SupabaseClient) {}
+
+  async create(name: string, creator: string): Promise<{ league: League; inviteCode: string }> {
+    const trimmed = name.trim();
+    if (trimmed.length < 2 || trimmed.length > 60) {
+      throw new Error("League names are 2-60 characters.");
+    }
+
+    const { count } = await this.client
+      .from("leagues")
+      .select("id", { count: "exact", head: true })
+      .eq("created_by", creator);
+    if ((count ?? 0) >= 5) throw new Error("You already run 5 leagues — that's the cap.");
+
+    // Slug from the name; a short random suffix resolves collisions without a
+    // read-check race.
+    const base = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "league";
+    const slug = `${base}-${randomToken(4)}`;
+    const inviteCode = randomToken(10);
+
+    const { data: league, error } = await this.client
+      .from("leagues")
+      .insert({ slug, name: trimmed, created_by: creator })
+      .select()
+      .single();
+    if (error || !league) throw new Error(`Could not create league: ${error?.message}`);
+
+    const { error: inviteError } = await this.client
+      .from("league_invites")
+      .insert({ league_id: league.id, code: inviteCode });
+    if (inviteError) {
+      await this.client.from("leagues").delete().eq("id", league.id);
+      throw new Error(`Could not create league invite: ${inviteError.message}`);
+    }
+    await this.client.from("league_members").insert({ league_id: league.id, username: creator });
+
+    return { league: mapLeague(league), inviteCode };
+  }
+
+  async joinByCode(code: string, username: string): Promise<League> {
+    const { data: invite } = await this.client
+      .from("league_invites")
+      .select("league_id")
+      .eq("code", code.trim())
+      .maybeSingle();
+    if (!invite) throw new Error("That invite code doesn't match any league.");
+
+    const { count } = await this.client
+      .from("league_members")
+      .select("username", { count: "exact", head: true })
+      .eq("league_id", invite.league_id);
+    if ((count ?? 0) >= 100) throw new Error("This league is full (100 members).");
+
+    // Idempotent: joining twice is a no-op, not an error.
+    await this.client
+      .from("league_members")
+      .upsert({ league_id: invite.league_id, username }, { onConflict: "league_id,username" });
+
+    const { data: league } = await this.client
+      .from("leagues")
+      .select()
+      .eq("id", invite.league_id)
+      .single();
+    if (!league) throw new Error("League vanished mid-join.");
+    return mapLeague(league);
+  }
+
+  async getBySlug(slug: string): Promise<{ league: League; members: LeagueBoardRow[] } | null> {
+    const { data: league } = await this.client.from("leagues").select().eq("slug", slug).maybeSingle();
+    if (!league) return null;
+
+    const { data: memberRows } = await this.client
+      .from("league_members")
+      .select("username, joined_at")
+      .eq("league_id", league.id);
+    const usernames = (memberRows ?? []).map((m) => m.username);
+
+    // Best submission per member; the whole set is small (≤100 members), so
+    // dedupe client-side rather than grow the query surface.
+    let best = new Map<string, { totalCost: number; totalTokens: number; verified: boolean }>();
+    if (usernames.length > 0) {
+      const { data: subs } = await this.client
+        .from("submissions")
+        .select("username, total_cost, total_tokens, verified")
+        .in("username", usernames)
+        .or("flagged_for_review.is.null,flagged_for_review.eq.false");
+      for (const sub of subs ?? []) {
+        const prior = best.get(sub.username);
+        if (!prior || sub.total_cost > prior.totalCost) {
+          best.set(sub.username, {
+            totalCost: sub.total_cost,
+            totalTokens: sub.total_tokens,
+            verified: sub.verified,
+          });
+        }
+      }
+    }
+
+    const members: LeagueBoardRow[] = (memberRows ?? [])
+      .map((m) => ({
+        username: m.username,
+        joinedAt: m.joined_at,
+        totalCost: best.get(m.username)?.totalCost ?? 0,
+        totalTokens: best.get(m.username)?.totalTokens ?? 0,
+        verified: best.get(m.username)?.verified ?? false,
+      }))
+      .sort((a, b) => b.totalCost - a.totalCost);
+
+    return { league: mapLeague(league), members };
+  }
+
+  async getInviteCode(slug: string, requester: string): Promise<string | null> {
+    const { data: league } = await this.client.from("leagues").select("id").eq("slug", slug).maybeSingle();
+    if (!league) return null;
+    const { data: membership } = await this.client
+      .from("league_members")
+      .select("username")
+      .eq("league_id", league.id)
+      .eq("username", requester)
+      .maybeSingle();
+    if (!membership) return null;
+    const { data: invite } = await this.client
+      .from("league_invites")
+      .select("code")
+      .eq("league_id", league.id)
+      .maybeSingle();
+    return invite?.code ?? null;
+  }
+
+  async listForUser(username: string): Promise<League[]> {
+    const { data } = await this.client
+      .from("league_members")
+      .select("leagues(*)")
+      .eq("username", username);
+    return (data ?? [])
+      .map((row) => (row as unknown as { leagues: LeagueRow | null }).leagues)
+      .filter((l): l is LeagueRow => Boolean(l))
+      .map(mapLeague);
+  }
+}
+
+interface LeagueRow {
+  id: string;
+  slug: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+}
+
+function mapLeague(row: LeagueRow): League {
+  return { id: row.id, slug: row.slug, name: row.name, createdBy: row.created_by, createdAt: row.created_at };
+}
+
+/** URL-safe random token; crypto-strength because invite codes gate joins. */
+function randomToken(bytes: number): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, bytes + 6);
+}
+
 class SupabaseDataLayer implements DataLayer {
   tokens: TokensService;
   submissions: SubmissionsService;
   profiles: ProfilesService;
   stats: StatsService;
+  leagues: LeaguesService;
 
   constructor(client: SupabaseClient) {
     this.tokens = new SupabaseTokensService(client);
     this.submissions = new SupabaseSubmissionsService(client);
     this.profiles = new SupabaseProfilesService(client);
     this.stats = new SupabaseStatsService(client);
+    this.leagues = new SupabaseLeaguesService(client);
   }
 }
 
