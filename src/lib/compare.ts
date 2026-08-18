@@ -71,8 +71,12 @@ export interface CompareMatchup {
 
 // Ordered pairs in FEATURED_TOOLS order: claude-vs-codex, claude-vs-gemini, …
 // Only this ordering is generated; the reversed slug 301s to the canonical one.
-export const COMPARE_MATCHUPS: CompareMatchup[] = FEATURED_TOOLS.flatMap((a, i) =>
-  FEATURED_TOOLS.slice(i + 1).map((b) => ({
+// Restricted to tools with COMPARE_FACTS entries — newer boards (hermes, pi, …)
+// get a /tool page without exploding the matchup grid into thin pages.
+const COMPARE_TOOLS = FEATURED_TOOLS.filter((t) => t.key in COMPARE_FACTS);
+
+export const COMPARE_MATCHUPS: CompareMatchup[] = COMPARE_TOOLS.flatMap((a, i) =>
+  COMPARE_TOOLS.slice(i + 1).map((b) => ({
     slug: `${a.key}-vs-${b.key}`,
     a: a.key,
     b: b.key,

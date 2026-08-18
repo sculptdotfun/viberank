@@ -19,6 +19,15 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "ai-token-leaderboards-compared",
+    title: "AI Token Leaderboards Compared (2026): Viberank, tokenmaxxing.sh, TokenRank, Straude & More",
+    excerpt:
+      "Nine public leaderboards now rank AI coding token usage. An honest map of the field — scale, verification, tools covered — from the people who built the original.",
+    datePublished: "2026-08-18",
+    dateModified: "2026-08-18",
+    readTime: "6 min read",
+  },
+  {
     slug: "how-to-check-opencode-usage",
     title: "How to Check OpenCode Usage: Tokens, Costs & Session Stats (2026)",
     excerpt:
