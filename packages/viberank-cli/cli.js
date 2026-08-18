@@ -24,6 +24,15 @@ const __dirname = path.dirname(__filename);
 // scheduled autosubmit run since the feature shipped was a silent no-op).
 const QUIET = process.argv.includes('--quiet') || !process.stdin.isTTY;
 
+/** GitHub handle: 1-39 alphanumerics with single interior hyphens. The
+ * fallback source for the default is `git config user.name`, which has held
+ * anything from real names to captured shell fragments — one of which ended
+ * up as a public profile and a sitemap entry (#119). Validate rather than
+ * warn: a warning is skippable, a re-prompt is not. */
+function looksLikeGithubHandle(value) {
+  return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(value);
+}
+
 /** Generate a fresh ccusage report to `dest` without relying on PATH or a
  * shell redirect — a launchd/schtasks job runs with a minimal PATH that has
  * no node or npx on it, so resolve npx next to the running node binary the
@@ -283,8 +292,10 @@ async function main() {
     type: 'text',
     name: 'username',
     message: 'GitHub username:',
-    initial: githubUser || '',
-    validate: value => value.length > 0 || 'Username is required'
+    initial: githubUser && looksLikeGithubHandle(githubUser) ? githubUser : '',
+    validate: (value) =>
+      looksLikeGithubHandle(value.trim()) ||
+      'That is not a valid GitHub username (1-39 letters, digits, single hyphens)'
   });
   
   if (!response.username) {
@@ -292,7 +303,7 @@ async function main() {
     process.exit(1);
   }
   
-  githubUser = response.username;
+  githubUser = response.username.trim();
   // Remember it: a scheduled --quiet run has no TTY to ask on.
   try { writeConfig({ username: githubUser }); } catch { /* best effort */ }
 
