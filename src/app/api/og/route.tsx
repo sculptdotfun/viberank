@@ -333,6 +333,76 @@ async function profileCard(searchParams: URLSearchParams, headers: HeadersInit) 
   );
 }
 
+
+// Monthly Wrapped share card: four big tiles under a month headline. Same
+// palette as the profile card so shared links read as one family.
+function wrappedCard(searchParams: URLSearchParams, headers: HeadersInit) {
+  const username = searchParams.get('username') || 'developer';
+  const label = searchParams.get('label') || 'This month';
+  const cost = Number(searchParams.get('cost') || 0);
+  const tokens = searchParams.get('tokens') || '0';
+  const rank = searchParams.get('rank') || '—';
+  const actives = searchParams.get('actives') || '—';
+  const days = searchParams.get('days') || '0';
+  const streak = searchParams.get('streak') || '0';
+
+  const tile = (labelText: string, value: string, sub?: string) => (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#1a1a1a',
+        border: '1px solid #2a2a2a',
+        borderRadius: 16,
+        padding: '24px 28px',
+        width: 238,
+      }}
+    >
+      <div style={{ color: '#8a8a8a', fontSize: 20, textTransform: 'uppercase', letterSpacing: 2 }}>{labelText}</div>
+      <div style={{ color: '#f5f5f5', fontSize: 44, fontWeight: 700, marginTop: 8 }}>{value}</div>
+      {sub ? <div style={{ color: '#8a8a8a', fontSize: 18, marginTop: 4 }}>{sub}</div> : null}
+    </div>
+  );
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          backgroundColor: '#121212',
+          padding: '40px 64px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ color: '#f97316', fontSize: 26, textTransform: 'uppercase', letterSpacing: 4 }}>
+              Monthly Wrapped
+            </div>
+            <div style={{ color: '#f5f5f5', fontSize: 56, fontWeight: 700, marginTop: 6 }}>
+              {`${username} — ${label}`}
+            </div>
+          </div>
+          <div style={{ color: '#f97316', fontSize: 34, fontWeight: 700 }}>viberank</div>
+        </div>
+        <div style={{ display: 'flex', gap: 24, marginTop: 36 }}>
+          {tile('Spend', `$${cost.toLocaleString('en-US')}`, 'API-equivalent')}
+          {tile('Tokens', tokens)}
+          {tile('Rank', `#${rank}`, `of ${actives} active devs`)}
+          {tile('Streak', `${streak} days`, `${days} active days`)}
+        </div>
+        <div style={{ color: '#8a8a8a', fontSize: 22, marginTop: 32 }}>
+          Real ccusage data · get yours: npx viberank-cli
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630, headers }
+  );
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -348,6 +418,10 @@ export async function GET(request: Request) {
 
     if (searchParams.get('type') === 'profile') {
       return profileCard(searchParams, cacheHeaders);
+    }
+
+    if (searchParams.get('type') === 'wrapped') {
+      return wrappedCard(searchParams, cacheHeaders);
     }
 
     const title = searchParams.get('title') || 'Viberank';

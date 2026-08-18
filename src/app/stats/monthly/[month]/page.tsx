@@ -244,6 +244,11 @@ export default async function MonthReportPage({ params }: MonthParams) {
             every month.
           </p>
           <code className="font-mono text-accent text-sm">npx viberank-cli</code>
+          <p className="text-sm text-muted mt-3 mb-0">
+            Already on the board? Your personal recap lives at{" "}
+            <span className="font-mono text-foreground">/wrapped/{month}/&#123;your-username&#125;</span> — or find
+            it on your profile.
+          </p>
         </div>
 
         <p className="text-xs text-muted mt-8 max-w-3xl flex items-start gap-1.5">
