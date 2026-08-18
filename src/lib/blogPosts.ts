@@ -19,6 +19,15 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "how-to-check-opencode-usage",
+    title: "How to Check OpenCode Usage: Tokens, Costs & Session Stats (2026)",
+    excerpt:
+      "OpenCode has no built-in usage meter — but one ccusage command turns its local session logs into per-day token counts and real API costs. Plus dashboards and the public leaderboard.",
+    datePublished: "2026-08-18",
+    dateModified: "2026-08-18",
+    readTime: "5 min read",
+  },
+  {
     slug: "claude-code-usage-limits",
     title: "Claude Code Usage Limits Explained (2026): 5-Hour Sessions, Weekly Caps & What To Do When You Hit Them",
     excerpt:
@@ -56,11 +65,11 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "codex-token-usage-leaderboard",
-    title: "How to Track OpenAI Codex Token Usage — and Join the Codex Leaderboard",
+    title: "How to Check Codex Usage: /status, Token Counts & Costs (2026)",
     excerpt:
-      "Turn Codex CLI's local logs into daily token counts and costs with ccusage, understand why the numbers look huge, and rank yourself against 190+ Codex developers.",
+      "Two commands answer it: /status inside Codex CLI for your 5-hour and weekly limits, and ccusage for token-level history and costs — plus the public Codex leaderboard.",
     datePublished: "2026-07-24",
-    dateModified: "2026-07-24",
+    dateModified: "2026-08-18",
     readTime: "6 min read",
   },
   {

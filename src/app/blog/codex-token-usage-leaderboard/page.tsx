@@ -3,17 +3,18 @@ import { ArrowLeft, Clock, Calendar, Terminal, Gauge, Trophy, DollarSign } from 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "How to Track OpenAI Codex Token Usage (+ the Codex Leaderboard) 2026",
+  title: "How to Check Codex Usage: /status, Token Counts & Costs (2026)",
   description:
-    "Check your OpenAI Codex CLI token usage and costs with ccusage, understand what your sessions burn, and see how you rank against 190+ Codex developers on the public Viberank leaderboard.",
+    "Two commands answer it: /status inside Codex CLI shows how much of your 5-hour and weekly limits you've used, and npx ccusage@latest daily turns your local logs into token counts and real costs.",
   alternates: { canonical: "https://www.viberank.app/blog/codex-token-usage-leaderboard" },
   openGraph: {
-    title: "How to Track OpenAI Codex Token Usage (+ the Codex Leaderboard)",
+    title: "How to Check Codex Usage: /status, Token Counts & Costs (2026)",
     description:
       "Read your Codex CLI logs with ccusage, understand what sessions cost, and rank yourself on the public Codex leaderboard.",
     url: "https://www.viberank.app/blog/codex-token-usage-leaderboard",
     type: "article",
     publishedTime: "2026-07-24T00:00:00.000Z",
+    modifiedTime: "2026-08-18T00:00:00.000Z",
     authors: ["Viberank Team"],
     images: [
       {
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "How to Track OpenAI Codex Token Usage (+ the Codex Leaderboard)",
+    title: "How to Check Codex Usage: /status, Token Counts & Costs (2026)",
     description: "Read your Codex CLI logs with ccusage and rank yourself on the public Codex leaderboard.",
     images: ["/api/og?title=Codex%20Token%20Usage&description=Track%20it%2C%20cost%20it%2C%20rank%20it"],
   },
@@ -35,7 +36,15 @@ export const metadata: Metadata = {
 const FAQS = [
   {
     q: "How do I check my OpenAI Codex token usage?",
-    a: "Codex CLI writes session logs as JSONL under ~/.codex. Run npx ccusage@latest daily to parse them into per-day token counts and API-equivalent costs, alongside any other coding agents you use.",
+    a: "Two ways: type /status inside a Codex CLI session to see how much of your 5-hour and weekly rate limits you've used, or run npx ccusage@latest daily to parse Codex's local session logs (JSONL under ~/.codex) into per-day token counts and API-equivalent costs.",
+  },
+  {
+    q: "How do I check how many tokens I have left in Codex?",
+    a: "Codex doesn't meter you in tokens — it meters percentage of a 5-hour session window and a weekly cap. /status shows the live percentages for both. Reset timestamps and any banked usage credits are on your ChatGPT account's web usage page, not in the CLI.",
+  },
+  {
+    q: "Where do I check my Codex credits?",
+    a: "On your ChatGPT/OpenAI account's usage page in the browser. The CLI's /status shows rate-limit percentages only; credit balances and window reset times are web-only for now.",
   },
   {
     q: "Does Codex usage tracked this way match my OpenAI bill?",
@@ -56,12 +65,12 @@ export default function CodexTokenUsage() {
     {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
-      headline: "How to Track OpenAI Codex Token Usage (+ the Codex Leaderboard) 2026",
+      headline: "How to Check Codex Usage: /status, Token Counts & Costs (2026)",
       description:
         "Check your OpenAI Codex CLI token usage and costs with ccusage, and see how you rank on the public Codex leaderboard.",
       image: "https://www.viberank.app/api/og?title=Codex%20Token%20Usage",
       datePublished: "2026-07-24T00:00:00.000Z",
-      dateModified: "2026-07-24T00:00:00.000Z",
+      dateModified: "2026-08-18T00:00:00.000Z",
       author: { "@type": "Organization", name: "Viberank", url: "https://www.viberank.app" },
       publisher: {
         "@type": "Organization",
@@ -96,7 +105,7 @@ export default function CodexTokenUsage() {
 
         <header className="mb-12">
           <h1 className="text-5xl font-bold text-foreground mb-4 leading-tight">
-            How to Track OpenAI Codex Token Usage — and Join the Codex Leaderboard
+            How to Check Your Codex Usage: Limits, Tokens & Costs
           </h1>
 
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
@@ -112,10 +121,11 @@ export default function CodexTokenUsage() {
 
           <div className="p-6 bg-card border border-border rounded-lg">
             <p className="text-lg text-foreground m-0">
-              OpenAI&apos;s Codex CLI doesn&apos;t ship a usage dashboard, but it logs everything you need locally.
-              This guide shows how to turn those logs into daily token counts and dollar figures with{" "}
-              <span className="font-semibold text-accent">ccusage</span>, what the numbers actually mean, and how to
-              stack yours against the 190+ developers tracking Codex on the{" "}
+              The short answer: type <code>/status</code> inside Codex CLI to see how much of your 5-hour and
+              weekly rate limits you&apos;ve used, and run{" "}
+              <span className="font-semibold text-accent">npx ccusage@latest daily</span> in your terminal to turn
+              Codex&apos;s local logs into daily token counts and dollar figures. This guide covers both — plus what
+              the numbers mean and how to stack yours against the 190+ developers on the{" "}
               <Link href="/tool/codex">public Codex leaderboard</Link>.
             </p>
           </div>
@@ -123,8 +133,22 @@ export default function CodexTokenUsage() {
 
         <section className="mb-12">
           <h2 className="text-3xl font-bold text-foreground mb-6 flex items-center gap-3">
+            <Gauge className="w-8 h-8 text-accent" />
+            Checking your limits: <code className="text-accent">/status</code>
+          </h2>
+          <p className="text-foreground text-lg leading-relaxed mb-6">
+            Inside any Codex CLI session, type <code>/status</code>. It shows your current position against both
+            rate-limit windows — the rolling 5-hour session and the weekly cap — as live percentages. (You need to
+            send at least one message in the session first, or there&apos;s no rate-limit state to report.) What it
+            doesn&apos;t show: reset timestamps or banked credits — those live on your ChatGPT account&apos;s web
+            usage page. And it says nothing about tokens or dollars, which is what the next command is for.
+          </p>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-6 flex items-center gap-3">
             <Terminal className="w-8 h-8 text-accent" />
-            Reading your Codex usage with ccusage
+            Checking tokens and costs: ccusage
           </h2>
           <p className="text-foreground text-lg leading-relaxed mb-6">
             Codex CLI writes each session as JSONL under <code>~/.codex</code> (or wherever{" "}
