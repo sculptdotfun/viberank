@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { FEATURED_TOOLS } from "@/lib/utils";
 import { fetchAllPages } from "@/lib/data/supabase/client";
+import { BLOG_POSTS } from "@/lib/blogPosts";
+import { COMPARE_MATCHUPS } from "@/lib/compare";
 
 const SITE = "https://www.viberank.app";
 
@@ -12,23 +14,33 @@ const toolEntries: MetadataRoute.Sitemap = FEATURED_TOOLS.map((t) => ({
   priority: 0.8,
 }));
 
+const compareEntries: MetadataRoute.Sitemap = COMPARE_MATCHUPS.map((m) => ({
+  url: `${SITE}/compare/${m.slug}`,
+  lastModified: new Date(),
+  changeFrequency: "daily" as const,
+  priority: 0.8,
+}));
+
+// Blog entries carry the post's real publish/modified date. Stamping
+// `new Date()` on every build tells crawlers lastModified is noise and they
+// stop trusting it for the pages where it matters.
+const blogEntries: MetadataRoute.Sitemap = BLOG_POSTS.map((p) => ({
+  url: `${SITE}/blog/${p.slug}`,
+  lastModified: new Date(`${p.dateModified}T00:00:00.000Z`),
+  changeFrequency: "monthly" as const,
+  priority: 0.7,
+}));
+
 const staticEntries: MetadataRoute.Sitemap = [
   { url: SITE, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
   ...toolEntries,
+  ...compareEntries,
+  { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/calculator`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
   { url: `${SITE}/blog`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
-  { url: `${SITE}/blog/what-is-tokenmaxxing`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },
-  { url: `${SITE}/blog/codex-token-usage-leaderboard`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },
-  { url: `${SITE}/blog/state-of-ai-coding-2026`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/codex-vs-claude-code-vs-gemini-cli`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/how-much-does-claude-code-cost`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/reduce-ai-coding-costs`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/mcp-servers-guide`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/cursor-vs-claude-code-vs-copilot`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/claude-code-complete-guide`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE}/blog/vibe-coding-revolution`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
+  ...blogEntries,
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
