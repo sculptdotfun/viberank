@@ -31,13 +31,35 @@ const blogEntries: MetadataRoute.Sitemap = BLOG_POSTS.map((p) => ({
   priority: 0.7,
 }));
 
+// Every month from the first tracked data (Sep 2025) through the current one.
+function monthlyReportEntries(): MetadataRoute.Sitemap {
+  const entries: MetadataRoute.Sitemap = [];
+  const now = new Date();
+  const cursor = new Date(Date.UTC(2025, 8, 1));
+  while (cursor <= now) {
+    const month = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`;
+    entries.push({
+      url: `${SITE}/stats/monthly/${month}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    });
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return entries;
+}
+
 const staticEntries: MetadataRoute.Sitemap = [
   { url: SITE, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
   ...toolEntries,
   ...compareEntries,
   { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
+  { url: `${SITE}/claude-rank-tracker`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
+  { url: `${SITE}/ko`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
+  { url: `${SITE}/stats/monthly`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
+  ...monthlyReportEntries(),
   { url: `${SITE}/calculator`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
   { url: `${SITE}/blog`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
   ...blogEntries,
