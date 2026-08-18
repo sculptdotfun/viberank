@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   keywords: ["codex vs claude code", "claude code vs gemini cli", "openai codex cli", "gemini cli", "ai coding cost comparison", "ccusage", "ai coding tools 2026", "claude code cost"],
+  alternates: { canonical: "https://www.viberank.app/blog/codex-vs-claude-code-vs-gemini-cli" },
   openGraph: {
     title: TITLE,
     description: DESC,

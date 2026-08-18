@@ -120,7 +120,23 @@ export default async function CalculatorPage() {
           </div>
         </section>
 
-        <p className="text-xs text-muted mt-10 leading-relaxed">
+        <p className="text-sm text-muted mt-10 leading-relaxed">
+          Want the reasoning behind the math? Read{" "}
+          <Link href="/blog/is-claude-max-worth-it" className="text-accent hover:underline">
+            Is Claude Max worth it?
+          </Link>{" "}
+          for the full Pro vs Max breakdown,{" "}
+          <Link href="/blog/claude-code-usage-limits" className="text-accent hover:underline">
+            how the usage limits work
+          </Link>
+          , and{" "}
+          <Link href="/blog/how-to-check-claude-code-usage" className="text-accent hover:underline">
+            how to find your own ccusage number
+          </Link>
+          .
+        </p>
+
+        <p className="text-xs text-muted mt-6 leading-relaxed">
           Plan prices were checked against each vendor&apos;s own pricing page on 2026-08-05 and are
           monthly-billing list prices in USD; the source is shown alongside each tool&apos;s plans.
           Gemini CLI is not covered yet — Google does not publish comparable monthly prices for the

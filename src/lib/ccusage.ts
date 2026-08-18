@@ -299,14 +299,33 @@ function inferAgents(modelsUsed: string[]): string[] {
   return Array.from(new Set(modelsUsed.map(inferToolFromModel)));
 }
 
+/**
+ * Canonical tool keys. Different ccusage versions have emitted variant names
+ * for the same source (e.g. `claude-code` vs `claude`), which fragments the
+ * per-tool boards into separate chips.
+ */
+const TOOL_ALIASES: Record<string, string> = {
+  "claude-code": "claude",
+  "claude_code": "claude",
+  "gemini-cli": "gemini",
+  "copilot-cli": "copilot",
+  "hermes-agent": "hermes",
+  "pi-agent": "pi",
+};
+
+export function canonicalToolKey(tool: string): string {
+  const key = tool.toLowerCase();
+  return TOOL_ALIASES[key] ?? key;
+}
+
 /** Resolve the agents for a single raw daily row. */
 function resolveAgents(entry: RawDailyEntry): string[] {
   const fromMeta = entry.metadata?.agents;
   if (Array.isArray(fromMeta) && fromMeta.length > 0) {
-    return Array.from(new Set(fromMeta.map((a) => a.toLowerCase())));
+    return Array.from(new Set(fromMeta.map((a) => canonicalToolKey(a))));
   }
   // Single-agent rows (per-source report) carry `agent` directly.
-  if (entry.agent && entry.agent !== "all") return [entry.agent.toLowerCase()];
+  if (entry.agent && entry.agent !== "all") return [canonicalToolKey(entry.agent)];
   return inferAgents(entry.modelsUsed ?? []);
 }
 

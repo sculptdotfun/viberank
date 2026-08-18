@@ -44,6 +44,10 @@ export const FEATURED_TOOLS: { key: string; blurb: string }[] = [
   { key: "gemini", blurb: "Google's Gemini CLI" },
   { key: "copilot", blurb: "GitHub Copilot CLI" },
   { key: "opencode", blurb: "the OpenCode agent" },
+  { key: "hermes", blurb: "Nous Research's self-improving Hermes Agent" },
+  { key: "openclaw", blurb: "the OpenClaw personal AI assistant" },
+  { key: "pi", blurb: "the Pi coding agent from pi.dev" },
+  { key: "kimi", blurb: "Moonshot AI's Kimi Code CLI" },
 ];
 
 export function toolBlurb(tool: string): string {

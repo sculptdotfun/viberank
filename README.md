@@ -26,10 +26,11 @@ Live at **[viberank.app](https://www.viberank.app)**.
 - 🖥️ **Multi-machine** — a laptop and a desktop sum into one profile instead of overwriting each other
 - 📈 **[`/stats`](https://www.viberank.app/stats)** — site-wide spend curve, monthly trend, and where your burn lands against everyone else
 - 🧮 **[`/calculator`](https://www.viberank.app/calculator)** — which subscription tier your actual usage justifies, based on your real `ccusage` numbers rather than a guess
+- ⚔️ **[Head-to-head comparisons](https://www.viberank.app/compare)** — `/compare/claude-vs-codex` and every other tool matchup, with live adoption numbers from the board
 - 🎖️ **README badges** — `https://www.viberank.app/api/badge/{username}` for rank, cost, or tokens
 - 🛡️ **Input validation** — one-sided token math (reasoning-token aware), cost/token ratio guard, date sanity, realistic-range ceilings
 - 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
-- ✍️ **Blog** — data-backed posts on AI coding costs at [viberank.app/blog](https://www.viberank.app/blog)
+- ✍️ **Blog** — data-backed posts on AI coding costs at [viberank.app/blog](https://www.viberank.app/blog) ([RSS](https://www.viberank.app/feed.xml)); [`llms.txt`](https://www.viberank.app/llms.txt) for AI search engines
 
 ## Submitting your usage data
 

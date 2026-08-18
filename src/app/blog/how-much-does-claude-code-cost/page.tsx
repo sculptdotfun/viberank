@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   keywords: ["how much does claude code cost", "claude code pricing", "claude code cost per month", "claude code token cost", "ai coding cost", "claude code usage", "ccusage"],
+  alternates: { canonical: "https://www.viberank.app/blog/how-much-does-claude-code-cost" },
   openGraph: {
     title: TITLE,
     description: DESC,
