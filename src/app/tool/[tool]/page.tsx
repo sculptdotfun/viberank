@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
 import { formatNumber, formatCurrency, toolLabel, toolBlurb, FEATURED_TOOLS } from "@/lib/utils";
+import { COMPARE_MATCHUPS, matchupTitle } from "@/lib/compare";
 
 interface ToolParams {
   params: Promise<{ tool: string }>;
@@ -138,6 +139,20 @@ export default async function ToolPage({ params }: ToolParams) {
               }`}
             >
               {toolLabel(t.key)}
+            </Link>
+          ))}
+        </div>
+
+        {/* Head-to-head comparisons involving this tool */}
+        <div className="flex flex-wrap items-center gap-2 -mt-4 mb-8 text-sm">
+          <span className="micro-label">Compare</span>
+          {COMPARE_MATCHUPS.filter((m) => m.a === tool || m.b === tool).map((m) => (
+            <Link
+              key={m.slug}
+              href={`/compare/${m.slug}`}
+              className="px-2.5 py-1 rounded-md border bg-surface-1 border-border text-muted hover:text-foreground transition-colors"
+            >
+              {matchupTitle(m)}
             </Link>
           ))}
         </div>
