@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -10,12 +10,33 @@ import chalk from 'chalk';
 import ora from 'ora';
 import prompts from 'prompts';
 import fetch from 'node-fetch';
-import { getToken, getMachineId, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
+import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus } from './lib/corpus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Quiet mode: no prompts, no cwd side effects, timestamped log lines. A
+// scheduled run passes --quiet explicitly; a missing TTY means there is no
+// human to answer prompts either way, so treat that as quiet too rather than
+// cancel (the pre-1.5 behavior: prompts got EOF, "cancelled", exit 0 — every
+// scheduled autosubmit run since the feature shipped was a silent no-op).
+const QUIET = process.argv.includes('--quiet') || !process.stdin.isTTY;
+
+/** Generate a fresh ccusage report to `dest` without relying on PATH or a
+ * shell redirect — a launchd/schtasks job runs with a minimal PATH that has
+ * no node or npx on it, so resolve npx next to the running node binary the
+ * same way lib/autosubmit.js does. */
+function generateCcJson(dest) {
+  const npxLocal = path.join(path.dirname(process.execPath), process.platform === 'win32' ? 'npx.cmd' : 'npx');
+  const npx = fs.existsSync(npxLocal) ? npxLocal : 'npx';
+  const out = execFileSync(npx, ['-y', 'ccusage@latest', 'daily', '--json'], {
+    encoding: 'utf8',
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  fs.writeFileSync(dest, out);
+}
 
 // Read package.json to get version
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
@@ -152,7 +173,79 @@ async function autosubmitCommand(arg) {
   console.log(chalk.gray('  Turn it off with: npx viberank-cli autosubmit off\n'));
 }
 
+/**
+ * The scheduled path: no prompts, no cwd writes, one timestamped line per run.
+ * Identity comes from the API token (the server resolves the token's owner and
+ * ignores the header claim), so a token is required here.
+ */
+async function quietSubmit() {
+  const stamp = () => `[${new Date().toISOString()}]`;
+
+  if (!getToken()) {
+    console.error(`${stamp()} no API token — run \`npx viberank-cli login\`, then re-enable autosubmit`);
+    process.exit(1);
+  }
+
+  // RunAtLoad/logon triggers fire on every boot; skip if a run already
+  // succeeded in the last 20 hours so catch-up never double-submits.
+  const last = readConfig().lastAutosubmit;
+  if (last && Date.now() - Date.parse(last) < 20 * 60 * 60 * 1000) {
+    console.log(`${stamp()} already submitted at ${last}, skipping`);
+    return;
+  }
+
+  const ccJsonPath = path.join(CONFIG_DIR, 'cc.json');
+  try {
+    generateCcJson(ccJsonPath);
+  } catch (error) {
+    console.error(`${stamp()} ccusage failed: ${error.message}`);
+    process.exit(1);
+  }
+
+  const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
+  try {
+    const corpus = collectCorpus();
+    if (corpus) ccData.drift = { corpus };
+  } catch { /* best effort */ }
+
+  const githubUser = readConfig().username || 'autosubmit';
+  let lastError = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch('https://www.viberank.app/api/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-GitHub-User': githubUser,
+          'X-CLI-Version': CLI_VERSION,
+          'X-Machine-Id': getMachineId(),
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(ccData),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.success) {
+        writeConfig({ lastAutosubmit: new Date().toISOString() });
+        console.log(`${stamp()} submitted ${ccData.daily?.length ?? '?'} days — ${result.profileUrl ?? ''}`);
+        try { fs.unlinkSync(ccJsonPath); } catch { /* fine */ }
+        return;
+      }
+      lastError = new Error(result.error || `server returned ${response.status}`);
+      if (response.status !== 503 && response.status < 500) break; // 4xx: retrying won't help
+    } catch (error) {
+      lastError = error; // network error — retry
+    }
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 5000 * attempt));
+  }
+
+  try { fs.unlinkSync(ccJsonPath); } catch { /* fine */ }
+  console.error(`${stamp()} submit failed: ${lastError?.message ?? 'unknown error'}`);
+  process.exit(1);
+}
+
 async function main() {
+  if (QUIET) return quietSubmit();
+
   console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
 
   // Try to get GitHub username from remote URL first, then fall back to git config
@@ -200,6 +293,8 @@ async function main() {
   }
   
   githubUser = response.username;
+  // Remember it: a scheduled --quiet run has no TTY to ask on.
+  try { writeConfig({ username: githubUser }); } catch { /* best effort */ }
 
   // Check if cc.json already exists
   let ccJsonPath = path.join(process.cwd(), 'cc.json');
@@ -218,10 +313,7 @@ async function main() {
       const spinner = ora('Generating usage data with ccusage...').start();
       
       try {
-        execSync('npx ccusage@latest daily --json > cc.json', { 
-          encoding: 'utf8',
-          stdio: 'pipe' 
-        });
+        generateCcJson(ccJsonPath);
         spinner.succeed('Generated cc.json successfully');
       } catch (error) {
         spinner.fail('Failed to generate cc.json');
@@ -238,10 +330,7 @@ async function main() {
     const spinner = ora('Generating usage data with ccusage...').start();
     
     try {
-      execSync('npx ccusage@latest daily --json > cc.json', { 
-        encoding: 'utf8',
-        stdio: 'pipe' 
-      });
+      generateCcJson(ccJsonPath);
       spinner.succeed('Generated cc.json successfully');
     } catch (error) {
       spinner.fail('Failed to generate cc.json');
@@ -437,7 +526,6 @@ async function main() {
 }
 
 const [command, arg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const QUIET = process.argv.includes('--quiet');
 
 const run = async () => {
   switch (command) {

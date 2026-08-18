@@ -1,5 +1,12 @@
 # Changelog
 
+## CLI v1.5.0 — autosubmit actually submits (August 2026)
+
+### Fixed
+- **Scheduled autosubmit runs never submitted.** Three compounding bugs: `submit --quiet` still ran interactive prompts, which cancel silently (exit 0) with no TTY; `cc.json` was written to the scheduler's working directory (`/` under launchd); and ccusage was invoked via `npx` from PATH, which launchd/schtasks jobs don't have node on. Every scheduled run since the feature shipped was a no-op that looked successful in the logs. `--quiet` (or any non-TTY stdin) now takes a dedicated prompt-free path: token-authenticated, PATH-safe ccusage invocation resolved next to the running node binary, temp file under `~/.viberank/`, network retries with backoff, and one timestamped log line per run — success or failure, with a real exit code.
+- **Missed-run catch-up now works on all three platforms**, not just Linux. launchd's calendar trigger doesn't fire across a power-off, and schtasks DAILY doesn't catch up either; macOS now also runs at login (`RunAtLoad`) and Windows gains an `ONLOGON` companion task. A 20-hour staleness guard in the CLI keeps catch-up triggers from double-submitting.
+- The interactive flow now remembers your confirmed GitHub username (`~/.viberank/config.json`) so scheduled runs can label submissions without prompting; the server still resolves identity from the API token either way.
+
 ## v2.0 — Multi-tool leaderboard (June 2026)
 
 viberank evolved from a Claude Code leaderboard into the leaderboard for **all AI coding usage** — Claude Code, Codex, Gemini CLI, Copilot, OpenCode and every other tool [ccusage](https://github.com/ryoppippi/ccusage) tracks.
