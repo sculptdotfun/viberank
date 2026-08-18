@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   keywords: ["ai coding spend", "claude code cost benchmark", "ai coding statistics 2026", "developer ai usage data", "claude code tokens", "ai agent cost", "state of ai coding", "ccusage"],
+  alternates: { canonical: "https://www.viberank.app/blog/state-of-ai-coding-2026" },
   openGraph: {
     title: TITLE,
     description: DESC,

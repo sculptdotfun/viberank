@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   keywords: ["reduce claude code cost", "lower ai coding cost", "claude code cheaper", "ai coding bill", "prompt caching", "claude code model routing", "save money claude code", "ccusage"],
+  alternates: { canonical: "https://www.viberank.app/blog/reduce-ai-coding-costs" },
   openGraph: {
     title: TITLE,
     description: DESC,

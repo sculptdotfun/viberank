@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
   description: "Learn how to extend Claude Code with MCP (Model Context Protocol) servers. Connect to GitHub, PostgreSQL, Slack, and build custom integrations for AI-powered development.",
   keywords: ["mcp servers", "model context protocol", "claude code mcp", "claude code github", "claude code database", "anthropic mcp", "ai integrations", "claude code plugins"],
+  alternates: { canonical: "https://www.viberank.app/blog/mcp-servers-guide" },
   openGraph: {
     title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
     description: "Extend Claude Code with MCP servers. Connect to GitHub, databases, Slack, and more.",
@@ -467,7 +468,10 @@ await server.connect(transport);`}</code>
             AI to your entire development stack is what makes Claude Code uniquely powerful.
           </p>
           <p className="text-stone-500 text-sm">
-            Explore more MCP servers at the official MCP repository and community collections.
+            Explore more MCP servers at the official MCP repository and community collections. New to Claude Code?
+            Start with the <Link href="/blog/claude-code-complete-guide">complete guide</Link>, then learn{" "}
+            <Link href="/blog/how-to-check-claude-code-usage">how to check your usage</Link> once your agents are
+            running around the clock.
           </p>
         </footer>
       </article>
