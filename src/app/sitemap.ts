@@ -56,6 +56,7 @@ const staticEntries: MetadataRoute.Sitemap = [
   { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   { url: `${SITE}/claude-rank-tracker`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
   { url: `${SITE}/ko`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
+  { url: `${SITE}/leagues`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats/monthly`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
