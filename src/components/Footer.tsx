@@ -4,10 +4,12 @@ import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
 const RESOURCES = [
   { name: "Cost calculator", href: "/calculator" },
   { name: "Blog", href: "/blog" },
+  { name: "Compare AI coding tools", href: "/compare" },
   { name: "Hire AI-native engineers", href: "/hire" },
+  { name: "Claude Code usage limits", href: "/blog/claude-code-usage-limits" },
+  { name: "Check your Claude Code usage", href: "/blog/how-to-check-claude-code-usage" },
+  { name: "Is Claude Max worth it?", href: "/blog/is-claude-max-worth-it" },
   { name: "What is tokenmaxxing?", href: "/blog/what-is-tokenmaxxing" },
-  { name: "Track Codex token usage", href: "/blog/codex-token-usage-leaderboard" },
-  { name: "Codex vs Claude Code vs Gemini", href: "/blog/codex-vs-claude-code-vs-gemini-cli" },
   { name: "What Claude Code costs", href: "/blog/how-much-does-claude-code-cost" },
   { name: "Cut your AI coding bill", href: "/blog/reduce-ai-coding-costs" },
 ];

@@ -418,8 +418,10 @@ export default function VibeCodingRevolution() {
             who has ideas worth building. Welcome to the vibe.
           </p>
           <p className="text-stone-500 text-sm">
-            Follow the conversation: Track your stats at Viberank, experiment with Claude Code and Cursor, 
-            and remember—Karpathy himself called it a tool for "throwaway weekend projects." Use it wisely.
+            Follow the conversation: track your stats on <Link href="/">the leaderboard</Link>, see{" "}
+            <Link href="/blog/what-is-tokenmaxxing">where vibe coding culture went next</Link>, or read{" "}
+            <Link href="/blog/how-much-does-claude-code-cost">what all this vibing actually costs</Link> —
+            and remember, Karpathy himself called it a tool for &quot;throwaway weekend projects.&quot; Use it wisely.
           </p>
         </footer>
       </article>
