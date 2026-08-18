@@ -9,6 +9,7 @@ import type {
   GlobalStats,
   SiteStats,
   MonthStats,
+  UserMonthStats,
   HireListing,
   LeaderboardParams,
   LeaderboardResult,
@@ -343,6 +344,10 @@ export function createDemoDataLayer(): DataLayer {
       },
     },
     submissions: {
+      async deleteOwn(): Promise<boolean> {
+        // Demo data is read-only.
+        return false;
+      },
       async submit(_data: SubmitData): Promise<string> {
         throw new Error("Demo data is read-only");
       },
@@ -455,6 +460,23 @@ export function createDemoDataLayer(): DataLayer {
         };
       },
     },
+    leagues: {
+      async create(): Promise<never> {
+        throw new Error("Leagues need the live backend.");
+      },
+      async joinByCode(): Promise<never> {
+        throw new Error("Leagues need the live backend.");
+      },
+      async getBySlug() {
+        return null;
+      },
+      async getInviteCode() {
+        return null;
+      },
+      async listForUser() {
+        return [];
+      },
+    },
     stats: {
       // The demo backend has no site-wide rollup table; returning null is the
       // documented "not available" signal and callers already handle it.
@@ -463,6 +485,9 @@ export function createDemoDataLayer(): DataLayer {
       },
       // Same "not available" signal as getSiteStats — demo has no daily rollup.
       async getMonthStats(): Promise<MonthStats | null> {
+        return null;
+      },
+      async getUserMonthStats(): Promise<UserMonthStats | null> {
         return null;
       },
       // The demo backend has no cohort to rank against; an empty list makes

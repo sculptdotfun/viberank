@@ -255,6 +255,39 @@ export interface MonthStats {
   perModel: { model: string; cost: number }[];
 }
 
+/** One user's month from get_user_month_stats() (migration 015) — Wrapped data. */
+export interface UserMonthStats {
+  month: string;
+  username: string;
+  cost: number;
+  tokens: number;
+  activeDays: number;
+  bestDayCost: number;
+  longestStreak: number;
+  /** 1-based rank among that month's active users, by cost. */
+  rank: number;
+  totalActives: number;
+  topModels: { model: string; cost: number }[];
+  tools: string[];
+}
+
+export interface League {
+  id: string;
+  slug: string;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** One row on a league board: a member plus their best submission's totals. */
+export interface LeagueBoardRow {
+  username: string;
+  joinedAt: string;
+  totalCost: number;
+  totalTokens: number;
+  verified: boolean;
+}
+
 export interface ClaimStatus {
   actionNeeded: "claim" | "merge" | null;
   actionText: string;
@@ -317,6 +350,11 @@ export interface FindProfilesResult {
 // ============================================================================
 
 export interface SubmissionsService {
+  /**
+   * Delete one of the caller's own submissions (#127): the row must belong to
+   * `username` directly or be claimed by them. Returns false when no such row.
+   */
+  deleteOwn(username: string, submissionId: string): Promise<boolean>;
   submit(data: SubmitData): Promise<string>;
   getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult>;
   getLeaderboardByDateRange(
@@ -364,8 +402,23 @@ export interface StatsService {
   getSiteStats(): Promise<SiteStats | null>;
   /** One month's aggregates via get_month_stats() (migration 013); null if unavailable. */
   getMonthStats(month: string): Promise<MonthStats | null>;
+  /** One user's month via get_user_month_stats() (migration 015); null if unavailable or empty. */
+  getUserMonthStats(month: string, username: string): Promise<UserMonthStats | null>;
   /** Raw rows for the /calculator spend curve. */
   getSpendRows(): Promise<import("@/lib/spend-curve").BurnRow[]>;
+}
+
+export interface LeaguesService {
+  /** Create a league owned by `creator` (also its first member). Throws on cap/name problems. */
+  create(name: string, creator: string): Promise<{ league: League; inviteCode: string }>;
+  /** Join via invite code; idempotent for existing members. Throws on unknown code or full league. */
+  joinByCode(code: string, username: string): Promise<League>;
+  /** League + member board rows (best submission per member), or null. */
+  getBySlug(slug: string): Promise<{ league: League; members: LeagueBoardRow[] } | null>;
+  /** The invite code — only revealed to current members. */
+  getInviteCode(slug: string, requester: string): Promise<string | null>;
+  /** Leagues `username` belongs to. */
+  listForUser(username: string): Promise<League[]>;
 }
 
 export interface DataLayer {
@@ -373,6 +426,7 @@ export interface DataLayer {
   submissions: SubmissionsService;
   profiles: ProfilesService;
   stats: StatsService;
+  leagues: LeaguesService;
 }
 
 // ============================================================================

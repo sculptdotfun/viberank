@@ -570,7 +570,32 @@ export default async function ProfilePage({ params }: ProfileParams) {
           </div>
         )}
       </div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10 space-y-6">
+        {/* Personal monthly recap — the share loop's entry point. */}
+        <div className="rounded-lg border border-accent/40 bg-surface-1 p-5">
+          <p className="font-medium mb-1">Monthly Wrapped</p>
+          <p className="text-sm text-muted mb-3">
+            A shareable recap of a month on the board — spend, tokens, streak, and rank among that month&apos;s
+            active developers.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[0, 1].map((back) => {
+              const d = new Date();
+              d.setUTCMonth(d.getUTCMonth() - back);
+              const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+              const label = back === 0 ? "This month" : "Last month";
+              return (
+                <Link
+                  key={m}
+                  href={`/wrapped/${m}/${encodeURIComponent(profileData.username)}`}
+                  className="px-3 py-1.5 rounded-md border bg-surface-2 border-border text-sm text-foreground hover:text-accent transition-colors"
+                >
+                  {label} →
+                </Link>
+              );
+            })}
+          </div>
+        </div>
         <BadgeSnippet username={profileData.username} />
       </div>
       <Footer />

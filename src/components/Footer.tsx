@@ -5,6 +5,7 @@ const RESOURCES = [
   { name: "Cost calculator", href: "/calculator" },
   { name: "Blog", href: "/blog" },
   { name: "Compare AI coding tools", href: "/compare" },
+  { name: "Friend leagues", href: "/leagues" },
   { name: "Claude rank tracker", href: "/claude-rank-tracker" },
   { name: "한국어 안내", href: "/ko" },
   { name: "Hire AI-native engineers", href: "/hire" },
