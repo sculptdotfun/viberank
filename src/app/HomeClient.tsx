@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 
 const SubmitModal = dynamic(() => import("@/components/SubmitModal"), { ssr: false });
 import NavBar from "@/components/NavBar";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import Footer from "@/components/Footer";
 import { useSession, signIn } from "next-auth/react";
 import { useCheckClaimableSubmissions, useClaimAndMergeSubmissions } from "@/lib/data/hooks/useSubmissions";
@@ -100,6 +101,11 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
       {stats && <Ticker stats={stats} />}
 
       <NavBar />
+
+      <AnnouncementBanner id="leagues-2026-08" href="/leagues">
+        <span className="font-medium text-accent">New:</span> Friend Leagues — a private leaderboard for your team
+        or group chat, one invite code to start. <span className="underline underline-offset-2">Start yours →</span>
+      </AnnouncementBanner>
 
       {/* Claim/Merge Banner */}
       <AnimatePresence>
