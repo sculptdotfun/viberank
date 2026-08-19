@@ -41,6 +41,7 @@ export default function NavBar() {
 
   const navItems = [
     { name: "Stats", href: "/stats" },
+    { name: "Leagues", href: "/leagues" },
     { name: "Calculator", href: "/calculator" },
     { name: "Blog", href: "/blog" },
     { name: "Hire", href: "/hire" },
