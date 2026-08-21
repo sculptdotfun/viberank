@@ -7,7 +7,7 @@ import { toolLabel } from "@/lib/utils";
 import { COMPARE_FACTS, COMPARE_MATCHUPS, matchupTitle } from "@/lib/compare";
 
 const SITE = "https://www.viberank.app";
-const TITLE = "Compare AI Coding Tools: Claude Code, Codex, Gemini CLI & More | Viberank";
+const TITLE = "Compare AI Coding Tools on Real Usage: Claude, Codex & More";
 const DESC =
   "Head-to-head comparisons of AI coding agents — Claude Code, OpenAI Codex, Gemini CLI, Copilot, OpenCode — on pricing, models, and real adoption from live ccusage data.";
 

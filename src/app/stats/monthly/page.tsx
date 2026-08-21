@@ -7,7 +7,7 @@ import NavBar from "@/components/NavBar";
 import { formatUsd } from "@/lib/utils";
 
 const SITE = "https://www.viberank.app";
-const TITLE = "Monthly AI Coding Spend Reports | Viberank";
+const TITLE = "Monthly AI Coding Spend Reports: Tokens, Cost & Models";
 const DESC =
   "Month-by-month reports on what developers actually spend on AI coding — totals, medians, per-tool and per-model breakdowns from real ccusage data on the Viberank leaderboard.";
 const MONTHS = [

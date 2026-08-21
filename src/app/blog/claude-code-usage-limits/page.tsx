@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Timer, CalendarClock, Gauge, Wrench, CreditCard } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "Claude Code Usage Limits Explained (2026): 5-Hour Sessions, Weekly Caps & What To Do When You Hit Them";
+const TITLE = "Claude Code Usage Limits: 5-Hour & Weekly Caps (2026)";
 const DESC =
   "How Claude Code's rolling 5-hour session limit and weekly cap actually work in 2026, how to check where you stand with /usage and ccusage, and your options when you hit the wall.";
 const URL = "https://www.viberank.app/blog/claude-code-usage-limits";

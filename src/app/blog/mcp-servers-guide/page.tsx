@@ -3,12 +3,12 @@ import { ArrowLeft, Clock, Calendar, Plug, Database, Github, MessageSquare, File
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
+  title: "MCP Servers Guide: Connect Claude Code to GitHub & Databases",
   description: "Learn how to extend Claude Code with MCP (Model Context Protocol) servers. Connect to GitHub, PostgreSQL, Slack, and build custom integrations for AI-powered development.",
   keywords: ["mcp servers", "model context protocol", "claude code mcp", "claude code github", "claude code database", "anthropic mcp", "ai integrations", "claude code plugins"],
   alternates: { canonical: "https://www.viberank.app/blog/mcp-servers-guide" },
   openGraph: {
-    title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
+    title: "MCP Servers Guide: Connect Claude Code to GitHub & Databases",
     description: "Extend Claude Code with MCP servers. Connect to GitHub, databases, Slack, and more.",
     url: "https://www.viberank.app/blog/mcp-servers-guide",
     type: "article",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
+    title: "MCP Servers Guide: Connect Claude Code to GitHub & Databases",
     description: "Learn how to extend Claude Code with MCP servers for powerful integrations.",
     images: ["/api/og?title=MCP%20Servers%20Guide&description=Connect%20Claude%20Code%20to%20Everything"],
   },
@@ -35,7 +35,7 @@ export default function MCPServersGuide() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
-    "headline": "MCP Servers Guide: Connect Claude Code to GitHub, Databases & More",
+    "headline": "MCP Servers Guide: Connect Claude Code to GitHub & Databases",
     "description": "Learn how to extend Claude Code with MCP servers for powerful AI integrations.",
     "image": "https://www.viberank.app/api/og?title=MCP%20Servers%20Guide",
     "datePublished": "2025-12-15T00:00:00.000Z",
@@ -74,7 +74,7 @@ export default function MCPServersGuide() {
 
         <header className="mb-12">
           <h1 className="text-5xl font-bold text-foreground mb-4 leading-tight">
-            MCP Servers Guide: Connect Claude Code to GitHub, Databases & More
+            MCP Servers Guide: Connect Claude Code to GitHub & Databases
           </h1>
 
           <div className="flex items-center gap-6 text-sm text-muted mb-8">

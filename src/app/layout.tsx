@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Viberank - Claude Code, Codex & AI Coding Usage Leaderboard | Track AI Dev Stats",
+  title: "Viberank — Claude Code & Codex Token Usage Leaderboard",
   description: "The public AI token leaderboard for vibe coding. Track Claude Code, OpenAI Codex, Gemini CLI and more with ccusage data — see real spend, tokens burned, and how your tokenmaxxing ranks against 1,000+ developers.",
   keywords: ["claude", "claude code", "claude code leaderboard", "anthropic", "codex", "codex leaderboard", "codex token usage", "openai codex", "gemini cli", "github copilot", "opencode", "ccusage", "ai coding", "ai coding leaderboard", "ai token leaderboard", "token leaderboard", "tokenmaxxing", "token maxxing", "leaderboard", "developer stats", "code usage", "token usage tracker", "ai development", "developer ranking", "cc.json", "npx viberank-cli", "vibe coding", "vibe coding leaderboard", "ai pair programming"],
   authors: [{ name: "Viberank Team" }],

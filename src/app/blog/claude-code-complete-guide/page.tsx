@@ -3,12 +3,12 @@ import { ArrowLeft, Clock, Calendar, Terminal, Zap, Settings, Code, FileCode, Bo
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Claude Code Complete Guide 2026: Installation, Commands & Best Practices",
+  title: "Claude Code Guide 2026: Install, Commands & Best Practices",
   description: "Master Claude Code in 2026 with this comprehensive guide. Learn installation, essential commands, MCP servers, hooks, and advanced workflows for AI-powered terminal development.",
   keywords: ["claude code", "claude code tutorial", "claude code guide", "anthropic cli", "ai coding assistant", "terminal ai", "claude code commands", "mcp servers", "claude code installation"],
   alternates: { canonical: "https://www.viberank.app/blog/claude-code-complete-guide" },
   openGraph: {
-    title: "Claude Code Complete Guide 2026: Installation, Commands & Best Practices",
+    title: "Claude Code Guide 2026: Install, Commands & Best Practices",
     description: "Master Claude Code with this comprehensive guide covering installation, commands, MCP servers, and advanced workflows.",
     url: "https://www.viberank.app/blog/claude-code-complete-guide",
     type: "article",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Claude Code Complete Guide 2026: Installation, Commands & Best Practices",
+    title: "Claude Code Guide 2026: Install, Commands & Best Practices",
     description: "Master Claude Code with this comprehensive guide covering installation, commands, and advanced workflows.",
     images: ["/api/og?title=Claude%20Code%20Complete%20Guide%202026&description=Installation%2C%20Commands%20%26%20Best%20Practices"],
   },
@@ -36,7 +36,7 @@ export default function ClaudeCodeCompleteGuide() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
-    "headline": "Claude Code Complete Guide 2026: Installation, Commands & Best Practices",
+    "headline": "Claude Code Guide 2026: Install, Commands & Best Practices",
     "description": "Master Claude Code in 2026 with this comprehensive guide covering installation, essential commands, MCP servers, and advanced workflows.",
     "image": "https://www.viberank.app/api/og?title=Claude%20Code%20Complete%20Guide%202026",
     "datePublished": "2025-10-12T00:00:00.000Z",
@@ -75,7 +75,7 @@ export default function ClaudeCodeCompleteGuide() {
 
         <header className="mb-12">
           <h1 className="text-5xl font-bold text-foreground mb-4 leading-tight">
-            Claude Code Complete Guide 2026: Installation, Commands & Best Practices
+            Claude Code Guide 2026: Install, Commands & Best Practices
           </h1>
 
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
