@@ -536,7 +536,66 @@ async function main() {
     }
   }
 
+  await offerAutosubmit();
+
   console.log(chalk.green('\nDone! 🎉'));
+}
+
+/**
+ * Offer to keep submitting after a successful one-off submit.
+ *
+ * A single submission freezes your rank on the day you sent it, and 94% of
+ * people who join never send a second one — the feature that fixes that has
+ * been a settings page nobody visits. So ask here, where the value is obvious,
+ * defaulted to yes.
+ *
+ * Deliberately a prompt and not a silent default: this installs a scheduled
+ * job that runs daily and uploads. Doing that without an explicit yes is not
+ * something to spring on anyone, least of all this audience.
+ */
+async function offerAutosubmit() {
+  if (QUIET) return;                        // scheduled run; nobody to ask
+  if (!autosubmit.platform()) return;       // no scheduler we can drive
+  if (autosubmit.status().enabled) return;  // already on
+
+  console.log(
+    chalk.gray(
+      '\nOne submission freezes your rank at today. Autosubmit sends your\n' +
+      'usage once a day in the background so it stays current.'
+    )
+  );
+
+  const { enable } = await prompts({
+    type: 'confirm',
+    name: 'enable',
+    message: 'Keep my rank up to date automatically?',
+    initial: true,
+  });
+  if (!enable) {
+    console.log(chalk.gray('No problem — turn it on later with `npx viberank-cli autosubmit`.'));
+    return;
+  }
+
+  // A scheduled run can't open a browser, so it needs a token first.
+  if (!getToken()) {
+    console.log(chalk.yellow('\nAutosubmit needs a token, because a background run cannot sign in.'));
+    console.log(`  1. ${chalk.bold('npx viberank-cli login')}   (paste a token from ${SITE}/settings/tokens)`);
+    console.log(`  2. ${chalk.bold('npx viberank-cli autosubmit')}\n`);
+    return;
+  }
+
+  try {
+    const result = autosubmit.enable(9);
+    console.log(
+      chalk.green(
+        `\n✓ Submitting daily at ${String(result.hour).padStart(2, '0')}:00 via ${result.scheduler}.`
+      )
+    );
+    console.log(chalk.gray('  Stop any time with `npx viberank-cli autosubmit off`.'));
+  } catch (error) {
+    console.log(chalk.yellow(`\nCould not schedule automatic submission: ${error.message}`));
+    console.log(chalk.gray('Run `npx viberank-cli autosubmit` to try again.'));
+  }
 }
 
 const [command, arg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));

@@ -464,6 +464,9 @@ export function createDemoDataLayer(): DataLayer {
       async create(): Promise<never> {
         throw new Error("Leagues need the live backend.");
       },
+      async previewByCode() {
+        return null;
+      },
       async joinByCode(): Promise<never> {
         throw new Error("Leagues need the live backend.");
       },

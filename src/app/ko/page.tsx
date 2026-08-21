@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Trophy, Terminal, Shield, BarChart3 } from "lucide-react";
 import { getServerDataLayer } from "@/lib/data";
+import { buildCostBenchmark, percentile, shareAbove, usd, pct } from "@/lib/cost-benchmark";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 
@@ -70,14 +71,20 @@ const FAQS = [
 export default async function KoreanLandingPage() {
   let totalUsers = 0;
   let totalCost = 0;
+  let benchmark = buildCostBenchmark([]);
   try {
     const dataLayer = await getServerDataLayer();
-    const site = await dataLayer.stats.getSiteStats();
+    const [site, spendRows] = await Promise.all([
+      dataLayer.stats.getSiteStats(),
+      dataLayer.stats.getSpendRows(),
+    ]);
     totalUsers = site?.totalUsers ?? 0;
     totalCost = site?.totalCost ?? 0;
+    benchmark = buildCostBenchmark(spendRows);
   } catch {
     // render static content
   }
+  const hasBenchmark = benchmark.cohortSize > 0;
 
   const faqLd = {
     "@context": "https://schema.org",
@@ -179,6 +186,48 @@ export default async function KoreanLandingPage() {
             </p>
           </div>
         </div>
+
+        {hasBenchmark && (
+          <section className="mb-12 max-w-3xl">
+            <h2 className="font-mono text-xl font-bold tracking-tight mb-3">
+              Claude Code 실제 비용은 얼마일까?
+            </h2>
+            <p className="text-muted text-sm mb-5 leading-relaxed">
+              대부분의 자료는 Anthropic이 공개한 개발자당 월 $150~250이라는 수치를 그대로 인용합니다. 하지만
+              viberank는 직접 측정합니다 — 아래는 자신의 사용량을 실제로 추적하는 개발자{" "}
+              {benchmark.cohortSize.toLocaleString("ko-KR")}명의 월 API 환산 비용 분포입니다.
+            </p>
+            <div className="rounded-lg border border-border overflow-x-auto mb-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="micro-label bg-surface-1 border-b border-border">
+                    <th className="text-left px-4 py-2.5 font-normal">백분위</th>
+                    <th className="text-right px-4 py-2.5 font-normal">월 API 환산 비용</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle font-mono">
+                  {[25, 50, 75, 90].map((p) => (
+                    <tr key={p}>
+                      <td className="px-4 py-2.5 text-muted">{p === 50 ? "중앙값" : `p${p}`}</td>
+                      <td className={`px-4 py-2.5 text-right ${p === 50 ? "text-accent font-bold" : "text-foreground"}`}>
+                        {usd(percentile(benchmark, p))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-sm text-muted leading-relaxed">
+              중앙값은 <span className="text-accent font-semibold">{usd(benchmark.medianMonthlyUsd)}</span>,
+              그리고 <span className="text-accent font-semibold">{pct(shareAbove(benchmark, 250))}</span>가 월 $250을
+              넘습니다. 단, 이 수치는 실제 청구액이 아니라 API 정가 기준 환산 비용이며, 사용량을 직접 측정해
+              공개하는 개발자 집단이라 평균보다 무겁습니다.{" "}
+              <Link href="/data" className="text-accent hover:underline">
+                데이터와 방법론 전체 보기
+              </Link>
+            </p>
+          </section>
+        )}
 
         <section className="mb-12 max-w-3xl">
           <h2 className="font-mono text-xl font-bold tracking-tight mb-4">자주 묻는 질문</h2>

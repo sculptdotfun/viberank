@@ -2057,6 +2057,29 @@ class SupabaseLeaguesService implements LeaguesService {
     return mapLeague(league);
   }
 
+  async previewByCode(code: string): Promise<{ league: League; memberCount: number } | null> {
+    const { data: invite } = await this.client
+      .from("league_invites")
+      .select("league_id")
+      .eq("code", code.trim())
+      .maybeSingle();
+    if (!invite) return null;
+
+    const { data: league } = await this.client
+      .from("leagues")
+      .select()
+      .eq("id", invite.league_id)
+      .maybeSingle();
+    if (!league) return null;
+
+    const { count } = await this.client
+      .from("league_members")
+      .select("username", { count: "exact", head: true })
+      .eq("league_id", invite.league_id);
+
+    return { league: mapLeague(league), memberCount: count ?? 0 };
+  }
+
   async getBySlug(slug: string): Promise<{ league: League; members: LeagueBoardRow[] } | null> {
     const { data: league } = await this.client.from("leagues").select().eq("slug", slug).maybeSingle();
     if (!league) return null;

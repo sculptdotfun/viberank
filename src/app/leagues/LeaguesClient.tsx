@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Plus, LogIn, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { leagueCreated } from "@/lib/analytics";
 
 interface LeaguesClientProps {
   signedIn: boolean;
@@ -30,6 +31,7 @@ export default function LeaguesClient({ signedIn, myLeagues }: LeaguesClientProp
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create league.");
+      leagueCreated();
       setCreated({ slug: data.league.slug, inviteCode: data.inviteCode });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create league.");

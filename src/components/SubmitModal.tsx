@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, Terminal, Copy, Check } from "lucide-react";
-import { track } from "@vercel/analytics";
+import Link from "next/link";
 import FileUpload from "./FileUpload";
+import { cliCommandCopied, autosubmitCommandCopied } from "@/lib/analytics";
 
 interface SubmitModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface SubmitModalProps {
 
 export default function SubmitModal({ open, onClose }: SubmitModalProps) {
   const [copied, setCopied] = useState(false);
+  const [copiedAuto, setCopiedAuto] = useState(false);
 
   // Esc to close + lock body scroll while open.
   useEffect(() => {
@@ -29,9 +31,16 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
 
   const copyCommand = () => {
     navigator.clipboard.writeText("npx viberank-cli");
-    track("cli_command_copied");
+    cliCommandCopied();
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyAutosubmit = () => {
+    navigator.clipboard.writeText("npx viberank-cli autosubmit");
+    autosubmitCommandCopied();
+    setCopiedAuto(true);
+    setTimeout(() => setCopiedAuto(false), 2000);
   };
 
   return (
@@ -77,6 +86,28 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
                   <code className="text-sm font-mono text-accent">npx viberank-cli</code>
                   {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4 text-muted" />}
                 </button>
+
+                {/* A one-off submission freezes your rank on the day you sent
+                    it. Autosubmit is the difference between a snapshot and a
+                    profile, and burying it in /settings/tokens is why almost
+                    nobody has it on. */}
+                <p className="text-[11px] text-muted mt-2.5 leading-relaxed">
+                  One submission freezes your rank at today. To keep it current:
+                </p>
+                <button
+                  onClick={copyAutosubmit}
+                  className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 mt-1.5 border border-border hover:border-accent/50 transition-colors"
+                >
+                  <code className="text-xs font-mono text-accent">npx viberank-cli autosubmit</code>
+                  {copiedAuto ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-3.5 h-3.5 text-muted" />}
+                </button>
+                <p className="text-[11px] text-muted mt-2 leading-relaxed">
+                  Submits daily in the background via your OS scheduler.{" "}
+                  <Link href="/settings/tokens" className="text-accent hover:underline">
+                    Needs a token
+                  </Link>
+                  .
+                </p>
               </div>
 
               {/* Divider */}

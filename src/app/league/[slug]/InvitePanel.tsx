@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Copy, Check, KeyRound } from "lucide-react";
+import { leagueInviteCopied } from "@/lib/analytics";
 
 // Fetches the invite code client-side so it never lands in the (cached,
 // public) page HTML — the API only reveals it to members.
@@ -21,6 +22,7 @@ export default function InvitePanel({ slug }: { slug: string }) {
   const link = `https://www.viberank.app/league/join/${code}`;
   const copy = (what: "code" | "link") => {
     navigator.clipboard.writeText(what === "code" ? code : link);
+    leagueInviteCopied();
     setCopied(what);
     setTimeout(() => setCopied(null), 2000);
   };
