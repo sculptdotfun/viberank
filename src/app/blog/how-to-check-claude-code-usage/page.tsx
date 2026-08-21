@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Gauge, Terminal, LineChart, RefreshCcw } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "How to Check Your Claude Code Usage (and Codex, Gemini CLI): /usage, ccusage & Your Real Costs";
+const TITLE = "How to Check Your Claude Code Usage: /usage & ccusage";
 const DESC =
   "Three ways to see exactly how much Claude Code you've used — the /usage command for limits, ccusage for token-level history and API-equivalent cost, and the leaderboard that tracks it daily.";
 const URL = "https://www.viberank.app/blog/how-to-check-claude-code-usage";
@@ -184,7 +184,7 @@ export default function Post() {
             <Link href="/tool/codex">Codex CLI</Link>, <Link href="/tool/gemini">Gemini CLI</Link>,{" "}
             <Link href="/tool/copilot">Copilot CLI</Link>, and <Link href="/tool/opencode">OpenCode</Link> too, and
             aggregates them into one report. Codex users:{" "}
-            <Link href="/blog/codex-token-usage-leaderboard">we wrote up the Codex specifics separately</Link>.
+            <Link href="/blog/how-to-check-codex-usage">we wrote up the Codex specifics separately</Link>.
           </p>
         </section>
 

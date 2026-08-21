@@ -57,8 +57,8 @@ export async function generateMetadata({ params }: MonthParams): Promise<Metadat
   const stats = await getMonth(month);
   const label = monthLabel(month);
   const title = stats && stats.users > 0
-    ? `AI Coding Spend Report ${label}: ${formatUsd(Math.round(stats.cost))} Across ${stats.users} Developers | Viberank`
-    : `AI Coding Spend Report ${label} | Viberank`;
+    ? `AI Coding Spend, ${label}: ${formatUsd(Math.round(stats.cost))} Across ${stats.users} Devs`
+    : `AI Coding Spend Report — ${label}`;
   const description = stats && stats.users > 0
     ? `${label} on the Viberank leaderboard: ${formatUsd(Math.round(stats.cost))} in API-equivalent AI coding spend, ${formatNumber(stats.tokens)} tokens, median developer at ${formatUsd(Math.round(stats.medianUserCost))}. Per-tool and per-model breakdowns from real ccusage data.`
     : `Monthly AI coding usage report for ${label} from the Viberank leaderboard.`;

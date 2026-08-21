@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Scale, DollarSign, Calculator, TrendingUp } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "Is Claude Max Worth It? Pro vs Max 5x vs Max 20x, Decided With Your Own Usage Data (2026)";
+const TITLE = "Is Claude Max Worth It? Pro vs Max 5x vs Max 20x (2026)";
 const DESC =
   "Stop guessing which Claude plan you need. Compare Pro ($20), Max 5x ($100), and Max 20x ($200) against your real API-equivalent usage — with benchmarks from 1,100+ developers on the Viberank leaderboard.";
 const URL = "https://www.viberank.app/blog/is-claude-max-worth-it";

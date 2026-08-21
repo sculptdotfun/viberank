@@ -13,11 +13,15 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
   try {
     const profile = await getProfileCached(username);
 
-    if (!profile) {
+    // A missing or submission-less profile is an empty shell. Let it render for
+    // anyone who follows a link, but keep it out of the index — these pages
+    // earn impressions on username searches and effectively zero clicks.
+    if (!profile || profile.submissions.length === 0) {
       return {
         title: `${username} | Viberank`,
         description: `AI coding usage stats (Claude Code, Codex & more) for ${username}.`,
         alternates: { canonical: `https://www.viberank.app/profile/${encodeURIComponent(username)}` },
+        robots: { index: false, follow: true },
       };
     }
 

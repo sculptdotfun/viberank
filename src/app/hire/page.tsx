@@ -11,7 +11,7 @@ import HireCta from "./HireCta";
 
 export const revalidate = 300;
 
-const TITLE = "Hire AI-native engineers | Viberank";
+const TITLE = "Hire AI-Native Engineers, Ranked by Real Usage";
 const DESC =
   "Engineers from the viberank leaderboard who are open to work — ranked by real, measured AI coding usage, not claims on a resume.";
 

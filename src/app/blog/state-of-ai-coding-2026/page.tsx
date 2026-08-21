@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "State of AI Coding Spend 2026: Benchmarks From 800 Developers and $2.3M of Usage";
+const TITLE = "State of AI Coding Spend 2026: $2.3M, 800 Developers";
 const DESC = "How much do developers really spend on AI coding agents? Percentiles, daily burn rates, cache economics, and power-user benchmarks from 29,000 days of real Claude Code, Codex, and Gemini CLI usage.";
 const OG = "/api/og?title=State%20of%20AI%20Coding%20Spend%202026&description=Benchmarks%20from%20800%20developers%20%26%20%242.3M%20of%20usage";
 

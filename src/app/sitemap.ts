@@ -4,6 +4,7 @@ import { FEATURED_TOOLS } from "@/lib/utils";
 import { fetchAllPages } from "@/lib/data/supabase/client";
 import { BLOG_POSTS } from "@/lib/blogPosts";
 import { COMPARE_MATCHUPS } from "@/lib/compare";
+import { buildModelEconomics, publishableModels } from "@/lib/model-economics";
 
 const SITE = "https://www.viberank.app";
 
@@ -54,7 +55,6 @@ const staticEntries: MetadataRoute.Sitemap = [
   ...toolEntries,
   ...compareEntries,
   { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
-  { url: `${SITE}/claude-rank-tracker`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
   { url: `${SITE}/ko`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   { url: `${SITE}/leagues`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
@@ -62,6 +62,8 @@ const staticEntries: MetadataRoute.Sitemap = [
   { url: `${SITE}/stats/monthly`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
   ...monthlyReportEntries(),
   { url: `${SITE}/calculator`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
+  { url: `${SITE}/data`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
+  { url: `${SITE}/model`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/blog`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
   ...blogEntries,
 ];
@@ -84,6 +86,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // the sitemap entirely — the same silent cap fixed in the data layer.
     // Page through with the same helper rather than a second implementation.
     const client = createClient(supabaseUrl, serviceKey);
+
+    // Per-model economics pages, gated on the same developer threshold the
+    // pages themselves use so the sitemap never advertises a thin page.
+    let modelEntries: MetadataRoute.Sitemap = [];
+    try {
+      const { getServerDataLayer } = await import("@/lib/data");
+      const site = await (await getServerDataLayer()).stats.getSiteStats();
+      modelEntries = publishableModels(
+        buildModelEconomics(site.modelSpend ?? [], site.models ?? [])
+      ).map((m) => ({
+        url: `${SITE}/model/${m.slug}`,
+        lastModified: new Date(),
+        changeFrequency: "daily" as const,
+        priority: 0.7,
+      }));
+    } catch {
+      // model pages are optional in the sitemap
+    }
+    // Only profiles that have actually submitted. A signed-in account with no
+    // submission renders an empty shell: 774 profile URLs were indexed for a
+    // combined 47 clicks, and the empty ones are pure thin-content ballast.
     const profiles = await fetchAllPages<{
       username: string;
       github_username: string | null;
@@ -93,6 +116,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         client
           .from("profiles")
           .select("username, github_username, updated_at")
+          .gt("total_submissions", 0)
           .order("updated_at", { ascending: false })
           .order("username", { ascending: true })
           .range(from, to),
@@ -110,7 +134,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }];
     });
 
-    return [...staticEntries, ...profileEntries];
+    return [...staticEntries, ...modelEntries, ...profileEntries];
   } catch {
     // If the DB call fails (cold deploy, transient outage) still serve a
     // valid sitemap with the static entries.

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Terminal, FolderOpen, DollarSign, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "How to Check OpenCode Usage: Tokens, Costs & Session Stats (2026)";
+const TITLE = "How to Check OpenCode Usage: Tokens, Costs & Stats (2026)";
 const DESC =
   "OpenCode has no built-in usage meter, but one command fixes that: npx ccusage@latest daily reads OpenCode's local session logs into per-day token counts and real API costs. Here's how, plus dashboards and the public leaderboard.";
 const URL = "https://www.viberank.app/blog/how-to-check-opencode-usage";

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "Codex vs Claude Code vs Gemini CLI: AI Coding Cost & Usage Compared (2026)";
+const TITLE = "Codex vs Claude Code vs Gemini CLI: Cost & Usage (2026)";
 const DESC = "How OpenAI Codex, Claude Code, and Gemini CLI compare on cost, tokens, and real-world usage — backed by data from 800+ developers on the Viberank leaderboard.";
 const OG = "/api/og?title=Codex%20vs%20Claude%20Code%20vs%20Gemini%20CLI&description=AI%20Coding%20Cost%20%26%20Usage%20Compared";
 
@@ -51,7 +51,7 @@ export default function Post() {
           Back to Blog
         </Link>
 
-        <h1>Codex vs Claude Code vs Gemini CLI: AI Coding Cost & Usage Compared (2026)</h1>
+        <h1>Codex vs Claude Code vs Gemini CLI: Cost & Usage (2026)</h1>
 
         <div className="flex items-center gap-3 text-sm text-muted not-prose mb-8">
           <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />June 9, 2026</span>

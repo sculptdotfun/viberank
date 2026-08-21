@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: CompareParams): Promise<Metad
   const { matchup } = resolved;
   const a = compareLabel(matchup.a);
   const b = compareLabel(matchup.b);
-  const title = `${a} vs ${b} (2026): Real Usage, Cost & Adoption Compared | Viberank`;
+  const title = `${a} vs ${b}: Real Usage & Cost Compared (2026)`;
   const description = `${a} or ${b}? Compare pricing, models, and real adoption — developer counts, top spenders, and API-equivalent cost from live ccusage data on the Viberank leaderboard.`;
   const canonical = `${SITE}/compare/${matchup.slug}`;
   return {

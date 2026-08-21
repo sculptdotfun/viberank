@@ -13,12 +13,12 @@ import Footer from "@/components/Footer";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "AI Coding Usage Stats | Viberank",
+  title: "AI Coding Usage Stats: Spend, Tokens & Top Models",
   description:
     "Site-wide AI coding usage: total spend, tokens burned, cache hit share, and the most used models across Claude Code, Codex, Gemini CLI and more.",
   alternates: { canonical: "https://www.viberank.app/stats" },
   openGraph: {
-    title: "AI Coding Usage Stats | Viberank",
+    title: "AI Coding Usage Stats: Spend, Tokens & Top Models",
     description:
       "Total spend, tokens burned, and the most used models across every coding agent tracked on Viberank.",
     url: "https://www.viberank.app/stats",
@@ -88,6 +88,25 @@ function BarList({
   );
 }
 
+const SITE = "https://www.viberank.app";
+
+// The aggregates on this page are the citable asset; mark them up as a dataset
+// so aggregators and answer engines can lift them with attribution intact.
+const datasetLd = {
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  name: "Viberank site-wide AI coding usage statistics",
+  description:
+    "Total API-equivalent spend, token counts, cache-read share, and per-tool and per-model breakdowns across every developer tracked on Viberank.",
+  url: `${SITE}/stats`,
+  license: "https://creativecommons.org/licenses/by/4.0/",
+  isAccessibleForFree: true,
+  creator: { "@type": "Organization", name: "Viberank", url: SITE },
+  distribution: [
+    { "@type": "DataDownload", encodingFormat: "application/json", contentUrl: `${SITE}/api/stats` },
+  ],
+};
+
 export default async function StatsPage() {
   const dataLayer = await getServerDataLayer();
   const [site, global] = await Promise.all([
@@ -148,6 +167,7 @@ export default async function StatsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetLd) }} />
       <NavBar />
 
       <div className="max-w-6xl mx-auto px-6 py-8">

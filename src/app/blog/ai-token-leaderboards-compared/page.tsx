@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Trophy, Users, Shield, Scale } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "AI Token Leaderboards Compared (2026): Viberank, tokenmaxxing.sh, TokenRank, Straude & More";
+const TITLE = "AI Token Leaderboards Compared: 9 Boards Ranked (2026)";
 const DESC =
   "Nine public leaderboards now rank AI coding token usage. An honest comparison of viberank, tokenmaxxing.sh, TokenRank, Straude, ccclub, ccrank, CCWarriors, DevBurn and Token Tracker — scale, verification, tools covered, and which to pick.";
 const URL = "https://www.viberank.app/blog/ai-token-leaderboards-compared";

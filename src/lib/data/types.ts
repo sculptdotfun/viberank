@@ -413,6 +413,15 @@ export interface LeaguesService {
   create(name: string, creator: string): Promise<{ league: League; inviteCode: string }>;
   /** Join via invite code; idempotent for existing members. Throws on unknown code or full league. */
   joinByCode(code: string, username: string): Promise<League>;
+  /**
+   * What a code points at, without joining and without needing a session.
+   *
+   * An invitee arriving at /league/join/<code> was handed that code on
+   * purpose, so showing them the league they were invited to is the point —
+   * asking them to authenticate before they can see what they're joining is
+   * what an empty invite funnel looks like.
+   */
+  previewByCode(code: string): Promise<{ league: League; memberCount: number } | null>;
   /** League + member board rows (best submission per member), or null. */
   getBySlug(slug: string): Promise<{ league: League; members: LeagueBoardRow[] } | null>;
   /** The invite code — only revealed to current members. */

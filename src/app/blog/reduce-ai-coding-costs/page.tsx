@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "How to Cut Your AI Coding Bill: 9 Ways to Reduce Claude Code & Codex Costs";
+const TITLE = "How to Cut Your AI Coding Bill: 9 Ways to Spend Less";
 const DESC = "Practical, proven ways to lower your AI coding costs — model routing, prompt caching, context hygiene, and more — without slowing down your workflow.";
 const OG = "/api/og?title=Cut%20Your%20AI%20Coding%20Bill&description=9%20ways%20to%20reduce%20Claude%20Code%20%26%20Codex%20costs";
 
@@ -51,7 +51,7 @@ export default function Post() {
           Back to Blog
         </Link>
 
-        <h1>How to Cut Your AI Coding Bill: 9 Ways to Reduce Claude Code & Codex Costs</h1>
+        <h1>How to Cut Your AI Coding Bill: 9 Ways to Spend Less</h1>
 
         <div className="flex items-center gap-3 text-sm text-muted not-prose mb-8">
           <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />June 9, 2026</span>

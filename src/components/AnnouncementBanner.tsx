@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { X, Users } from "lucide-react";
+import { leagueBannerClicked } from "@/lib/analytics";
 
 /**
  * One-line launch announcement, dismissible forever per `id`. Change the id
@@ -41,7 +42,14 @@ export default function AnnouncementBanner({ id, href, children }: {
     <div className="bg-surface-1 border-b border-accent/30">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-3 text-sm">
         <Users className="w-4 h-4 text-accent flex-shrink-0" />
-        <Link href={href} onClick={dismiss} className="flex-1 min-w-0 truncate text-foreground hover:text-accent transition-colors">
+        <Link
+          href={href}
+          onClick={() => {
+            leagueBannerClicked();
+            dismiss();
+          }}
+          className="flex-1 min-w-0 truncate text-foreground hover:text-accent transition-colors"
+        >
           {children}
         </Link>
         <button

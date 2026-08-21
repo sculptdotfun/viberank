@@ -18,8 +18,28 @@ const SITE = "https://www.viberank.app";
 // surface for in search ("<tool> check usage") deserves a one-click answer.
 const TOOL_GUIDES: Record<string, { href: string; label: string }> = {
   claude: { href: "/blog/how-to-check-claude-code-usage", label: "How to check your Claude Code usage" },
-  codex: { href: "/blog/codex-token-usage-leaderboard", label: "How to check your Codex usage (/status + ccusage)" },
+  codex: { href: "/blog/how-to-check-codex-usage", label: "How to check your Codex usage (/status + ccusage)" },
   opencode: { href: "/blog/how-to-check-opencode-usage", label: "How to check your OpenCode usage" },
+};
+
+// These boards rank ahead of the how-to guides for "<tool> check usage" /
+// "how to check <tool> token usage" — a query family with hundreds of
+// impressions and effectively no clicks, because a ranking table is a bad
+// answer to a how-to question. Rather than fight the ranking, answer the
+// question on the page that already ranks. `builtin` is only set where the
+// tool genuinely ships a usage meter.
+const TOOL_USAGE: Record<string, { builtin?: string; builtinNote?: string; note?: string }> = {
+  claude: {
+    builtin: "/usage",
+    builtinNote: "shows your 5-hour session and weekly limits, and when each resets",
+  },
+  codex: {
+    builtin: "/status",
+    builtinNote: "shows how much of your 5-hour and weekly rate limits you've used",
+  },
+  opencode: {
+    note: "OpenCode core ships no usage meter — ccusage reads its local session storage instead.",
+  },
 };
 
 // Regenerate per-tool boards hourly.
@@ -33,8 +53,13 @@ export async function generateMetadata({ params }: ToolParams): Promise<Metadata
   const { tool: raw } = await params;
   const tool = decodeURIComponent(raw).toLowerCase();
   const label = toolLabel(tool);
-  const title = `${label} Usage Leaderboard — Track ${label} Spend & Tokens | Viberank`;
-  const description = `See who's using ${label} (${toolBlurb(tool)}) the most. Ranked by cost and tokens from real ccusage data. Submit your own with npx viberank-cli.`;
+  const usage = TOOL_USAGE[tool];
+  const title = `${label} Usage Leaderboard — Check Your Tokens & Spend`;
+  // Lead with the command, because most of the queries reaching this page ask
+  // how to check usage rather than who is winning.
+  const description = usage?.builtin
+    ? `Check your ${label} usage: type ${usage.builtin} in the CLI for limits, or npx ccusage@latest daily for tokens and real cost. Then see how you rank against 1,100+ developers.`
+    : `Check your ${label} usage with npx ccusage@latest daily — per-day token counts and API-equivalent cost from your local logs. Then see how you rank against 1,100+ developers.`;
   const canonical = `${SITE}/tool/${encodeURIComponent(tool)}`;
   return {
     title,
@@ -106,6 +131,36 @@ export default async function ToolPage({ params }: ToolParams) {
       acceptedAnswer: { "@type": "Answer", text: f.a },
     })),
   };
+  const usage = TOOL_USAGE[tool];
+  const howToLd = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: `How to check your ${label} token usage and cost`,
+    description: `Read ${label}'s local session logs into per-day token counts and API-equivalent cost, then compare against other developers.`,
+    totalTime: "PT2M",
+    tool: [{ "@type": "HowToTool", name: "Node.js (npx)" }],
+    step: [
+      ...(usage?.builtin
+        ? [{
+            "@type": "HowToStep",
+            name: `Check your limits with ${usage.builtin}`,
+            text: `Type ${usage.builtin} inside a ${label} session — it ${usage.builtinNote}.`,
+          }]
+        : []),
+      {
+        "@type": "HowToStep",
+        name: "Check tokens and cost with ccusage",
+        text: `Run npx ccusage@latest daily in your terminal. It parses ${label}'s local logs into per-day input, output and cache token counts with API-equivalent USD cost. No account or API key needed.`,
+      },
+      {
+        "@type": "HowToStep",
+        name: "Compare against other developers",
+        text: `Run npx viberank-cli to submit the same totals and see where your ${label} usage ranks. Only aggregate numbers are sent — never code or prompts.`,
+        url: `${SITE}/tool/${encodeURIComponent(tool)}`,
+      },
+    ],
+  };
+
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -117,7 +172,7 @@ export default async function ToolPage({ params }: ToolParams) {
 
   return (
     <div className="min-h-screen bg-background">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([breadcrumbLd, faqLd]) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([breadcrumbLd, howToLd, faqLd]) }} />
 
       <NavBar />
 
@@ -133,16 +188,40 @@ export default async function ToolPage({ params }: ToolParams) {
           Developers ranked by their {label} usage ({toolBlurb(tool)}) — by cost and tokens, from real{" "}
           <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ccusage</a>{" "}
           data. Submit yours with <code className="font-mono text-accent">npx viberank-cli</code>.
-          {TOOL_GUIDES[tool] && (
-            <>
-              {" "}New here?{" "}
-              <Link href={TOOL_GUIDES[tool].href} className="text-accent hover:underline">
-                {TOOL_GUIDES[tool].label}
-              </Link>
-              .
-            </>
-          )}
         </p>
+
+        {/* Answer-first: the "how do I check my usage" query family lands here
+            before it lands on the guide, so answer it above the table. */}
+        <section className="rounded-lg border border-border bg-surface-1 p-5 mb-8">
+          <h2 className="font-mono text-base font-semibold tracking-tight mb-3">
+            How to check your {label} usage
+          </h2>
+          <ol className="space-y-3 text-sm text-muted">
+            {usage?.builtin && (
+              <li>
+                <span className="text-foreground font-medium">Limits</span> — type{" "}
+                <code className="font-mono text-accent">{usage.builtin}</code> inside a {label} session. It{" "}
+                {usage.builtinNote}.
+              </li>
+            )}
+            <li>
+              <span className="text-foreground font-medium">Tokens and cost</span> — run{" "}
+              <code className="font-mono text-accent">npx ccusage@latest daily</code>. It reads {label}&apos;s local
+              logs into per-day token counts and API-equivalent USD cost. No account or API key needed.
+              {usage?.note && <span className="block mt-1 text-xs">{usage.note}</span>}
+            </li>
+            <li>
+              <span className="text-foreground font-medium">Rank</span> — run{" "}
+              <code className="font-mono text-accent">npx viberank-cli</code> to put those totals on the board below.
+              Only aggregate numbers are submitted, never code or prompts.
+            </li>
+          </ol>
+          {TOOL_GUIDES[tool] && (
+            <Link href={TOOL_GUIDES[tool].href} className="inline-block mt-4 text-sm text-accent hover:underline">
+              {TOOL_GUIDES[tool].label} — full guide →
+            </Link>
+          )}
+        </section>
 
         {/* Browse other tools */}
         <div className="flex flex-wrap items-center gap-2 mb-8 text-sm">

@@ -3,12 +3,12 @@ import { ArrowLeft, Clock, Calendar, Flame, Building2, Scale, Trophy, Terminal }
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "What Is Tokenmaxxing? Inside the AI Token Leaderboard Craze (2026)",
+  title: "What Is Tokenmaxxing? Meaning, Origin & the Leaderboards",
   description:
     "Tokenmaxxing is racking up AI token usage to climb a leaderboard — the trend behind Meta's Claudeonomics, Uber's blown AI budget, and public boards like Viberank. What it means, where it went wrong, and how to measure yours.",
   alternates: { canonical: "https://www.viberank.app/blog/what-is-tokenmaxxing" },
   openGraph: {
-    title: "What Is Tokenmaxxing? Inside the AI Token Leaderboard Craze",
+    title: "What Is Tokenmaxxing? Meaning, Origin & the Leaderboards",
     description:
       "The trend behind Meta's Claudeonomics and Uber's blown AI budget — and the public leaderboard where 1,000+ developers track $6.6M of real usage.",
     url: "https://www.viberank.app/blog/what-is-tokenmaxxing",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "What Is Tokenmaxxing? Inside the AI Token Leaderboard Craze",
+    title: "What Is Tokenmaxxing? Meaning, Origin & the Leaderboards",
     description:
       "The trend behind Meta's Claudeonomics and Uber's blown AI budget — and the public board where devs track real usage.",
     images: ["/api/og?title=What%20Is%20Tokenmaxxing%3F&description=Inside%20the%20AI%20Token%20Leaderboard%20Craze"],
@@ -57,7 +57,7 @@ export default function WhatIsTokenmaxxing() {
     {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
-      headline: "What Is Tokenmaxxing? Inside the AI Token Leaderboard Craze (2026)",
+      headline: "What Is Tokenmaxxing? Meaning, Origin & the Leaderboards",
       description:
         "Tokenmaxxing is racking up AI token usage to climb a leaderboard — the trend behind Meta's Claudeonomics, Uber's blown AI budget, and public boards like Viberank.",
       image: "https://www.viberank.app/api/og?title=What%20Is%20Tokenmaxxing%3F",
@@ -69,6 +69,21 @@ export default function WhatIsTokenmaxxing() {
         name: "Viberank",
         url: "https://www.viberank.app",
         logo: { "@type": "ImageObject", url: "https://www.viberank.app/icon.svg" },
+      },
+    },
+    // "tokenmaxxing meaning" / "tokenmaxxing wiki" are definition queries —
+    // DefinedTerm marks up the answer as a definition rather than an article.
+    {
+      "@context": "https://schema.org",
+      "@type": "DefinedTerm",
+      name: "Tokenmaxxing",
+      description:
+        "Deliberately maximizing your AI token consumption, usually to climb a usage leaderboard. The word follows the \"-maxxing\" slang pattern and spread in 2026 alongside internal corporate AI usage leaderboards and public boards like Viberank.",
+      url: "https://www.viberank.app/blog/what-is-tokenmaxxing",
+      inDefinedTermSet: {
+        "@type": "DefinedTermSet",
+        name: "Viberank AI coding glossary",
+        url: "https://www.viberank.app/blog",
       },
     },
     {
@@ -97,7 +112,7 @@ export default function WhatIsTokenmaxxing() {
 
         <header className="mb-12">
           <h1 className="text-5xl font-bold text-foreground mb-4 leading-tight">
-            What Is Tokenmaxxing? Inside the AI Token Leaderboard Craze
+            What Is Tokenmaxxing? Meaning, Origin & the Leaderboards
           </h1>
 
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
