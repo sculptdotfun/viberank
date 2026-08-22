@@ -1,6 +1,6 @@
 # viberank-cli
 
-Submit your AI coding usage stats — **Claude Code, Codex, Gemini CLI, Copilot, OpenCode and more** — to the [viberank](https://viberank.app) leaderboard.
+Submit your AI coding usage stats — **Claude Code, Codex, Gemini CLI, Copilot, OpenCode and more** — to the [viberank](https://www.viberank.app) leaderboard.
 
 ## Usage
 
@@ -99,7 +99,7 @@ curl -X POST https://www.viberank.app/api/submit \
 
 Submissions made with a token (`viberank login`) are **verified** and get a blue check immediately.
 
-Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set that, so those rows appear with a `cli` badge (unverified). Sign in to [viberank.app](https://viberank.app) with the same GitHub account and the site will offer to verify or merge them into your profile.
+Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set that, so those rows appear with a `cli` badge (unverified). Sign in to [viberank.app](https://www.viberank.app) with the same GitHub account and the site will offer to verify or merge them into your profile.
 
 ## Troubleshooting
 
@@ -122,4 +122,4 @@ Full ruleset: [VALIDATION.md](https://github.com/sculptdotfun/viberank/blob/main
 
 ## About
 
-viberank is a community leaderboard for AI coding usage — real costs and tokens measured by [ccusage](https://github.com/ryoppippi/ccusage), not self-reported numbers. See how you stack up at [viberank.app](https://viberank.app), or browse the per-tool boards: [Claude](https://www.viberank.app/tool/claude) · [Codex](https://www.viberank.app/tool/codex) · [Gemini](https://www.viberank.app/tool/gemini).
+viberank is a community leaderboard for AI coding usage — real costs and tokens measured by [ccusage](https://github.com/ryoppippi/ccusage), not self-reported numbers. See how you stack up at [viberank.app](https://www.viberank.app), or browse the per-tool boards: [Claude](https://www.viberank.app/tool/claude) · [Codex](https://www.viberank.app/tool/codex) · [Gemini](https://www.viberank.app/tool/gemini).

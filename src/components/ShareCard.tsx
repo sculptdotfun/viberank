@@ -5,6 +5,7 @@ import { Copy, X, Trophy, Check } from "lucide-react";
 import { useState } from "react";
 import { formatNumber, formatCurrency, toolLabel } from "@/lib/utils";
 import { getTier } from "@/lib/tiers";
+import { profileUrl } from "@/lib/site";
 import TierBadge from "./TierBadge";
 
 interface ShareCardProps {
@@ -20,7 +21,7 @@ interface ShareCardProps {
 export default function ShareCard({ rank, username, totalCost, totalTokens, dateRange, tools, onClose }: ShareCardProps) {
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = `https://viberank.app/profile/${encodeURIComponent(username)}`;
+  const shareUrl = profileUrl(username);
   const tier = getTier(totalCost);
   const toolsLine = tools && tools.length > 0 ? `\n🧰 ${tools.map(toolLabel).join(" · ")}` : "";
   const shareText = `I'm ranked #${rank} on viberank 🏆\n\n${tier.glyph} ${tier.name.toUpperCase()} tier\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens${toolsLine}\n\nJoin the AI coding leaderboard:`;

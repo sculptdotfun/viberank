@@ -9,7 +9,7 @@ import {
 } from "@/lib/badge";
 
 /**
- * README badge: ![viberank](https://viberank.app/api/badge/<username>)
+ * README badge: ![viberank](https://www.viberank.app/api/badge/<username>)
  *
  * Always answers 200 with an SVG, including for unknown users. A README that
  * renders a broken-image icon because someone typo'd their handle is worse

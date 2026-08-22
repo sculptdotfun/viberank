@@ -346,7 +346,7 @@ class ViberankMCPServer {
             type: 'text',
             text: JSON.stringify({
               success: true,
-              message: 'Leaderboard data is available at https://viberank.app',
+              message: 'Leaderboard data is available at https://www.viberank.app',
               note: 'Direct API access to leaderboard coming soon!',
               limit,
             }, null, 2),
@@ -370,7 +370,7 @@ class ViberankMCPServer {
 
   private async getProfile(username: string) {
     try {
-      const profileUrl = `https://viberank.app/profile/${encodeURIComponent(username)}`;
+      const profileUrl = `https://www.viberank.app/profile/${encodeURIComponent(username)}`;
       
       return {
         content: [
