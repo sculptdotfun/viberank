@@ -156,6 +156,17 @@ export interface SubmitData {
       // Tools/agents that contributed to this day (e.g. ["claude", "codex"]).
       // Populated by normalizeCcData from ccusage's metadata.agents.
       agents?: string[];
+      // Per-agent split of the day, keyed by agent name. Present only when the
+      // submitting CLI ran `ccusage --by-agent`; a drift verdict about one tool
+      // can then lower that tool alone instead of the whole day (#125).
+      agentBreakdowns?: Record<string, {
+        inputTokens: number;
+        outputTokens: number;
+        cacheCreationTokens: number;
+        cacheReadTokens: number;
+        totalTokens: number;
+        totalCost: number;
+      }>;
       modelBreakdowns?: Array<{
         modelName: string;
         inputTokens: number;

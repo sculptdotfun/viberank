@@ -40,10 +40,23 @@ function looksLikeGithubHandle(value) {
  * running node binary; going through node rather than the `npx.cmd` shim is
  * also what keeps this from throwing EINVAL on Windows (#137). */
 function generateCcJson(dest) {
-  const out = runNpx(['-y', 'ccusage@latest', 'daily', '--json'], {
+  const run = (extra) => runNpx(['-y', 'ccusage@latest', 'daily', '--json', ...extra], {
     encoding: 'utf8',
     maxBuffer: 256 * 1024 * 1024,
   });
+
+  // `--by-agent` adds a per-agent split to each day, which lets the server apply
+  // a Claude-transcript cleanup to Claude's tokens alone instead of taking the
+  // same day's Codex usage down with it (#125). It roughly doubles the report
+  // size and it is a newer flag, so an older ccusage on a pinned or cached
+  // resolve will reject it — fall back rather than fail the whole run, since a
+  // submission without the split is still a perfectly good submission.
+  let out;
+  try {
+    out = run(['--by-agent']);
+  } catch {
+    out = run([]);
+  }
   fs.writeFileSync(dest, out);
 }
 
@@ -260,8 +273,11 @@ async function main() {
 
   console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
 
-  // Try to get GitHub username from remote URL first, then fall back to git config
+  // Try to get GitHub username from remote URL first, then fall back to git config.
+  // `source` matters: a GitHub remote is evidence, `git config user.name` is a
+  // guess, and only evidence is allowed to become the prompt's default (#141).
   let githubUser;
+  let source = null;
   
   // First, try to extract from GitHub remote URL
   try {
@@ -273,6 +289,7 @@ async function main() {
     const githubMatch = remoteUrl.match(/github\.com[:/]([^/]+)\//);
     if (githubMatch) {
       githubUser = githubMatch[1];
+      source = 'remote';
       console.log(chalk.gray(`Detected GitHub username from repository: ${githubUser}`));
     }
   } catch (error) {
@@ -283,19 +300,29 @@ async function main() {
   if (!githubUser) {
     try {
       githubUser = execSync('git config user.name', { encoding: 'utf8' }).trim();
-      console.log(chalk.yellow('Warning: Using git config user.name which might be your real name, not GitHub username'));
-      console.log(chalk.yellow('Please verify this is correct or enter your GitHub username manually'));
+      source = 'gitconfig';
     } catch (error) {
       console.log(chalk.yellow('Could not detect GitHub username automatically'));
     }
   }
 
-  // Always confirm with the user
+  // Always confirm with the user.
+  //
+  // Only a GitHub remote pre-fills the answer. `git config user.name` is
+  // usually a display name, and pre-filling it turned a reflexive Enter into a
+  // submission under a handle that wasn't the user's — that is how a public
+  // profile called "Matt" appeared, holding 86B tokens belonging to mattw90
+  // (#141). Validation cannot catch it: "Matt" is a perfectly well-formed
+  // GitHub handle. So the guess is shown in the question and the field starts
+  // empty, which costs one line of typing to the people it would have misfiled.
+  const guessed = source === 'gitconfig' && githubUser;
   const response = await prompts({
     type: 'text',
     name: 'username',
-    message: 'GitHub username:',
-    initial: githubUser && looksLikeGithubHandle(githubUser) ? githubUser : '',
+    message: guessed
+      ? `GitHub username (git config says "${githubUser}" — type it if that's right)`
+      : 'GitHub username:',
+    initial: source === 'remote' && looksLikeGithubHandle(githubUser) ? githubUser : '',
     validate: (value) =>
       looksLikeGithubHandle(value.trim()) ||
       'That is not a valid GitHub username (1-39 letters, digits, single hyphens)'

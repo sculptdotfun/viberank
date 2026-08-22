@@ -39,6 +39,13 @@ interface RawDailyEntry {
   modelsUsed?: string[];
   modelBreakdowns?: unknown;
   metadata?: { agents?: string[] };
+  /**
+   * Per-agent split of this row, present only with `ccusage daily --by-agent`.
+   * Note the shape clash: this is an array of objects, while `agents` on our
+   * own normalized entry is a list of names. Kept `unknown` so the sanitiser
+   * is the only thing that decides what it means.
+   */
+  agents?: unknown;
 }
 
 interface RawCcData {
@@ -55,6 +62,23 @@ export interface NormalizedModelBreakdown {
   cost: number;
 }
 
+/**
+ * One agent's measured share of a day.
+ *
+ * Exists so a drift verdict can be applied to the tool it is actually evidence
+ * about. The corpus scan reads ~/.claude/projects, so it says nothing about a
+ * Codex or Gemini day — but before this, a mixed day was stored as one lump and
+ * lowering the lump took the untouched tools down with it (#125).
+ */
+export interface AgentSlice {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  totalCost: number;
+}
+
 /** A daily entry after normalization — always keyed by `date`, agents resolved. */
 export interface NormalizedDaily {
   date: string;
@@ -68,6 +92,74 @@ export interface NormalizedDaily {
   agents: string[];
   /** Per-model split for the day, when the report provides it. */
   modelBreakdowns?: NormalizedModelBreakdown[];
+  /**
+   * Per-agent split for the day, keyed by agent name. Absent for payloads from
+   * a CLI that predates `--by-agent`, which is most of the board — every
+   * consumer must treat it as optional and fall back to whole-slice behaviour.
+   */
+  agentBreakdowns?: Record<string, AgentSlice>;
+}
+
+/** Agents we will store a slice for. Anything else is summed into the day but
+ * not tracked separately — an unbounded key space here is a storage hazard. */
+const MAX_AGENTS_PER_DAY = 12;
+
+/**
+ * Rebuild the `--by-agent` array into a name-keyed map, field by field.
+ *
+ * The payload is user-supplied, so nothing here trusts the shape: a hostile or
+ * merely old client can send any JSON at all. Slices that don't parse are
+ * dropped rather than coerced, and the caller checks the survivors still sum to
+ * the day before using them.
+ */
+function sanitizeAgentSlices(value: unknown): Record<string, AgentSlice> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+  const out: Record<string, AgentSlice> = {};
+  for (const item of value.slice(0, MAX_AGENTS_PER_DAY)) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const name = typeof row.agent === "string" ? row.agent.trim().toLowerCase() : "";
+    if (!name) continue;
+    const slice: AgentSlice = {
+      inputTokens: num(row.inputTokens),
+      outputTokens: num(row.outputTokens),
+      cacheCreationTokens: num(row.cacheCreationTokens),
+      cacheReadTokens: num(row.cacheReadTokens),
+      totalTokens: num(row.totalTokens),
+      totalCost: num(row.totalCost),
+    };
+    // Sum rather than overwrite: a payload repeating an agent for one date is
+    // malformed, but dropping half its tokens would be worse than adding them.
+    const prior = out[name];
+    out[name] = prior ? addSlices(prior, slice) : slice;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function addSlices(a: AgentSlice, b: AgentSlice): AgentSlice {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheCreationTokens: a.cacheCreationTokens + b.cacheCreationTokens,
+    cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    totalCost: a.totalCost + b.totalCost,
+  };
+}
+
+/** Merge two per-agent maps by summing each agent's slice. */
+function mergeAgentMaps(
+  a: Record<string, AgentSlice> | undefined,
+  b: Record<string, AgentSlice> | undefined
+): Record<string, AgentSlice> | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const out: Record<string, AgentSlice> = { ...a };
+  for (const [name, slice] of Object.entries(b)) {
+    out[name] = out[name] ? addSlices(out[name], slice) : slice;
+  }
+  return out;
 }
 
 // Per-model day splits come straight from user-supplied JSON, so rebuild them
@@ -146,6 +238,8 @@ export interface MachineContribution {
   modelsUsed: string[];
   agents: string[];
   modelBreakdowns?: NormalizedModelBreakdown[];
+  /** Per-agent split, when the submitting CLI was new enough to send one. */
+  agentBreakdowns?: Record<string, AgentSlice>;
 }
 
 /** Aggregate of every machine's slice for a day — what the row stores/displays. */
@@ -206,6 +300,65 @@ function aggregateContributions(
  *   which machine it came from, and assuming "a different one" double-counts
  *   single-machine users (#81). It is replaced instead.
  */
+/**
+ * The tool the drift corpus is evidence about.
+ *
+ * Duplicated from drift.ts rather than imported: this module is the one the CLI
+ * and the archive re-parser both pull in, and it stays free of dependencies on
+ * the storage layer. drift.ts owns the *policy* of when a month counts as
+ * deleted; this owns the *mechanics* of applying it to one slice.
+ */
+const CORPUS_AGENT = "claude";
+
+/**
+ * Rebuild a machine's slice, taking the named agent's re-report even when it is
+ * lower, while every other agent keeps the larger of the two observations.
+ *
+ * Returns null when either side lacks a per-agent split, which is the caller's
+ * signal to fall back to whole-slice behaviour. Deliberately not a per-*field*
+ * max: within one agent the slice is still swapped whole, because mixing tokens
+ * from one run with cost from another would synthesise a slice nobody observed.
+ * Across agents it is safe, because each agent's slice was measured
+ * independently.
+ */
+function lowerOneAgent(
+  prior: MachineContribution,
+  incoming: MachineContribution,
+  agent: string
+): MachineContribution | null {
+  const p = prior.agentBreakdowns;
+  const i = incoming.agentBreakdowns;
+  if (!p || !i) return null;
+
+  const merged: Record<string, AgentSlice> = {};
+  for (const name of new Set([...Object.keys(p), ...Object.keys(i)])) {
+    if (name === agent) {
+      // The pruned tool: honour the new observation, including its absence.
+      // A user who deleted a month's transcripts should not keep its total.
+      if (i[name]) merged[name] = i[name];
+      continue;
+    }
+    const a = p[name];
+    const b = i[name];
+    if (a && b) merged[name] = b.totalCost >= a.totalCost ? b : a;
+    else merged[name] = (b ?? a)!;
+  }
+
+  const slices = Object.values(merged);
+  if (slices.length === 0) return incoming;
+  const totals = slices.reduce(addSlices);
+  return {
+    ...incoming,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    cacheCreationTokens: totals.cacheCreationTokens,
+    cacheReadTokens: totals.cacheReadTokens,
+    totalTokens: totals.totalTokens,
+    totalCost: totals.totalCost,
+    agentBreakdowns: merged,
+  };
+}
+
 export function mergeMachineContribution(
   existing: Record<string, MachineContribution> | null | undefined,
   machineId: string,
@@ -251,7 +404,17 @@ export function mergeMachineContribution(
     // Compared on cost and swapped whole rather than per-field: taking the max
     // of each field independently would synthesise a slice that was never
     // actually observed, with tokens from one run and cost from another.
-    if (!acceptLower && prior && prior.totalCost > incoming.totalCost) {
+    if (acceptLower && prior) {
+      // The verdict is evidence about one tool. Lower that tool's slice and
+      // leave every other tool at its high-water mark, so a Claude cleanup
+      // stops dragging the same day's Codex tokens down with it (#125).
+      //
+      // Only reachable when both sides carry a split — which means a recent
+      // CLI on both submissions. Everything older falls through to the
+      // whole-slice path below and behaves exactly as it did before.
+      const scoped = lowerOneAgent(prior, incoming, CORPUS_AGENT);
+      contributions = { ...idSlices, [machineId]: scoped ?? incoming };
+    } else if (!acceptLower && prior && prior.totalCost > incoming.totalCost) {
       contributions = { ...idSlices, [machineId]: prior };
       retainedPrior = true;
     } else {
@@ -358,6 +521,21 @@ function selectAuthoritativeRows(rows: RawDailyEntry[]): RawDailyEntry[] {
 }
 
 /**
+ * A per-agent split for this row, but only if it reconciles with the row.
+ *
+ * Tolerance is a cent and one token — enough to absorb float noise in a sum of
+ * many slices, far too tight to hide a fabricated one.
+ */
+function reconciledAgentSlices(entry: RawDailyEntry): Record<string, AgentSlice> | undefined {
+  const slices = sanitizeAgentSlices(entry.agents);
+  if (!slices) return undefined;
+  const sum = Object.values(slices).reduce(addSlices);
+  const costOk = Math.abs(sum.totalCost - entry.totalCost) <= 0.01;
+  const tokensOk = Math.abs(sum.totalTokens - entry.totalTokens) <= TOKEN_SLOP;
+  return costOk && tokensOk ? slices : undefined;
+}
+
+/**
  * Normalize raw ccusage JSON into one canonical, deduped, date-keyed shape.
  * Throws validation-style Errors (message surfaced to the client) for input
  * that cannot be made sense of.
@@ -381,6 +559,12 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
     const agents = resolveAgents(entry);
     const models = entry.modelsUsed ?? [];
     const breakdowns = sanitizeModelBreakdowns(entry.modelBreakdowns);
+    // Only keep a per-agent split that actually reconciles with the row it
+    // claims to divide. ccusage's own output does — measured at $0.000000 drift
+    // across a real 103-day report — so a split that doesn't add up is a
+    // malformed or hostile payload, and storing it would let a caller inflate
+    // one agent while the day's headline total stayed believable.
+    const agentSplit = reconciledAgentSlices(entry);
     const existing = byDate.get(date);
 
     if (existing) {
@@ -393,6 +577,7 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
       existing.modelsUsed = Array.from(new Set([...existing.modelsUsed, ...models]));
       existing.agents = Array.from(new Set([...existing.agents, ...agents]));
       existing.modelBreakdowns = mergeModelBreakdowns(existing.modelBreakdowns, breakdowns);
+      existing.agentBreakdowns = mergeAgentMaps(existing.agentBreakdowns, agentSplit);
     } else {
       byDate.set(date, {
         date,
@@ -405,6 +590,7 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
         modelsUsed: [...models],
         agents: [...agents],
         modelBreakdowns: breakdowns,
+        agentBreakdowns: agentSplit,
       });
     }
   }

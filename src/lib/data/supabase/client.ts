@@ -164,6 +164,7 @@ function dailyEntryToContribution(
     modelsUsed: day.modelsUsed,
     agents: day.agents ?? [],
     modelBreakdowns: day.modelBreakdowns,
+    agentBreakdowns: day.agentBreakdowns,
   };
 }
 
