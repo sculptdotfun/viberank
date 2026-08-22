@@ -13,6 +13,7 @@ import fetch from 'node-fetch';
 import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus } from './lib/corpus.js';
+import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
 import { runNpx } from './lib/npx.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -85,6 +86,18 @@ first submitted.
 }
 
 async function login() {
+  if (!(await acquireToken())) process.exit(1);
+  console.log(`Next: ${chalk.bold('npx viberank-cli autosubmit')} to keep a running backup.\n`);
+}
+
+/**
+ * Walk someone through creating and saving a token.
+ *
+ * Returns false instead of exiting so it can be offered mid-flow — the
+ * autosubmit prompt used to hand out two commands to run later and end there,
+ * which is a dead end at the exact moment someone has just said yes.
+ */
+async function acquireToken() {
   const url = `${SITE}/settings/tokens`;
   console.log(chalk.yellow.bold('\nConnect this machine to viberank\n'));
   console.log(`  1. Open ${chalk.cyan(url)}`);
@@ -111,8 +124,8 @@ async function login() {
   });
 
   if (!token) {
-    console.log(chalk.red('\nNo token entered.'));
-    process.exit(1);
+    console.log(chalk.gray('\nNo token entered.'));
+    return false;
   }
 
   // Prove it works before saving, so a typo fails here rather than silently
@@ -126,7 +139,7 @@ async function login() {
 
   if (res.status === 401) {
     spinner.fail('That token was rejected — it may be revoked or mistyped.');
-    process.exit(1);
+    return false;
   }
   // Any other status means the token authenticated and the empty body was
   // then rejected on its own merits, which is what we want.
@@ -134,7 +147,7 @@ async function login() {
 
   writeConfig({ token: token.trim() });
   console.log(chalk.green(`\n✓ Saved to ${CONFIG_DIR}/config.json (owner-only)\n`));
-  console.log(`Next: ${chalk.bold('npx viberank-cli autosubmit')} to keep your rank current.\n`);
+  return true;
 }
 
 function logout() {
@@ -412,12 +425,16 @@ async function main() {
   let attempt = 0;
   const maxAttempts = 3;
   const retryDelay = 5000; // 5 seconds
+  // Held outside the retry loop so the autosubmit prompt can still describe the
+  // report after cc.json may have been cleaned up.
+  let submitted = null;
   
   while (attempt < maxAttempts) {
     attempt++;
     
     try {
       const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
+      submitted = ccData;
 
       // Per-month corpus size, so the server can tell a transcript the runtime
       // rewrote from history the user deleted (#112). Best effort: a scan that
@@ -581,7 +598,7 @@ async function main() {
     }
   }
 
-  await offerAutosubmit();
+  await offerAutosubmit(submitted);
 
   console.log(chalk.green('\nDone! 🎉'));
 }
@@ -598,22 +615,25 @@ async function main() {
  * job that runs daily and uploads. Doing that without an explicit yes is not
  * something to spring on anyone, least of all this audience.
  */
-async function offerAutosubmit() {
+async function offerAutosubmit(ccData) {
   if (QUIET) return;                        // scheduled run; nobody to ask
   if (!autosubmit.platform()) return;       // no scheduler we can drive
   if (autosubmit.status().enabled) return;  // already on
 
-  console.log(
-    chalk.gray(
-      '\nOne submission freezes your rank at today. Autosubmit sends your\n' +
-      'usage once a day in the background so it stays current.'
-    )
-  );
+  // The pitch used to be about keeping a rank fresh. That is the vanity reason
+  // and it converts badly — 62 of ~1,100 people have ever sent a second report.
+  // The true reason is better: Claude Code deletes session transcripts after
+  // `cleanupPeriodDays`, 30 by default, with no warning and no recovery. Once
+  // it runs, the local history is gone for every tool that reads those files.
+  // What has already been submitted here survives it. That makes autosubmit a
+  // backup rather than a leaderboard chore, and it is the one thing viberank
+  // can offer that a tool reading the same folder cannot.
+  for (const line of autosubmitPitch(ccData)) console.log(chalk.gray(line));
 
   const { enable } = await prompts({
     type: 'confirm',
     name: 'enable',
-    message: 'Keep my rank up to date automatically?',
+    message: 'Keep a running backup of my usage?',
     initial: true,
   });
   if (!enable) {
@@ -621,11 +641,11 @@ async function offerAutosubmit() {
     return;
   }
 
-  // A scheduled run can't open a browser, so it needs a token first.
-  if (!getToken()) {
-    console.log(chalk.yellow('\nAutosubmit needs a token, because a background run cannot sign in.'));
-    console.log(`  1. ${chalk.bold('npx viberank-cli login')}   (paste a token from ${SITE}/settings/tokens)`);
-    console.log(`  2. ${chalk.bold('npx viberank-cli autosubmit')}\n`);
+  // A scheduled run can't open a browser, so it needs a token first. Offer to
+  // do it here rather than printing two commands to run later: they just said
+  // yes, and sending them away to read instructions is where that yes is lost.
+  if (!getToken() && !(await acquireToken())) {
+    console.log(chalk.gray(`Turn it on any time with ${chalk.bold('npx viberank-cli autosubmit')}.\n`));
     return;
   }
 
@@ -637,6 +657,9 @@ async function offerAutosubmit() {
       )
     );
     console.log(chalk.gray('  Stop any time with `npx viberank-cli autosubmit off`.'));
+    // We back the history up; we can also tell them how to stop losing it in
+    // the first place. Costs nothing and is the more useful half of the advice.
+    console.log(chalk.gray(`  ${keepLocalHistoryHint()}`));
   } catch (error) {
     console.log(chalk.yellow(`\nCould not schedule automatic submission: ${error.message}`));
     console.log(chalk.gray('Run `npx viberank-cli autosubmit` to try again.'));
