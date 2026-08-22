@@ -363,7 +363,7 @@ export async function POST(request: NextRequest) {
       // CLI is the one moment they are addressable.
       hint: tokenOwner
         ? null
-        : "Tip: run `npx viberank-cli login` then `npx viberank-cli autosubmit` to keep this updated automatically.",
+        : "Claude Code deletes session history after 30 days by default — what you send here outlives it. Run `npx viberank-cli login` then `npx viberank-cli autosubmit` to keep a daily backup.",
     });
 
   } catch (error) {

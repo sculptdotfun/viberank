@@ -231,6 +231,11 @@ class ViberankMCPServer {
     }
   }
 
+  /** 1-39 alphanumerics with single interior hyphens — GitHub's own rule. */
+  private static isGithubHandle(value: string): boolean {
+    return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(value);
+  }
+
   private async submitToViberank(
     githubUsername?: string,
     autoDetectUsername: boolean = true
@@ -239,13 +244,21 @@ class ViberankMCPServer {
       // Determine GitHub username
       let username = githubUsername;
       
+      // Prefer the GitHub remote, which is evidence, over `git config
+      // user.name`, which is a guess and usually a display name. The CLI hit
+      // this and it created a public profile called "Matt" holding 86B tokens
+      // that its owner could not delete (#141). The CLI could re-prompt; an MCP
+      // tool call cannot, so an unusable guess is refused rather than sent.
       if (!username && autoDetectUsername) {
         try {
-          username = execSync('git config user.name', { encoding: 'utf8' }).trim();
+          const remote = execSync('git config --get remote.origin.url', { encoding: 'utf8' }).trim();
+          username = remote.match(/github\.com[:/]([^/]+)\//)?.[1];
         } catch {
-          // Ignore git config errors
+          // No GitHub remote; fall through to asking for it explicitly.
         }
       }
+
+      if (username && !ViberankMCPServer.isGithubHandle(username)) username = undefined;
 
       if (!username) {
         return {

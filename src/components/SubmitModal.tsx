@@ -92,7 +92,8 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
                     profile, and burying it in /settings/tokens is why almost
                     nobody has it on. */}
                 <p className="text-[11px] text-muted mt-2.5 leading-relaxed">
-                  One submission freezes your rank at today. To keep it current:
+                  Claude Code deletes session history after 30 days by default.
+                  What you send here outlives it — keep it arriving:
                 </p>
                 <button
                   onClick={copyAutosubmit}
