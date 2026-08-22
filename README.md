@@ -21,7 +21,7 @@ Live at **[viberank.app](https://www.viberank.app)**.
 - 📊 **Profile pages** at `viberank.app/profile/{username}` — global rank, daily charts, token breakdown, tools used
 - ⚡ **Server-rendered** — homepage, profiles, and tool boards are SSR'd with structured data (FAQPage, ProfilePage, BreadcrumbList) for fast paint and full crawlability
 - 🚀 **Four ways to submit**: `npx viberank-cli`, plain `curl`, signed-in web upload, or MCP
-- ♾️ **Autosubmit** — `viberank login` once, `viberank autosubmit` once, and your rank stays current instead of freezing on the day you first submitted
+- ♾️ **Autosubmit** — `viberank login` once, `viberank autosubmit` once, and your usage keeps arriving daily. Claude Code deletes session transcripts after 30 days by default, so this is the difference between a permanent record and whatever survived the last cleanup
 - 🔐 **GitHub OAuth + API tokens** — OAuth and token submissions show a blue check; header-only CLI submissions show a `cli` pill
 - 🖥️ **Multi-machine** — a laptop and a desktop sum into one profile instead of overwriting each other
 - 📈 **[`/stats`](https://www.viberank.app/stats)** — site-wide spend curve, monthly trend, and where your burn lands against everyone else
@@ -40,14 +40,16 @@ Live at **[viberank.app](https://www.viberank.app)**.
 npx viberank-cli
 ```
 
-This generates a fresh `cc.json` via `ccusage daily --json` (the aggregate report across **all** your detected tools) and POSTs it to `/api/submit`. It picks up your GitHub username from your git remote / `git config user.name`.
+This generates a fresh `cc.json` via `ccusage daily --json` (the aggregate report across **all** your detected tools) and POSTs it to `/api/submit`. It reads your GitHub username from your git remote and asks you to confirm it. If there is no GitHub remote it shows what `git config user.name` says but makes you type the handle yourself — that value is usually a display name, and accepting it silently created profiles belonging to nobody (#141).
 
-**Set it and forget it.** A one-off submission freezes your rank on the day you ran it. Mint a token at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), then:
+**Set it and forget it.** A one-off submission captures only what survives on disk today, and freezes your rank there. Mint a token at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), then:
 
 ```bash
 npx viberank-cli login       # paste the token once
 npx viberank-cli autosubmit  # daily background submission
 ```
+
+Claude Code deletes session transcripts older than `cleanupPeriodDays` — 30 by default — on startup, with no warning. Every tool that reads `~/.claude/projects` loses that history at the same moment; what has already been submitted here does not. Submitting daily is what makes the record outlive the local files. (Raising `cleanupPeriodDays` in `~/.claude/settings.json` stops the deletion at the source.)
 
 `autosubmit` registers with your platform's own scheduler — launchd, systemd user timers, or Task Scheduler — rather than running a daemon of its own, so it survives reboots and catches up after a missed run. `npx viberank-cli status` shows the token and schedule state; `autosubmit off` removes it. Token submissions are verified, so they carry a blue check without a browser sign-in.
 
@@ -57,9 +59,13 @@ npx viberank-cli autosubmit  # daily background submission
 npx ccusage@latest daily --json > cc.json
 curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
-  -H "X-GitHub-User: $(git config user.name)" \
+  -H "X-GitHub-User: your-github-username" \
   -d @cc.json
 ```
+
+> Put your **GitHub username** in that header, not `$(git config user.name)` — that is usually a display name, and submitting under it creates a second profile nobody owns.
+
+> Add `--by-agent` to the `ccusage` command to include a per-tool split, so a Claude Code cleanup can be applied to Claude's numbers alone.
 
 > `ccusage` v20 keys daily entries by `period` and reports an `agent` per day; viberank normalizes this server-side, so either the new or older `ccusage` output works.
 

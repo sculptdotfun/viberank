@@ -17,7 +17,9 @@ This will:
 
 ## Stay on the board
 
-A one-off submission freezes your rank on the day you ran it. Two commands fix that permanently:
+Claude Code deletes session transcripts older than `cleanupPeriodDays` — **30 days by default** — on startup, with no warning and no recovery. Every tool that reads those files loses that history at the same moment. What you have already submitted here survives it.
+
+A one-off submission also freezes your rank on the day you ran it. Two commands fix both:
 
 ```bash
 npx viberank-cli login       # paste a token from viberank.app/settings/tokens
@@ -25,6 +27,8 @@ npx viberank-cli autosubmit  # submit once a day, in the background
 ```
 
 Most people run these once and never think about it again.
+
+To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `~/.claude/settings.json`.
 
 `autosubmit` registers with your operating system's own scheduler — **launchd** on macOS, a **systemd user timer** on Linux, **Task Scheduler** on Windows — instead of running a daemon of its own. Those already survive reboots, catch up after a missed run, and write logs; a node process sitting in your tray to fire once a day would be a worse version of software you already have.
 
@@ -87,7 +91,7 @@ The CLI detects the existing `cc.json` and asks whether to use it.
 ## Direct API usage
 
 ```bash
-GITHUB_USER=$(git config user.name)
+GITHUB_USER=your-github-username   # your GitHub login, not your display name
 
 curl -X POST https://www.viberank.app/api/submit \
   -H "Content-Type: application/json" \
@@ -105,7 +109,7 @@ Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set 
 
 - **"npx viberank-cli" not found** — try `npx viberank-cli@latest` or clear the npx cache with `npx clear-npx-cache`
 - **"Failed to submit data"** — regenerate with `npx ccusage@latest daily --json > cc.json` and retry
-- **"GitHub username not found"** — run `git config --global user.name "YourGitHubUsername"`
+- **"GitHub username not found"** — just type it at the prompt. The CLI no longer pre-fills `git config user.name`, because that is usually a display name and accepting it created profiles belonging to nobody (#141)
 - **"No usage data"** — make sure you've used a supported AI coding tool at least once on this machine
 - **Autosubmit isn't firing** — `npx viberank-cli status` prints the schedule state and the last few log lines from `~/.viberank/autosubmit.log`
 - **"Invalid token"** — it may have been revoked; mint a fresh one at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens) and run `login` again
