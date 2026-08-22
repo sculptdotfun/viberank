@@ -7,6 +7,7 @@ import { normalizeCcData } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { getCliNotice } from "@/lib/sponsor";
 import { bearerFrom } from "@/lib/tokens";
+import { getTier } from "@/lib/tiers";
 
 /**
  * `{ "2026-07": { files, bytes } }` from the submission body, or undefined.
@@ -309,11 +310,46 @@ export async function POST(request: NextRequest) {
       cliVersion: cliVersion || "unknown",
     }).catch((e) => console.error("Analytics track failed:", e));
 
+    // Where they landed, plus something worth pasting somewhere.
+    //
+    // This is the highest-emotion moment the product has, and until now it said
+    // nothing but "submitted, here is a URL". Meanwhile 3 repos out of 1,100+
+    // developers have ever embedded the README badge — not because people
+    // declined, but because nothing ever offered it. Rank is a single head-only
+    // count and the badge is a string, so the whole block costs one round trip.
+    let standing: {
+      rank: number;
+      totalDevelopers: number;
+      topPercent: number;
+      tier: string;
+      badgeMarkdown: string;
+    } | null = null;
+    try {
+      const layer = await getServerDataLayer();
+      const cost = Number(ccData.totals?.totalCost) || 0;
+      const [rank, site] = await Promise.all([
+        layer.submissions.getGlobalRank(cost),
+        layer.stats.getSiteStats(),
+      ]);
+      const totalDevelopers = site?.totalUsers ?? 0;
+      standing = {
+        rank,
+        totalDevelopers,
+        // Ceil so nobody is ever told they are "top 0%".
+        topPercent: totalDevelopers > 0 ? Math.max(1, Math.ceil((rank / totalDevelopers) * 100)) : 0,
+        tier: getTier(cost).name,
+        badgeMarkdown: `[![viberank](https://viberank.app/api/badge/${encodeURIComponent(githubUsername)})](https://viberank.app/profile/${encodeURIComponent(githubUsername)})`,
+      };
+    } catch {
+      // A nicety. Never fail an accepted submission over it.
+    }
+
     return NextResponse.json({
       success: true,
       submissionId,
       message: `Successfully submitted data for ${githubUsername}`,
       profileUrl: `https://viberank.app/profile/${githubUsername}`,
+      standing,
       // Optional sponsor line the CLI prints after a successful submission.
       notice: getCliNotice(),
       // Only for submissions that did not carry a token — i.e. someone who

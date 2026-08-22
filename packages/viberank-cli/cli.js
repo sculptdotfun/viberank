@@ -476,7 +476,25 @@ async function main() {
 
       if (result.success) {
         submitSpinner.succeed('Successfully submitted to Viberank!');
-        console.log(`\nView your profile at: ${chalk.green(result.profileUrl)}\n`);
+
+        // Where you landed, and the badge, right here. This is the one moment
+        // someone is actually pleased with the tool, and it used to print a
+        // bare URL — which is why almost nobody has ever put the badge up.
+        const st = result.standing;
+        if (st && st.totalDevelopers > 0) {
+          console.log(
+            `\n  ${chalk.yellow.bold(`#${st.rank}`)} of ${st.totalDevelopers.toLocaleString('en-US')} developers` +
+            `  ${chalk.gray('·')}  top ${chalk.bold(st.topPercent + '%')}` +
+            `  ${chalk.gray('·')}  ${chalk.bold(st.tier)} tier`
+          );
+        }
+        console.log(`\n  Profile: ${chalk.green(result.profileUrl)}`);
+        if (st && st.badgeMarkdown) {
+          console.log(`\n  ${chalk.gray('Badge for your README:')}`);
+          console.log(`  ${chalk.cyan(st.badgeMarkdown)}\n`);
+        } else {
+          console.log('');
+        }
         if (result.hint) {
           console.log(chalk.yellow(result.hint) + '\n');
         }
