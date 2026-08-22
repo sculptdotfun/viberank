@@ -1,5 +1,32 @@
 # Changelog
 
+## CLI v1.10.0 — autosubmit is a backup, not a rank chore (August 2026)
+
+### Changed
+- **The autosubmit prompt now leads with what is actually at stake.** Claude Code deletes session transcripts older than `cleanupPeriodDays` — 30 by default — on startup, with no warning and no recovery; every tool reading `~/.claude/projects` loses that history at the same moment, and a report already submitted here survives it. The old pitch ("keep my rank up to date") was the vanity reason and converted badly: 62 of ~1,100 people had ever sent a second report. On our own data 38.7% of submissions span 31 days or less, with the 25th percentile sitting exactly at 30 — the default's fingerprint. When a report reaches back roughly that far the prompt says so, hedged, because a five-week-old install is indistinguishable from a pruned one.
+- **Saying yes without a token no longer dead-ends.** It printed two commands to run later and stopped — at the exact moment someone had just agreed. `login` is now a reusable non-fatal token flow the prompt runs inline.
+- After enabling, the CLI also says how to stop the loss at its source: `"cleanupPeriodDays": 3650`.
+
+### Fixed
+- `historyWindow` read only `date`, but ccusage's aggregate report keys days as `period` — the personalised line would have silently never appeared on a real report while passing every fixture written with `date`. Caught by rendering against a real `cc.json`.
+- The history reach was computed from the raw clock, so the same report read 29 days at midnight and 30 at noon.
+
+## CLI v1.9.0 — a Claude cleanup no longer lowers Codex (August 2026)
+
+### Fixed
+- **A drift verdict about Claude files lowered the whole day, including other tools** (#125). The corpus scan reads `~/.claude/projects` and is evidence about Claude alone, but a mixed day was stored as one lump per machine, so honouring a Claude deletion took the same day's untouched Codex tokens with it. Mixed days are 9.18% of daily rows but **34.33% of all cost on the board**. The CLI now passes `ccusage --by-agent`, whose per-agent slices reconcile with their row to $0.000000 across a real 103-day report; the server keeps a split only when it reconciles and lowers the corpus agent alone. Reports without a split behave exactly as before, and the flag is dropped silently if an older ccusage rejects it.
+- **`git config user.name` was pre-filled as the username prompt's default** (#141), so a reflexive Enter submitted under it. That created a public profile called `Matt` holding 86B tokens belonging to `mattw90` — both submissions shared a machine id. Validation cannot catch this: `Matt` is a well-formed GitHub handle. Only a GitHub remote pre-fills now; a git-config guess is shown in the question instead.
+
+## CLI v1.8.0 — you find out where you landed (August 2026)
+
+### Added
+- A successful submission now prints your rank, percentile and tier, plus a paste-ready README badge. Only 3 repositories on GitHub embedded a viberank badge, because the success path never gave anyone anything to share.
+
+## CLI v1.7.0 — autosubmit is offered where it makes sense (August 2026)
+
+### Added
+- The CLI offers autosubmit after a successful submission, defaulted to yes, instead of leaving it buried in `/settings/tokens` where almost nobody found it. Deliberately a prompt and not a silent default: it installs a scheduled job that uploads daily.
+
 ## CLI v1.6.0 — Windows submissions work again (August 2026)
 
 ### Fixed

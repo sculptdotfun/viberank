@@ -8,7 +8,7 @@ Submit your AI coding usage stats (Claude Code, Codex, Gemini CLI and more) to [
 - 📊 **Direct Submission** - Submit to Viberank leaderboard without leaving your workflow
 - 🔄 **Smart Caching** - Caches usage data for 5 minutes to reduce overhead
 - 👤 **Profile Management** - View profiles and leaderboard data
-- 🔐 **GitHub Integration** - Automatically detects your GitHub username from git config
+- 🔐 **GitHub Integration** - Reads your GitHub username from your repo's GitHub remote. Pass `username` explicitly if there isn't one — `git config user.name` is usually a display name, and submitting under it creates a profile you don't own
 
 ## Installation
 

@@ -43,7 +43,7 @@ export default async function TokensPage() {
           <p className="micro-label mb-3">Using it</p>
           <pre className="bg-surface-1 border border-border rounded-lg p-4 text-sm overflow-x-auto">
             <code>{`npx viberank-cli login       # paste the token once
-npx viberank-cli autosubmit  # submit daily, in the background`}</code>
+npx viberank-cli autosubmit  # daily backup, in the background`}</code>
           </pre>
           <p className="text-xs text-muted mt-3 leading-relaxed">
             The token is stored in <code>~/.viberank/config.json</code> with owner-only
