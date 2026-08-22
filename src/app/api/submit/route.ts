@@ -8,6 +8,7 @@ import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { getCliNotice } from "@/lib/sponsor";
 import { bearerFrom } from "@/lib/tokens";
 import { getTier } from "@/lib/tiers";
+import { badgeMarkdown, profileUrl } from "@/lib/site";
 
 /**
  * `{ "2026-07": { files, bytes } }` from the submission body, or undefined.
@@ -338,7 +339,7 @@ export async function POST(request: NextRequest) {
         // Ceil so nobody is ever told they are "top 0%".
         topPercent: totalDevelopers > 0 ? Math.max(1, Math.ceil((rank / totalDevelopers) * 100)) : 0,
         tier: getTier(cost).name,
-        badgeMarkdown: `[![viberank](https://viberank.app/api/badge/${encodeURIComponent(githubUsername)})](https://viberank.app/profile/${encodeURIComponent(githubUsername)})`,
+        badgeMarkdown: badgeMarkdown(githubUsername),
       };
     } catch {
       // A nicety. Never fail an accepted submission over it.
@@ -348,7 +349,7 @@ export async function POST(request: NextRequest) {
       success: true,
       submissionId,
       message: `Successfully submitted data for ${githubUsername}`,
-      profileUrl: `https://viberank.app/profile/${githubUsername}`,
+      profileUrl: profileUrl(githubUsername),
       standing,
       // Optional sponsor line the CLI prints after a successful submission.
       notice: getCliNotice(),

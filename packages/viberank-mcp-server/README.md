@@ -1,6 +1,6 @@
 # Viberank MCP Server
 
-Submit your AI coding usage stats (Claude Code, Codex, Gemini CLI and more) to [viberank](https://viberank.app) directly from your MCP-compatible AI assistant!
+Submit your AI coding usage stats (Claude Code, Codex, Gemini CLI and more) to [viberank](https://www.viberank.app) directly from your MCP-compatible AI assistant!
 
 ## Features
 
@@ -206,7 +206,7 @@ MIT - See LICENSE file for details
 
 ## Links
 
-- [Viberank Website](https://viberank.app)
+- [Viberank Website](https://www.viberank.app)
 - [GitHub Repository](https://github.com/sculptdotfun/viberank)
 - [Report Issues](https://github.com/sculptdotfun/viberank/issues)
 - [MCP Protocol Docs](https://modelcontextprotocol.io)

@@ -229,7 +229,7 @@ Submit usage data. Authenticated submissions (with a NextAuth session cookie) ar
   "success": true,
   "submissionId": "...",
   "message": "Successfully submitted data for username",
-  "profileUrl": "https://viberank.app/profile/username"
+  "profileUrl": "https://www.viberank.app/profile/username"
 }
 ```
 
