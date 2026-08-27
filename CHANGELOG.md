@@ -1,5 +1,10 @@
 # Changelog
 
+## Website — GitHub sign-in works again (August 2026)
+
+### Fixed
+- GitHub sign-in no longer ends at `OAuthCallback`, restoring access to API tokens and verified autosubmit.
+
 ## CLI v1.10.0 — autosubmit is a backup, not a rank chore (August 2026)
 
 ### Changed

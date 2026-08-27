@@ -10,6 +10,8 @@ export const authOptions: NextAuthOptions = {
     GithubProvider({
       clientId: serverEnv.GITHUB_ID,
       clientSecret: serverEnv.GITHUB_SECRET,
+      // GitHub sends `iss` in callbacks, so openid-client must validate this exact issuer.
+      issuer: "https://github.com/login/oauth",
       authorization: {
         params: {
           scope: "read:user user:email",
