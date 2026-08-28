@@ -1,5 +1,12 @@
 # Changelog
 
+## Site — sign-in emails are kept (August 2026)
+
+### Added
+- **The email GitHub already returns at sign-in is now stored.** The `user:email` scope has been requested since launch and the provider callback already mapped `profile.email`, but nothing downstream kept it: the jwt callback carried only `username`, sessions are stateless, and profiles are created by `/api/submit` rather than by signing in. Every sign-in since launch discarded a working address. Measured cost of that: 1,125 developers and 8 addresses on file, all volunteered through `/hire` — so there is no way to tell the 736 profiles whose data stopped more than 90 days ago that autosubmit finally works. Backfill is not available: only 18% of profiles expose a public email on GitHub (7 of a random 40, with 5 accounts no longer resolving), and GitHub's terms prohibit using site information to send unsolicited mail. Capture is therefore forward-only, starting now.
+- Addresses live in a new `profile_emails` table (migration 016) rather than a column on `profiles`, following the same reasoning as invite codes in 015: `profiles` carries a `Public read profiles` policy with `USING (true)` and is read with `select("*")` under the anon key in five places, and RLS is row-level rather than column-level — an email column there would be a published email column. The new table has RLS enabled and **no policies at all**, so only the service role can touch it. Verified against production: with a row present, the anon key reads `[]` and its insert is rejected `42501`.
+- Persisted from a NextAuth `signIn` **event** rather than a callback, so a write failure can never cost someone their sign-in, and the address never enters the session or reaches the browser.
+
 ## CLI v1.10.0 — autosubmit is a backup, not a rank chore (August 2026)
 
 ### Changed

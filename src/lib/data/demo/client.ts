@@ -420,6 +420,9 @@ export function createDemoDataLayer(): DataLayer {
       async setOpenToWork(): Promise<{ success: boolean; error?: string }> {
         return { success: false, error: "Demo data is read-only" };
       },
+      async recordSignInEmail(): Promise<{ success: boolean; error?: string }> {
+        return { success: false, error: "Demo data is read-only" };
+      },
       async getHireListings(): Promise<HireListing[]> {
         const ranked = sortSubmissions(submissions, "cost");
         return ranked
