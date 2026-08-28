@@ -92,7 +92,11 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-10 pt-6 border-t border-border-subtle text-xs text-muted">
-          <span>© {new Date().getFullYear()} viberank · MIT licensed</span>
+          <span className="flex items-center gap-2">
+            <span>© {new Date().getFullYear()} viberank · MIT licensed</span>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy" className="hover:text-accent transition-colors">Privacy</Link>
+          </span>
           <code className="font-mono text-accent">npx viberank-cli</code>
         </div>
       </div>

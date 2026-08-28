@@ -60,6 +60,7 @@ const staticEntries: MetadataRoute.Sitemap = [
   { url: `${SITE}/hire`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
   { url: `${SITE}/stats/monthly`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
+  { url: `${SITE}/privacy`, lastModified: new Date("2026-08-28T00:00:00.000Z"), changeFrequency: "yearly", priority: 0.3 },
   ...monthlyReportEntries(),
   { url: `${SITE}/calculator`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
   { url: `${SITE}/data`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
