@@ -1416,6 +1416,30 @@ export class SupabaseProfilesService implements ProfilesService {
     return { success: true };
   }
 
+  /**
+   * Persist the sign-in address. Upsert on the handle so repeat sign-ins
+   * refresh rather than accumulate, and lowercase it on the way in to match
+   * the unique index — GitHub handles are case-insensitive and arrive in
+   * whatever casing the user typed when they registered.
+   */
+  async recordSignInEmail(
+    githubUsername: string,
+    email: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await this.client.from("profile_emails").upsert(
+      {
+        github_username: githubUsername.toLowerCase(),
+        email,
+        source: "github_oauth",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "github_username" }
+    );
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+
   async getHireListings(): Promise<HireListing[]> {
     const { data: profiles } = await this.client
       .from("profiles")

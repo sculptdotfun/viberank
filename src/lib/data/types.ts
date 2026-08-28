@@ -397,6 +397,15 @@ export interface ProfilesService {
   ): Promise<{ success: boolean; error?: string }>;
   /** All opted-in profiles with board stats, sorted by best cost. */
   getHireListings(): Promise<HireListing[]>;
+  /**
+   * Store the address GitHub returns at sign-in. Service-role only — the
+   * addresses live in `profile_emails`, which has no public read policy.
+   * Idempotent: signing in again refreshes the address in place.
+   */
+  recordSignInEmail(
+    githubUsername: string,
+    email: string
+  ): Promise<{ success: boolean; error?: string }>;
   deleteByPattern(
     patterns: string[],
     options: PatternSearchOptions & { dryRun?: boolean }
