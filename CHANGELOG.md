@@ -1,5 +1,11 @@
 # Changelog
 
+## Site — a privacy page (August 2026)
+
+### Added
+- **`/privacy`.** Until this week the site stored handles and public usage figures, and the absence of a privacy page was defensible. Storing sign-in emails changed that. The page splits what is public (handle, avatar, usage totals, daily breakdowns, league membership, the opt-in `/hire` address) from what is server-only (the sign-in email, the CLI's machine ID, hashed API tokens, raw ccusage payloads and session-log file counts), says plainly that the email is not used for marketing and that nothing is sent to it today, and documents how to have a profile deleted. Linked from the footer and listed in the sitemap.
+- Two things it is careful to state accurately: the CLI's machine ID is a random UUID generated on the user's own machine, not anything derived from their hardware; and the corpus scan records file and byte *counts* of the session-log folder, never contents.
+
 ## Site — sign-in emails are kept (August 2026)
 
 ### Added
