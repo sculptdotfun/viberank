@@ -3,6 +3,8 @@ interface UsageObservation {
   total_tokens: number;
 }
 
+type SubmissionSource = "cli" | "oauth";
+
 function finiteMetric(value: number | string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
@@ -21,4 +23,16 @@ export function shouldReplaceClaimDay(
   if (candidateCost !== currentCost) return candidateCost > currentCost;
 
   return finiteMetric(candidate.total_tokens) > finiteMetric(current.total_tokens);
+}
+
+/**
+ * A verified GitHub session or API token proves ownership of the username, so
+ * it may update the owner's existing row regardless of how that row was first
+ * submitted. Unverified CLI claims must remain source-scoped.
+ */
+export function existingSubmissionSourceFilter(
+  verified: boolean,
+  source: SubmissionSource
+): SubmissionSource | undefined {
+  return verified ? undefined : source;
 }

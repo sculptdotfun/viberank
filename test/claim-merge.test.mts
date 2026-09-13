@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-const { shouldReplaceClaimDay } = await import(
+const { existingSubmissionSourceFilter, shouldReplaceClaimDay } = await import(
   "../src/lib/data/supabase/claim-merge.ts"
 );
 
@@ -33,4 +33,16 @@ assert.equal(
   "equal observations keep the existing row"
 );
 
-console.log("\n4 checks passed");
+assert.equal(
+  existingSubmissionSourceFilter(true, "cli"),
+  undefined,
+  "a verified API-token submission may update an OAuth row"
+);
+
+assert.equal(
+  existingSubmissionSourceFilter(false, "cli"),
+  "cli",
+  "an unverified CLI claim remains source-scoped"
+);
+
+console.log("\n6 checks passed");

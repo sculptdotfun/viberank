@@ -40,7 +40,10 @@ import type {
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
-import { shouldReplaceClaimDay } from "./claim-merge";
+import {
+  existingSubmissionSourceFilter,
+  shouldReplaceClaimDay,
+} from "./claim-merge";
 import type { BurnRow } from "@/lib/spend-curve";
 import {
   validateCcData,
@@ -332,15 +335,34 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     // Check for existing submission with overlapping date range
     // Use ilike for case-insensitive username matching
-    const { data: existingSubmissions, error: existingSubmissionsError } = await this.client
+    let existingSubmissionsQuery = this.client
       .from("submissions")
       .select("*")
       .ilike("username", data.username)
-      .eq("source", data.source)
       .or(
         `and(date_range_start.lte.${dateRangeEnd},date_range_end.gte.${dateRangeStart})`
-      )
-      .limit(1);
+      );
+
+    // Authenticated OAuth and API-token submissions prove ownership of the
+    // GitHub username and should update the same row. Keeping them source-
+    // scoped creates a duplicate after every user switches submission method,
+    // then sends them into the destructive claim-merge path. An unverified CLI
+    // header is only a claim, so it must remain isolated by source.
+    const sourceFilter = existingSubmissionSourceFilter(
+      data.verified,
+      data.source
+    );
+    if (sourceFilter) {
+      existingSubmissionsQuery = existingSubmissionsQuery.eq(
+        "source",
+        sourceFilter
+      );
+    }
+
+    const {
+      data: existingSubmissions,
+      error: existingSubmissionsError,
+    } = await existingSubmissionsQuery.limit(1);
 
     if (existingSubmissionsError) {
       throw new Error(
