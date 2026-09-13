@@ -40,6 +40,7 @@ import type {
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
+import { shouldReplaceClaimDay } from "./claim-merge";
 import type { BurnRow } from "@/lib/spend-curve";
 import {
   validateCcData,
@@ -1107,15 +1108,18 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       "daily breakdowns for claim merge"
     );
 
-    // Merge daily data (OAuth takes priority)
+    // Merge daily data using a whole-row high-water mark. Source priority is
+    // unsafe here: an OAuth upload can contain a shorter local history than a
+    // prior CLI submission, and replacing the row would permanently lower the
+    // user's totals when the other submissions are deleted below.
     const dailyMap = new Map<string, DbDailyBreakdown>();
     for (const submission of submissions) {
-      const isOauth = submission.source === "oauth";
       const daily = allDailyBreakdowns.filter(
         (d) => d.submission_id === submission.id
       );
       for (const day of daily) {
-        if (isOauth || !dailyMap.has(day.date)) {
+        const current = dailyMap.get(day.date);
+        if (!current || shouldReplaceClaimDay(current, day)) {
           dailyMap.set(day.date, day);
         }
       }
