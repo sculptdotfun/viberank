@@ -379,5 +379,111 @@ console.log("\n[9] Default bucket never sums against id'd slices (#81)");
   ok("no-id re-submit replaces default ($12)", d5.aggregate.totalCost === 12, `got ${d5.aggregate.totalCost}`);
 }
 
+// ---------------------------------------------------------------------------
+console.log("\n[10] DeepSeek Harness: cheap cache reads clear the cost/token floor");
+{
+  // A real DeepSeek day is ~99% cache reads, and DeepSeek bills a cache hit at
+  // $6e-9 against $3e-7 for fresh input — 2%, not the ~10% the default floor
+  // assumes. These figures mirror an actual deepseek-flash day.
+  const dshDay = (overrides: Record<string, unknown> = {}) => ({
+    date: "2026-09-15",
+    agent: "deepseek",
+    inputTokens: 5_000_000,
+    outputTokens: 3_000_000,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 1_000_000_000,
+    totalTokens: 1_008_000_000,
+    totalCost: 11.1,
+    modelsUsed: ["deepseek-flash"],
+    metadata: { agents: ["deepseek"] },
+    ...overrides,
+  });
+
+  const payload = (row: Record<string, unknown>) => ({
+    totals: {
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      cacheCreationTokens: row.cacheCreationTokens,
+      cacheReadTokens: row.cacheReadTokens,
+      totalTokens: row.totalTokens,
+      totalCost: row.totalCost,
+    },
+    daily: [row],
+  });
+
+  const honest = normalizeCcData(payload(dshDay()) as never);
+  ok(
+    "deepseek day lands under the default floor",
+    honest.totals.totalCost / honest.totals.totalTokens < 0.0000001,
+    `ratio ${(honest.totals.totalCost / honest.totals.totalTokens).toExponential(2)}`
+  );
+  doesNotThrow("honest DeepSeek report validates", () => validateCcData(honest, FIXED_NOW));
+
+  // The floor must not have been loosened for tools that never asked for it.
+  const asClaude = normalizeCcData(
+    payload(dshDay({ agent: "claude", metadata: { agents: ["claude"] } })) as never
+  );
+  throws(
+    "same numbers tagged claude are still rejected",
+    () => validateCcData(asClaude, FIXED_NOW),
+    "Cost per token ratio is unrealistic"
+  );
+
+  // Inflating tokens without inflating cost still trips the guard, even on the
+  // loosest floor, and the per-agent split catches it independently.
+  const inflated = normalizeCcData(
+    payload(
+      dshDay({
+        cacheReadTokens: 100_000_000_000,
+        totalTokens: 100_008_000_000,
+        agents: [
+          {
+            agent: "deepseek",
+            inputTokens: 5_000_000,
+            outputTokens: 3_000_000,
+            cacheCreationTokens: 0,
+            cacheReadTokens: 100_000_000_000,
+            totalTokens: 100_008_000_000,
+            totalCost: 11.1,
+          },
+        ],
+      })
+    ) as never
+  );
+  throws(
+    "100x inflated cache reads still rejected",
+    () => validateCcData(inflated, FIXED_NOW),
+    "Cost per token ratio is unrealistic"
+  );
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n[11] DeepSeek Harness: tool key resolution");
+{
+  const day = (overrides: Record<string, unknown>) => ({
+    date: "2026-09-15",
+    inputTokens: 100,
+    outputTokens: 100,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 200,
+    totalCost: 0.001,
+    ...overrides,
+  });
+  const tools = (row: Record<string, unknown>) =>
+    normalizeCcData({ totals: {}, daily: [row] } as never).tools;
+
+  ok("`deepseek` stays `deepseek`", tools(day({ agent: "deepseek" })).join(",") === "deepseek");
+  ok(
+    "`deepseek-harness` collapses to `deepseek`",
+    tools(day({ agent: "deepseek-harness" })).join(",") === "deepseek"
+  );
+  ok("`dsh` collapses to `deepseek`", tools(day({ agent: "dsh" })).join(",") === "deepseek");
+  ok(
+    "a bare deepseek model infers the tool",
+    tools(day({ modelsUsed: ["deepseek-flash"] })).join(",") === "deepseek"
+  );
+}
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

@@ -454,6 +454,7 @@ export function inferToolFromModel(modelName: string): string {
   const m = modelName.toLowerCase();
   if (m.startsWith("claude")) return "claude";
   if (m.startsWith("gemini")) return "gemini";
+  if (m.startsWith("deepseek")) return "deepseek";
   if (m.includes("codex")) return "codex";
   return "other";
 }
@@ -474,6 +475,12 @@ const TOOL_ALIASES: Record<string, string> = {
   "copilot-cli": "copilot",
   "hermes-agent": "hermes",
   "pi-agent": "pi",
+  // DeepSeek Harness. `ccusage` has no reader for ~/.dsh yet, so these arrive
+  // from an exporter rather than from ccusage itself; the aliases keep the
+  // hand-rolled spellings from fragmenting into separate chips.
+  "deepseek-harness": "deepseek",
+  "deepseek-harness-cli": "deepseek",
+  dsh: "deepseek",
 };
 
 export function canonicalToolKey(tool: string): string {
@@ -637,6 +644,40 @@ const MIN_COST_PER_TOKEN = 0.0000001; // cache reads are very cheap
 const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
 
 /**
+ * Cost-per-token floors that differ from the default.
+ *
+ * The floor is the anti-inflation guard: inventing tokens without inventing
+ * cost drives the ratio down, so a report claiming more tokens than its spend
+ * could buy is rejected. The default assumes frontier-lab pricing, where a
+ * cached read costs roughly a tenth of fresh input.
+ *
+ * That assumption is not universal. DeepSeek bills $0.006 per 1M cache-hit
+ * tokens against $0.30 per 1M cache-miss — a 2% ratio — and an agentic loop
+ * re-reads its whole context every step, so cache reads are ~99% of the tokens
+ * a DeepSeek day reports. A genuine, correctly-priced DeepSeek day therefore
+ * lands near 1e-8 cost/token and is rejected outright by a flat 1e-7 floor,
+ * which is why DeepSeek Harness could not submit at all.
+ *
+ * Each tool carries the floor its own price list justifies, and a submission is
+ * held to the loosest floor it has a claim to. Where a per-agent split is
+ * present, every agent is additionally checked against its own floor, so a
+ * mixed submission cannot hide inflated tokens behind one cheap-tool row.
+ */
+const MIN_COST_PER_TOKEN_BY_TOOL: Record<string, number> = {
+  deepseek: 0.000000001, // $1e-9/token; DeepSeek cache hits list at $6e-9
+};
+
+/** The loosest floor any tool in this submission is entitled to. */
+function minCostPerTokenFor(agents: Iterable<string>): number {
+  let floor = MIN_COST_PER_TOKEN;
+  for (const agent of agents) {
+    const candidate = MIN_COST_PER_TOKEN_BY_TOOL[agent];
+    if (candidate !== undefined && candidate < floor) floor = candidate;
+  }
+  return floor;
+}
+
+/**
  * Validate normalized ccusage data. Throws validation-style Errors whose
  * messages are surfaced to the client. Pure and side-effect free so it can be
  * unit-tested and reused across ingestion paths.
@@ -684,10 +725,27 @@ export function validateCcData(
   // inflating cost drives it above the ceiling.
   if (ccData.totals.totalTokens > 0) {
     const costPerToken = ccData.totals.totalCost / ccData.totals.totalTokens;
-    if (costPerToken < MIN_COST_PER_TOKEN || costPerToken > MAX_COST_PER_TOKEN) {
+    const floor = minCostPerTokenFor(ccData.daily.flatMap((d) => d.agents ?? []));
+    if (costPerToken < floor || costPerToken > MAX_COST_PER_TOKEN) {
       throw new Error(
         "Cost per token ratio is unrealistic. Please check your data."
       );
+    }
+  }
+
+  // A mixed submission is measured against the loosest floor any of its tools
+  // justifies, so the per-agent splits — when the client sent them — are checked
+  // individually to keep the tighter tools' guard intact.
+  for (const day of ccData.daily) {
+    if (!day.agentBreakdowns) continue;
+    for (const [agent, slice] of Object.entries(day.agentBreakdowns)) {
+      if (slice.totalTokens <= 0) continue;
+      const floor = MIN_COST_PER_TOKEN_BY_TOOL[agent] ?? MIN_COST_PER_TOKEN;
+      if (slice.totalCost / slice.totalTokens < floor) {
+        throw new Error(
+          "Cost per token ratio is unrealistic. Please check your data."
+        );
+      }
     }
   }
 
