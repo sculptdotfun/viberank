@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — GitHub sign-in works again (September 2026)
+
+### Fixed
+- **GitHub sign-in ended at `error=OAuthCallback` for everyone since ~2026-08-21.** GitHub began sending `iss` on OAuth callbacks; next-auth 4.24.11's GitHub provider declared no issuer, so `openid-client` rejected every callback and no session was created. Bumped next-auth to 4.24.15, which carries the upstream fix (nextauthjs/next-auth#13412). CLI submissions and existing API tokens were unaffected; new sign-ins, `/settings/tokens`, verified uploads and sign-in email capture were blocked. Diagnosis credit to @mattw90 (#139) and @dpmango (#147).
+
 ## Site — a privacy page (August 2026)
 
 ### Added
