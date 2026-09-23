@@ -413,5 +413,49 @@ console.log("\n[10] Claim merge combines rows without losing any (#152)");
   ok("tokens break ties for unpriced models", unpriced.aggregate.totalTokens === 5_000, `got ${unpriced.aggregate.totalTokens}`);
 }
 
+console.log("\n[11] Cost floor is priced per model (#150, #154)");
+{
+  const mb = (modelName: string, cacheRead: number, io: number, cost: number) => ({
+    modelName, inputTokens: io, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead, cost,
+  });
+  const report = (models: ReturnType<typeof mb>[], extraTokens = 0) => {
+    const tokens = models.reduce((a, m) => a + m.inputTokens + m.cacheReadTokens, 0) + extraTokens;
+    const cost = models.reduce((a, m) => a + m.cost, 0);
+    const cacheRead = models.reduce((a, m) => a + m.cacheReadTokens, 0);
+    return {
+      totals: { inputTokens: tokens - cacheRead, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead, totalTokens: tokens, totalCost: cost },
+      daily: [{ date: "2026-09-01", inputTokens: tokens - cacheRead, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead,
+        totalTokens: tokens, totalCost: cost, modelsUsed: models.map((m) => m.modelName), agents: ["opencode"], modelBreakdowns: models }],
+    };
+  };
+  const passes = (d: unknown) => { try { validateCcData(d as never); return true; } catch { return false; } };
+
+  // #150: OpenCode on MiMo + the unpriced big-pickle, ~2e-8 per token.
+  const opencode = report([mb("mimo-v2.5", 2_350_054_304, 118_066_095, 51.18), mb("big-pickle", 234_308_288, 12_258_444, 0)]);
+  ok("honest MiMo/big-pickle report is accepted", passes(opencode));
+
+  // #154: DeepSeek Harness, 99% cache reads at 2% of the miss price.
+  const deepseek = report([mb("deepseek-flash", 16_760_000_000, 142_020_120, 109.59)]);
+  ok("honest DeepSeek report is accepted", passes(deepseek));
+  ok("DeepSeek with 100x inflated cache reads is rejected",
+    !passes(report([mb("deepseek-flash", 1_676_000_000_000, 142_020_120, 109.59)])));
+
+  // The floor follows the model, not the tool or agent tag.
+  ok("the same ratio on a Claude model is still rejected",
+    !passes(report([mb("claude-opus-4-8", 16_760_000_000, 142_020_120, 109.59)])));
+
+  // A cheap model can't launder inflated Claude tokens in the same report.
+  ok("inflated Claude tokens beside a cheap model are rejected",
+    !passes(report([mb("deepseek-flash", 16_760_000_000, 142_020_120, 109.59), mb("claude-opus-4-8", 50_000_000_000, 0, 20)])));
+
+  // Tokens beyond the per-model split are charged at the day's cheapest floor.
+  ok("unsplit tokens on a Claude-only day keep the default floor",
+    !passes(report([mb("claude-opus-4-8", 1_000_000, 0, 5)], 100_000_000_000)));
+
+  // Default-floor-only reports behave exactly as before: 1e-7 per token.
+  ok("Claude report just above 1e-7 passes", passes(report([mb("claude-opus-4-8", 1_000_000_000, 0, 101)])));
+  ok("Claude report just below 1e-7 fails", !passes(report([mb("claude-opus-4-8", 1_000_000_000, 0, 99)])));
+}
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

@@ -489,6 +489,7 @@ export function inferToolFromModel(modelName: string): string {
   const m = modelName.toLowerCase();
   if (m.startsWith("claude")) return "claude";
   if (m.startsWith("gemini")) return "gemini";
+  if (m.startsWith("deepseek")) return "deepseek";
   if (m.includes("codex")) return "codex";
   return "other";
 }
@@ -509,6 +510,11 @@ const TOOL_ALIASES: Record<string, string> = {
   "copilot-cli": "copilot",
   "hermes-agent": "hermes",
   "pi-agent": "pi",
+  // DeepSeek Harness (#154). ccusage has no reader for ~/.dsh yet, so these
+  // arrive from an exporter; the aliases keep hand-rolled spellings together.
+  "deepseek-harness": "deepseek",
+  "deepseek-harness-cli": "deepseek",
+  dsh: "deepseek",
 };
 
 export function canonicalToolKey(tool: string): string {
@@ -672,6 +678,51 @@ const MIN_COST_PER_TOKEN = 0.0000001; // cache reads are very cheap
 const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
 
 /**
+ * Model families whose price lists sit far below the default floor's
+ * assumption that a cached read costs about a tenth of fresh input. DeepSeek
+ * bills cache hits at 2% of a miss and agentic loops are ~99% cache reads, so
+ * an honest DeepSeek day lands near 1e-8 (#154); OpenCode's MiMo and MiniMax
+ * models and the free big-pickle land near 2e-8 (#150). Matched on the model
+ * name, not the tool: Claude Code and OpenCode can both route to these.
+ */
+const CHEAP_MODEL_PATTERN = /deepseek|mimo|minimax|big-pickle/i;
+const CHEAP_MODEL_MIN_COST_PER_TOKEN = 0.000000001;
+
+function minCostPerTokenForModel(modelName: string): number {
+  return CHEAP_MODEL_PATTERN.test(modelName)
+    ? CHEAP_MODEL_MIN_COST_PER_TOKEN
+    : MIN_COST_PER_TOKEN;
+}
+
+/**
+ * The least a report could honestly cost: each model's tokens at that model's
+ * floor. With only default-floor models this is exactly totalTokens × the
+ * default floor — the old ratio check — so nothing loosens for them. Tokens a
+ * day reports beyond its per-model split (reasoning tokens, or no split at
+ * all) are charged at the cheapest floor present that day.
+ */
+function minimumPlausibleCost(daily: NormalizedDaily[]): number {
+  let minimum = 0;
+  for (const day of daily) {
+    let covered = 0;
+    let cheapestFloor = MIN_COST_PER_TOKEN;
+    for (const model of day.modelBreakdowns ?? []) {
+      const tokens =
+        model.inputTokens + model.outputTokens + model.cacheCreationTokens + model.cacheReadTokens;
+      const floor = minCostPerTokenForModel(model.modelName);
+      minimum += tokens * floor;
+      covered += tokens;
+      cheapestFloor = Math.min(cheapestFloor, floor);
+    }
+    for (const modelName of day.modelsUsed ?? []) {
+      cheapestFloor = Math.min(cheapestFloor, minCostPerTokenForModel(modelName));
+    }
+    minimum += Math.max(0, day.totalTokens - covered) * cheapestFloor;
+  }
+  return minimum;
+}
+
+/**
  * Validate normalized ccusage data. Throws validation-style Errors whose
  * messages are surfaced to the client. Pure and side-effect free so it can be
  * unit-tested and reused across ingestion paths.
@@ -717,9 +768,15 @@ export function validateCcData(
   // Cost/token ratio is the primary anti-inflation guard now that the token-sum
   // check is one-sided: inflating tokens drives the ratio below the floor,
   // inflating cost drives it above the ceiling.
+  //
+  // The floor is priced per model (see minimumPlausibleCost), so a mixed
+  // report can't hide inflated Claude tokens behind a cheap model's rows:
+  // every model's tokens have to be paid for at that model's own floor.
   if (ccData.totals.totalTokens > 0) {
     const costPerToken = ccData.totals.totalCost / ccData.totals.totalTokens;
-    if (costPerToken < MIN_COST_PER_TOKEN || costPerToken > MAX_COST_PER_TOKEN) {
+    const tokensUnpaidFor =
+      ccData.totals.totalCost < minimumPlausibleCost(ccData.daily) * (1 - 1e-9);
+    if (tokensUnpaidFor || costPerToken > MAX_COST_PER_TOKEN) {
       throw new Error(
         "Cost per token ratio is unrealistic. Please check your data."
       );
