@@ -46,6 +46,8 @@ import {
   inferToolFromModel,
   mergeMachineContribution,
   combineContributionMaps,
+  dayIsEstimated,
+  estimatedSliceKey,
   DEFAULT_MACHINE_ID,
   type DailyAggregate,
   type MachineContribution,
@@ -98,6 +100,9 @@ interface DbDailyBreakdown {
   // Per-machine slices of this day, keyed by machine id. NULL on legacy rows
   // that predate per-machine tracking (#43).
   machine_contributions: Record<string, MachineContribution> | null;
+  // Reconstructed rather than measured (018). See handSetEstimate for when a
+  // write keeps it.
+  estimated?: boolean | null;
 }
 
 interface DbProfile {
@@ -150,6 +155,16 @@ function convertDbSubmissionToSubmission(
     flaggedForReview: dbSubmission.flagged_for_review || undefined,
     flagReasons: dbSubmission.flag_reasons || undefined,
   };
+}
+
+/**
+ * A flag the row's own slices don't explain was set by hand (#163) and is kept
+ * on every write. A flag a counted estimated slice explains is recomputed
+ * instead, so a day ends up flagged or not by its slices, not by the order
+ * they arrived in.
+ */
+function handSetEstimate(row: DbDailyBreakdown | undefined): boolean {
+  return Boolean(row?.estimated) && !dayIsEstimated(storedContributions(row) ?? {});
 }
 
 /** One incoming day (one machine's cc.json) as a per-machine contribution. */
@@ -397,7 +412,10 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // machines sum while a same-machine re-submit replaces only its slice (#43).
     // Web uploads / older CLIs send no id ("default"): unattributable, so
     // they replace the whole day rather than sum against id'd slices (#81).
-    const machineId = data.machineId || DEFAULT_MACHINE_ID;
+    // An estimate gets the machine's separate estimated slice (#138).
+    const machineId = data.estimated
+      ? estimatedSliceKey(data.machineId!)
+      : data.machineId || DEFAULT_MACHINE_ID;
 
     let submissionId: string;
 
@@ -478,6 +496,11 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // ingestion path enforces the same rules. Data arrives already normalized
     // (period→date, deduped) from src/lib/ccusage.normalizeCcData.
     validateCcData(data.ccData as Parameters<typeof validateCcData>[0]);
+    // An estimate is kept as the machine's own slice so a re-run replaces
+    // rather than adds; without an id there is nothing to key it to.
+    if (data.estimated && !data.machineId) {
+      throw new Error("An estimated submission needs a machine id (X-Machine-Id).");
+    }
   }
 
   /**
@@ -617,6 +640,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         agents: aggregate.agents,
         model_breakdowns: aggregate.modelBreakdowns ?? null,
         machine_contributions: contributions,
+        estimated: handSetEstimate(prior) || dayIsEstimated(contributions),
       };
 
       dailyMap.set(day.date, dailyData as DbDailyBreakdown);
@@ -762,6 +786,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       agents: day.agents ?? [],
       model_breakdowns: day.modelBreakdowns ?? null,
       machine_contributions: { [machineId]: dailyEntryToContribution(day) },
+      estimated: Boolean(data.estimated),
     }));
 
     const { error: dailyError } = await this.client
@@ -1192,10 +1217,13 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // machine seen twice keeps its larger observation, distinct machines sum,
     // and nothing any row held is dropped.
     const mapsByDate = new Map<string, Array<Record<string, MachineContribution>>>();
+    // A day any row had flagged by hand stays flagged in the merged row (018).
+    const estimatedDates = new Set<string>();
     for (const day of allDailyBreakdowns) {
       const maps = mapsByDate.get(day.date) ?? [];
       maps.push(storedContributions(day)!);
       mapsByDate.set(day.date, maps);
+      if (handSetEstimate(day)) estimatedDates.add(day.date);
     }
 
     const mergedDaily = Array.from(mapsByDate.entries())
@@ -1250,6 +1278,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         date,
         ...aggregateToDailyColumns(aggregate),
         machine_contributions: contributions,
+        estimated: estimatedDates.has(date) || dayIsEstimated(contributions),
       })),
       { onConflict: "submission_id,date" }
     );

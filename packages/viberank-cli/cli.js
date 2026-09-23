@@ -15,6 +15,7 @@ import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus } from './lib/corpus.js';
 import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
 import { runNpx } from './lib/npx.js';
+import * as statsCache from './lib/statscache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +79,8 @@ ${chalk.yellow.bold('viberank')} — submit your AI coding usage
   ${chalk.bold('npx viberank-cli autosubmit')}      submit once a day in the background
   ${chalk.bold('npx viberank-cli autosubmit off')}  stop submitting automatically
   ${chalk.bold('npx viberank-cli status')}          show token and schedule state
+  ${chalk.bold('npx viberank-cli backfill')}        add Claude Code history whose transcripts are
+                                    gone, as estimated days (--dry-run to preview)
 
 Most people run ${chalk.bold('login')} once, then ${chalk.bold('autosubmit')} once, and never think
 about it again — your rank stays current instead of freezing on the day you
@@ -681,6 +684,110 @@ async function offerAutosubmit(ccData) {
   }
 }
 
+/**
+ * Submit Claude Code history ccusage can no longer read — its transcripts are
+ * gone after cleanupPeriodDays — rebuilt from ~/.claude/stats-cache.json and
+ * flagged as estimated (#138). lib/statscache.js has how the estimate is made.
+ */
+async function backfill() {
+  const dryRun = process.argv.includes('--dry-run');
+  if (!dryRun && !process.stdin.isTTY) {
+    console.error(chalk.red('backfill asks before it submits, so it needs a terminal. Pass --dry-run to only compute it.'));
+    process.exit(1);
+  }
+
+  console.log(chalk.yellow.bold(`\nViberank backfill v${CLI_VERSION}\n`));
+  const spinner = ora("Reading Claude Code's usage counter…").start();
+  let report;
+  try {
+    const dir = statsCache.claudeConfigDir();
+    const cache = statsCache.readStatsCache(dir);
+    spinner.text = 'Comparing the counter with your transcripts…';
+    const scan = await statsCache.scanTranscripts(statsCache.counterFiles(dir));
+    const factors = statsCache.measureFactor(cache, scan);
+    spinner.text = 'Fetching model prices…';
+    const pricing = await fetch(statsCache.LITELLM_PRICING_URL);
+    if (!pricing.ok) throw new Error(`could not fetch model prices (HTTP ${pricing.status})`);
+    report = statsCache.buildBackfill(cache, scan, factors, await pricing.json());
+    spinner.stop();
+  } catch (error) {
+    spinner.fail(`Nothing to backfill: ${error.message}`);
+    process.exit(1);
+  }
+
+  const p = report.provenance;
+  if (report.daily.length === 0) {
+    console.log(p.unpricedModels.length > 0
+      ? `Nothing to backfill: no price for ${p.unpricedModels.join(', ')}, and the server refuses unpriced tokens.\n`
+      : 'Nothing to backfill: the counter has no tokens beyond what your transcripts already show.\n');
+    return;
+  }
+  const n = (v) => Math.round(v).toLocaleString('en-US');
+  console.log(`  Days         ${p.window.start} → ${p.window.end}, ${report.daily.length} days` +
+    (p.lostItemisedDays.length > 0 ? ` (${p.lostItemisedDays.length} itemised by the counter, the rest spread by messages)` : ''));
+  console.log(`  Counter      ${n(p.counterTokens)} tokens no transcript accounts for`);
+  console.log(`  Correction   ÷${p.factor.toFixed(3)} overall, per model and token type where measured, from ${p.factorDays} days reproduced to the token`);
+  console.log(`  Estimate     ${chalk.bold(n(report.totals.totalTokens))} tokens · $${n(report.totals.totalCost)}`);
+  if (p.unpricedModels.length > 0) {
+    console.log(chalk.yellow(`  Left out     ${p.unpricedModels.join(', ')} (no price, so the server would refuse them)`));
+  }
+  if (p.nonClaudeModels.length > 0) {
+    console.log(chalk.yellow(`  Left out     ${p.nonClaudeModels.join(', ')} (not a claude-* model name, which the server requires)`));
+  }
+  console.log(chalk.gray('\n  Estimated days count on your profile and the board, stay out of the monthly'));
+  console.log(chalk.gray('  reports, and give way to real numbers on any day Claude Code usage is measured.\n'));
+
+  if (dryRun) {
+    const out = path.join(CONFIG_DIR, 'backfill.json');
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    fs.writeFileSync(out, JSON.stringify(report, null, 2));
+    console.log(`Dry run: nothing submitted. The report is in ${out}\n`);
+    return;
+  }
+
+  // No default: a stray answer to this prompt is how an unwanted profile got
+  // created (#151), so the handle is typed and the URL confirmed.
+  const { username } = await prompts({
+    type: 'text',
+    name: 'username',
+    message: 'GitHub username:',
+    validate: (v) => looksLikeGithubHandle(v.trim()) || 'Enter your GitHub username (letters, digits, single hyphens)'
+  });
+  if (!username) return;
+  const handle = username.trim();
+  const { confirmed } = await prompts({
+    type: 'confirm',
+    name: 'confirmed',
+    message: `Submit ${report.daily.length} estimated days to ${SITE}/profile/${handle}?`,
+    initial: false
+  });
+  if (!confirmed) {
+    console.log(chalk.gray('Nothing submitted.\n'));
+    return;
+  }
+
+  const submitSpinner = ora('Submitting…').start();
+  const response = await fetch(`${SITE}/api/submit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-GitHub-User': handle,
+      'X-CLI-Version': CLI_VERSION,
+      'X-Machine-Id': getMachineId(),
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
+    },
+    body: JSON.stringify(report)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.success) {
+    submitSpinner.fail('Failed to submit to Viberank');
+    console.error(chalk.red('Error:', result.error || `server returned ${response.status}`));
+    process.exit(1);
+  }
+  submitSpinner.succeed('Estimated days submitted');
+  console.log(`\n  Profile: ${chalk.green(result.profileUrl)}\n`);
+}
+
 const [command, arg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 
 const run = async () => {
@@ -696,6 +803,8 @@ const run = async () => {
       return showStatus();
     case 'autosubmit':
       return autosubmitCommand(arg);
+    case 'backfill':
+      return backfill();
     case 'help':
     case '--help':
     case '-h':

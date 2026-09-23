@@ -3,7 +3,7 @@ import { track } from "@vercel/analytics/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
-import { normalizeCcData } from "@/lib/ccusage";
+import { normalizeCcData, inferToolFromModel } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { VERIFIED_PROFILE_ERROR } from "@/lib/data/supabase/client";
 import { getCliNotice } from "@/lib/sponsor";
@@ -33,6 +33,15 @@ function readCorpus(payload: unknown): Record<string, { files: number; bytes: nu
   }
 
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Whether the body declares itself an estimate (#138): days the CLI rebuilt
+ * from ~/.claude/stats-cache.json because the transcripts behind them are
+ * gone. Only an explicit `true` counts; anything else is a measured report.
+ */
+function readEstimated(payload: unknown): boolean {
+  return (payload as { provenance?: { estimated?: unknown } })?.provenance?.estimated === true;
 }
 
 export async function POST(request: NextRequest) {
@@ -208,6 +217,31 @@ export async function POST(request: NextRequest) {
     // ccData is reassigned below, the original report shape is gone.
     const rawPayload = ccData;
 
+    // Stable per-machine id lets us sum overlapping dates across machines
+    // without double-counting same-machine re-submits (#43). Optional: web
+    // uploads and older CLIs omit it and fall back to a shared bucket.
+    const machineId = request.headers.get("X-Machine-Id") || undefined;
+
+    // An estimate is Claude Code's own counter, split over days. It is kept as
+    // the machine's own estimated slice, which needs the machine id, so a
+    // re-run replaces rather than adds; and it can only speak for Claude.
+    const estimated = readEstimated(rawPayload);
+    if (estimated && !machineId) {
+      return NextResponse.json(
+        { error: "An estimated submission needs X-Machine-Id. Submit it with npx viberank-cli backfill." },
+        { status: 400 }
+      );
+    }
+    const notClaude = (day: (typeof normalized.daily)[number]) =>
+      (day.agents ?? []).some((agent) => agent !== "claude") ||
+      day.modelsUsed.some((model) => inferToolFromModel(model) !== "claude");
+    if (estimated && normalized.daily.some(notClaude)) {
+      return NextResponse.json(
+        { error: "An estimated submission can only carry Claude Code days (it is rebuilt from ~/.claude/stats-cache.json)." },
+        { status: 400 }
+      );
+    }
+
     // Hand the data layer the canonical shape from here on.
     ccData = {
       totals: normalized.totals,
@@ -232,15 +266,11 @@ export async function POST(request: NextRequest) {
     try {
       const dataLayer = await getServerDataLayer();
 
-      // Stable per-machine id lets us sum overlapping dates across machines
-      // without double-counting same-machine re-submits (#43). Optional: web
-      // uploads and older CLIs omit it and fall back to a shared bucket.
-      const machineId = request.headers.get("X-Machine-Id") || undefined;
-
       // Per-month corpus size (#112). Validated here rather than trusted: it
       // comes from a client and decides whether a stored total may be lowered,
-      // so a malformed block must be ignored, not half-read.
-      const corpus = readCorpus(rawPayload);
+      // so a malformed block must be ignored, not half-read. An estimate is not
+      // a transcript scan, so it has no say in that.
+      const corpus = estimated ? undefined : readCorpus(rawPayload);
 
       // Awaited directly, not raced against a timer. A rejected race did not
       // cancel the underlying writes, so a slow merge reported failure while
@@ -257,6 +287,7 @@ export async function POST(request: NextRequest) {
         verified: verified,
         machineId,
         corpus,
+        estimated,
         ccData: ccData,
       });
 

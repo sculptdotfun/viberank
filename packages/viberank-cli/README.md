@@ -30,6 +30,14 @@ Most people run these once and never think about it again.
 
 To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `~/.claude/settings.json`.
 
+History that is already gone can still be estimated. Claude Code's `/stats` counter (`~/.claude/stats-cache.json`) keeps lifetime per-model totals, and per-day totals for recent days, after the transcripts are deleted. `npx viberank-cli backfill` rebuilds the missing days from it:
+
+- Days the counter still itemises but whose transcripts are gone are taken as itemised. The earlier window (lifetime total minus every itemised day) is spread over its days by Claude Code's own per-day message count, so its per-day split is an allocation, not a measurement.
+- The counter adds `usage` from every transcript line of a message, and Claude Code writes one line per content block, so it runs about 2× ccusage (more for output and cache writes than for cache reads). `backfill` measures that ratio on your own machine, per model and token type, on days where it can reproduce the counter from your surviving transcripts to the token, and divides by it. With fewer than 5 such days it refuses to estimate.
+- The days are submitted flagged `estimated`: they count on your profile and the board, stay out of the monthly reports, and give way to real numbers on any day Claude Code usage is measured. Running it again replaces the previous estimate.
+
+Run `npx viberank-cli backfill --dry-run` first to see the window, the measured ratio and the estimate without submitting anything.
+
 `autosubmit` registers with your operating system's own scheduler — **launchd** on macOS, a **systemd user timer** on Linux, **Task Scheduler** on Windows — instead of running a daemon of its own. Those already survive reboots, catch up after a missed run, and write logs; a node process sitting in your tray to fire once a day would be a worse version of software you already have.
 
 ## Commands
@@ -42,6 +50,7 @@ To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `
 | `npx viberank-cli autosubmit` | Submit once a day in the background |
 | `npx viberank-cli autosubmit off` | Stop submitting automatically |
 | `npx viberank-cli status` | Show token and schedule state |
+| `npx viberank-cli backfill` | Add Claude Code history whose transcripts are gone, as estimated days (`--dry-run` to preview) |
 
 ### Global install (optional)
 

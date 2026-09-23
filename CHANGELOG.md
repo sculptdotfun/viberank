@@ -1,5 +1,12 @@
 # Changelog
 
+## CLI — `backfill`: estimated days from stats-cache.json (September 2026)
+
+### Added
+- **`npx viberank-cli backfill`** rebuilds Claude Code history whose transcripts `cleanupPeriodDays` deleted, from `~/.claude/stats-cache.json`, and submits it flagged as estimated (#138). Days the counter still itemises are taken as itemised; the earlier window is spread by Claude Code's per-day message count. The counter's per-line double counting is measured per machine, per model and per token type on days it can be reproduced to the token, and divided out; days the counter skipped are subtracted where ccusage already measured them. `--dry-run` previews it.
+- **`POST /api/submit` accepts `provenance.estimated: true`.** An estimate is stored as the machine's own `<machine>:estimated` slice, so it adds to that machine's measured Codex on the same day instead of losing to it under the high-water mark. A re-run replaces the previous estimate rather than holding its high-water mark. It stops counting on any day any measured slice reports Claude, in either order (keyed to the day, not the machine, since the machine id is the client's claim). It needs `X-Machine-Id` and may only carry Claude days (by agent and by model).
+- The days are flagged `estimated` (018) on create, merge and claim merge. The flag is per day, so on a day with measured Codex plus estimated Claude the Codex also stays out of the monthly reports. A flag no estimated slice explains (set by hand, #163) is kept on every write; one an estimated slice explains is recomputed, so it clears once measured Claude replaces the estimate. Every daily write now names the `estimated` column, so 018 must be applied (it is in production).
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
