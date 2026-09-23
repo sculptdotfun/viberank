@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — reconstructed days stay out of the reports (September 2026)
+
+### Changed
+- **Days rebuilt from `stats-cache.json` are marked `estimated`** (migration 018) and skipped by the monthly reports, whose medians, p90s and per-model splits are published as measured figures. They still count on the board, profiles and wrapped: the tokens were really spent, only the per-day split is allocated (#138). 91 days are flagged today.
+
 ## CLI v1.11.0 — no more accidental second profiles (September 2026)
 
 ### Fixed
