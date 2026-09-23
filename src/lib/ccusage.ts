@@ -218,14 +218,15 @@ function mergeModelBreakdowns(
 // row keeps aggregate (summed) fields for display — the per-machine map is
 // bookkeeping the merge needs and the UI never reads.
 //
-// The "default" bucket (no X-Machine-Id: web uploads, pre-1.2 CLIs) is NOT a
-// machine — it is unattributable data that in practice comes from the same
-// machine that later submits with an id. Summing it against a UUID slice
-// double-counts the same history (#81), so it never coexists with id'd
-// slices: an id'd submission drops the default slice for the days it covers,
-// and a no-id submission replaces the whole day (pre-#43 overwrite
-// semantics). Cross-machine summing therefore only happens between id'd
-// slices, where attribution is sound.
+// The "default" bucket (no X-Machine-Id: web uploads, pre-1.2 CLIs, legacy
+// rows) is NOT a machine — it is unattributable data that in practice usually
+// comes from a machine that also submits with an id. Summing it against UUID
+// slices double-counts the same history (#81). Deleting it loses history
+// instead: an id'd submission used to drop it, a no-id submission used to
+// wipe every id'd slice, and the claim merge threw whole rows away (#138,
+// #152). So it is kept alongside id'd slices but never added to them: the day
+// shows whichever is larger, the unattributed slice or the sum of the id'd
+// ones. Cross-machine summing still only happens between id'd slices.
 
 /** One machine's contribution to a single day. */
 export interface MachineContribution {
@@ -258,9 +259,34 @@ export interface DailyAggregate {
 /** Sentinel machine id for submissions that carry no `X-Machine-Id` header. */
 export const DEFAULT_MACHINE_ID = "default";
 
-function aggregateContributions(
+/**
+ * Whether observation `a` of one day should win over `b`. Cost decides; total
+ * tokens break ties so unpriced models ($0) still keep the larger observation.
+ * Compared whole rather than per-field, so the winner is a slice that was
+ * actually observed rather than tokens from one run and cost from another.
+ */
+export function outweighs(
+  a: Pick<MachineContribution, "totalCost" | "totalTokens">,
+  b: Pick<MachineContribution, "totalCost" | "totalTokens">
+): boolean {
+  if (a.totalCost !== b.totalCost) return a.totalCost > b.totalCost;
+  return a.totalTokens > b.totalTokens;
+}
+
+export function aggregateContributions(
   contributions: Record<string, MachineContribution>
 ): DailyAggregate {
+  const { [DEFAULT_MACHINE_ID]: unattributed, ...attributed } = contributions;
+  const summed = sumContributions(Object.values(attributed));
+  // max(unattributed, Σ attributed): the unattributed slice may be any of the
+  // id'd machines, so it can hold a day up but never add to it (#81).
+  if (unattributed && (Object.keys(attributed).length === 0 || outweighs(unattributed, summed))) {
+    return sumContributions([unattributed]);
+  }
+  return summed;
+}
+
+function sumContributions(slices: MachineContribution[]): DailyAggregate {
   const agg: DailyAggregate = {
     inputTokens: 0,
     outputTokens: 0,
@@ -274,7 +300,7 @@ function aggregateContributions(
   };
   const models = new Set<string>();
   const agents = new Set<string>();
-  for (const c of Object.values(contributions)) {
+  for (const c of slices) {
     agg.inputTokens += c.inputTokens;
     agg.outputTokens += c.outputTokens;
     agg.cacheCreationTokens += c.cacheCreationTokens;
@@ -294,11 +320,10 @@ function aggregateContributions(
  * Fold one machine's slice for a day into the existing per-machine map and
  * recompute the day's aggregate. Pure so it can be unit-tested.
  *
- * @param existing prior per-machine map, or null for a legacy row that predates
- *   per-machine tracking. Unattributable data (legacy null rows and the
- *   "default" slice) is never preserved alongside id'd slices: we can't know
- *   which machine it came from, and assuming "a different one" double-counts
- *   single-machine users (#81). It is replaced instead.
+ * @param existing prior per-machine map. Callers pass a legacy row's columns as
+ *   a "default" slice (see storedContributions) so its history is kept.
+ *   Every slice survives the merge; only the submitting machine's slice can
+ *   change, and it only goes down when `acceptLower` says so.
  */
 /**
  * The tool the drift corpus is evidence about.
@@ -376,53 +401,63 @@ export function mergeMachineContribution(
   /** True when a lower re-report was rejected in favour of the stored slice. */
   retainedPrior: boolean;
 } {
-  let contributions: Record<string, MachineContribution>;
+  const others = existing ?? {};
+  const prior = others[machineId];
+  let slice = incoming;
   let retainedPrior = false;
 
-  if (machineId === DEFAULT_MACHINE_ID) {
-    // No-id submission: unattributable, so it owns the whole day.
-    contributions = { [DEFAULT_MACHINE_ID]: incoming };
-  } else {
-    const { [DEFAULT_MACHINE_ID]: _unattributed, ...idSlices } = existing ?? {};
-    const prior = idSlices[machineId];
-
-    // High-water mark per (day, machine).
+  // High-water mark per (day, machine) — including the unattributed slice.
+  //
+  // Claude Code rewrites its own session JSONLs on resume/compact, so a
+  // later run can report *less* for a day that already happened. #83 has two
+  // independent confirmations: a month-to-date total falling 11% between
+  // submissions 16h apart while the file count rose, and 5 assistant
+  // messages vanishing from one transcript between scans. Replacing the
+  // slice unconditionally meant the board silently took the lower number
+  // and a user's total decayed through no fault of their own.
+  //
+  // A past day can only ever be under-reported by a rewrite, never
+  // over-reported by one, so keeping the larger observation is the accurate
+  // choice rather than a generous one. Today's day still grows normally,
+  // because a later run legitimately reports more and simply wins.
+  if (acceptLower && prior && machineId !== DEFAULT_MACHINE_ID) {
+    // The verdict is evidence about one tool. Lower that tool's slice and
+    // leave every other tool at its high-water mark, so a Claude cleanup
+    // stops dragging the same day's Codex tokens down with it (#125).
     //
-    // Claude Code rewrites its own session JSONLs on resume/compact, so a
-    // later run can report *less* for a day that already happened. #83 has two
-    // independent confirmations: a month-to-date total falling 11% between
-    // submissions 16h apart while the file count rose, and 5 assistant
-    // messages vanishing from one transcript between scans. Replacing the
-    // slice unconditionally meant the board silently took the lower number
-    // and a user's total decayed through no fault of their own.
-    //
-    // A past day can only ever be under-reported by a rewrite, never
-    // over-reported by one, so keeping the larger observation is the accurate
-    // choice rather than a generous one. Today's day still grows normally,
-    // because a later run legitimately reports more and simply wins.
-    //
-    // Compared on cost and swapped whole rather than per-field: taking the max
-    // of each field independently would synthesise a slice that was never
-    // actually observed, with tokens from one run and cost from another.
-    if (acceptLower && prior) {
-      // The verdict is evidence about one tool. Lower that tool's slice and
-      // leave every other tool at its high-water mark, so a Claude cleanup
-      // stops dragging the same day's Codex tokens down with it (#125).
-      //
-      // Only reachable when both sides carry a split — which means a recent
-      // CLI on both submissions. Everything older falls through to the
-      // whole-slice path below and behaves exactly as it did before.
-      const scoped = lowerOneAgent(prior, incoming, CORPUS_AGENT);
-      contributions = { ...idSlices, [machineId]: scoped ?? incoming };
-    } else if (!acceptLower && prior && prior.totalCost > incoming.totalCost) {
-      contributions = { ...idSlices, [machineId]: prior };
-      retainedPrior = true;
-    } else {
-      contributions = { ...idSlices, [machineId]: incoming };
-    }
+    // Only reachable when both sides carry a split — which means a recent
+    // CLI on both submissions. Everything older falls through to the
+    // whole-slice path and behaves exactly as it did before.
+    // An unattributed slice for the same day is left alone: nothing ties it
+    // to this machine's deletion, and dropping it is how history got lost.
+    slice = lowerOneAgent(prior, incoming, CORPUS_AGENT) ?? incoming;
+  } else if (prior && outweighs(prior, incoming)) {
+    slice = prior;
+    retainedPrior = true;
   }
 
+  const contributions = { ...others, [machineId]: slice };
   return { contributions, aggregate: aggregateContributions(contributions), retainedPrior };
+}
+
+/**
+ * Fold several stored per-machine maps for one day into one — the claim merge,
+ * which combines a user's separate submission rows. The same machine seen in
+ * two rows is one machine, so its slices are high-water compared rather than
+ * summed; distinct machines keep summing; the unattributed slice follows the
+ * same max rule as everywhere else. Nothing a row held is dropped (#152).
+ */
+export function combineContributionMaps(
+  maps: Array<Record<string, MachineContribution>>
+): { contributions: Record<string, MachineContribution>; aggregate: DailyAggregate } {
+  const contributions: Record<string, MachineContribution> = {};
+  for (const map of maps) {
+    for (const [machineId, slice] of Object.entries(map)) {
+      const held = contributions[machineId];
+      if (!held || outweighs(slice, held)) contributions[machineId] = slice;
+    }
+  }
+  return { contributions, aggregate: aggregateContributions(contributions) };
 }
 
 export interface NormalizedCcData {

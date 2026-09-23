@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 // Dynamic import: Node's native .ts loader reparses as ESM at runtime, so a
 // static `import {…} from "….ts"` fails name resolution; dynamic import works.
-const { normalizeCcData, validateCcData, mergeMachineContribution } = await import("../src/lib/ccusage.ts");
+const { normalizeCcData, validateCcData, mergeMachineContribution, combineContributionMaps } = await import("../src/lib/ccusage.ts");
 
 let passed = 0;
 let failed = 0;
@@ -344,9 +344,9 @@ console.log("\n[8] Per-machine daily merge (#43)");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n[9] Default bucket never sums against id'd slices (#81)");
+console.log("\n[9] Default bucket never sums against id'd slices (#81) — and is never deleted (#138)");
 {
-  const contrib = (cost: number) => ({
+  const contrib = (cost: number, agents = ["claude"]) => ({
     inputTokens: cost * 100,
     outputTokens: cost * 10,
     cacheCreationTokens: 0,
@@ -354,29 +354,63 @@ console.log("\n[9] Default bucket never sums against id'd slices (#81)");
     totalTokens: cost * 110,
     totalCost: cost,
     modelsUsed: ["claude-opus-4-8"],
-    agents: ["claude"],
+    agents,
   });
 
   // The #81 doubling: no-id submission filled "default", then the same machine
-  // re-submits with an id. The id'd slice must REPLACE default, not add to it.
+  // re-submits with an id. The day must not become $30.
   const d1 = mergeMachineContribution(null, "default", contrib(15));
   const d2 = mergeMachineContribution(d1.contributions, "machineA", contrib(15));
-  ok("id'd submission drops default slice ($15, not $30)", d2.aggregate.totalCost === 15, `got ${d2.aggregate.totalCost}`);
-  ok("default slice removed from map", Object.keys(d2.contributions).join(",") === "machineA");
+  ok("id'd submission over default does not double ($15, not $30)", d2.aggregate.totalCost === 15, `got ${d2.aggregate.totalCost}`);
+  ok("default slice is kept, not deleted", Object.keys(d2.contributions).sort().join(",") === "default,machineA");
 
   // Id'd slices survive an id'd submission from another machine.
   const d3 = mergeMachineContribution(d2.contributions, "machineB", contrib(10));
   ok("distinct id'd machines still sum ($15+$10=$25)", d3.aggregate.totalCost === 25, `got ${d3.aggregate.totalCost}`);
 
-  // A no-id submission is unattributable: it owns the whole day (pre-#43
-  // overwrite), never sums against id'd slices it may itself contain.
+  // #138: a no-id upload used to replace the whole day, wiping machineA and
+  // machineB. Now it is one more observation: the day shows the larger view.
   const d4 = mergeMachineContribution(d3.contributions, "default", contrib(30));
-  ok("no-id submission replaces whole day ($30, not $55)", d4.aggregate.totalCost === 30, `got ${d4.aggregate.totalCost}`);
-  ok("only default slice remains", Object.keys(d4.contributions).join(",") === "default");
+  ok("larger no-id upload holds the day up ($30, not $55)", d4.aggregate.totalCost === 30, `got ${d4.aggregate.totalCost}`);
+  ok("id'd slices survive a no-id upload", Object.keys(d4.contributions).sort().join(",") === "default,machineA,machineB");
 
-  // No-id re-submit over default-only day: plain replace, unchanged behavior.
+  const small = mergeMachineContribution(d3.contributions, "default", contrib(5, ["claude"]));
+  ok("smaller no-id upload cannot wipe other machines ($25 kept)", small.aggregate.totalCost === 25, `got ${small.aggregate.totalCost}`);
+
+  // No-id re-submit over a default-only day is a high-water mark like any slice.
   const d5 = mergeMachineContribution(d4.contributions, "default", contrib(12));
-  ok("no-id re-submit replaces default ($12)", d5.aggregate.totalCost === 12, `got ${d5.aggregate.totalCost}`);
+  ok("lower no-id re-report keeps the observed high ($30)", d5.aggregate.totalCost === 30, `got ${d5.aggregate.totalCost}`);
+}
+
+console.log("\n[10] Claim merge combines rows without losing any (#152)");
+{
+  const contrib = (cost: number, tokens = cost * 110) => ({
+    inputTokens: tokens, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+    totalTokens: tokens, totalCost: cost, modelsUsed: ["claude-opus-4-8"], agents: ["claude"],
+  });
+
+  // The reported case: CLI row held $38k-scale history for machineA, a later
+  // web upload (no id) held a shorter, lower view of the same day.
+  const cliRow = { machineA: contrib(100) };
+  const webRow = { default: contrib(60) };
+  const merged = combineContributionMaps([webRow, cliRow]);
+  ok("lower web upload does not replace a higher CLI day ($100)", merged.aggregate.totalCost === 100, `got ${merged.aggregate.totalCost}`);
+  ok("both observations are kept", Object.keys(merged.contributions).sort().join(",") === "default,machineA");
+
+  const higherWeb = combineContributionMaps([cliRow, { default: contrib(140) }]);
+  ok("a genuinely higher upload still wins ($140)", higherWeb.aggregate.totalCost === 140, `got ${higherWeb.aggregate.totalCost}`);
+
+  // The same machine in two rows is one machine: keep its larger slice, never sum.
+  const same = combineContributionMaps([{ machineA: contrib(40) }, { machineA: contrib(70) }]);
+  ok("same machine across rows is high-water, not summed ($70)", same.aggregate.totalCost === 70, `got ${same.aggregate.totalCost}`);
+
+  // Distinct machines across rows add up, exactly as they would in one row.
+  const two = combineContributionMaps([{ machineA: contrib(40) }, { machineB: contrib(70) }]);
+  ok("distinct machines across rows sum ($110)", two.aggregate.totalCost === 110, `got ${two.aggregate.totalCost}`);
+
+  // Unpriced models: tokens break the $0 tie.
+  const unpriced = combineContributionMaps([{ machineA: contrib(0, 1_000) }, { machineA: contrib(0, 5_000) }]);
+  ok("tokens break ties for unpriced models", unpriced.aggregate.totalTokens === 5_000, `got ${unpriced.aggregate.totalTokens}`);
 }
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);

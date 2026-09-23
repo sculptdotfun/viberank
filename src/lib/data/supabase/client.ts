@@ -45,7 +45,9 @@ import {
   validateCcData,
   inferToolFromModel,
   mergeMachineContribution,
+  combineContributionMaps,
   DEFAULT_MACHINE_ID,
+  type DailyAggregate,
   type MachineContribution,
 } from "@/lib/ccusage";
 
@@ -168,6 +170,46 @@ function dailyEntryToContribution(
   };
 }
 
+/**
+ * A stored day as its per-machine map. Legacy rows (pre-#43) have no map, so
+ * their columns become the unattributed slice — otherwise the first id'd
+ * submission for that day would silently replace the legacy history.
+ */
+function storedContributions(
+  row: DbDailyBreakdown | undefined
+): Record<string, MachineContribution> | null {
+  if (!row) return null;
+  if (row.machine_contributions) return row.machine_contributions;
+  return {
+    [DEFAULT_MACHINE_ID]: {
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      cacheCreationTokens: row.cache_creation_tokens,
+      cacheReadTokens: row.cache_read_tokens,
+      totalTokens: row.total_tokens,
+      totalCost: Number(row.total_cost),
+      modelsUsed: row.models_used || [],
+      agents: row.agents || [],
+      modelBreakdowns: row.model_breakdowns ?? undefined,
+    },
+  };
+}
+
+/** The daily_breakdowns columns for one day's aggregate. */
+function aggregateToDailyColumns(aggregate: DailyAggregate) {
+  return {
+    input_tokens: aggregate.inputTokens,
+    output_tokens: aggregate.outputTokens,
+    cache_creation_tokens: aggregate.cacheCreationTokens,
+    cache_read_tokens: aggregate.cacheReadTokens,
+    total_tokens: aggregate.totalTokens,
+    total_cost: aggregate.totalCost,
+    models_used: aggregate.modelsUsed,
+    agents: aggregate.agents,
+    model_breakdowns: aggregate.modelBreakdowns ?? null,
+  };
+}
+
 function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
   return {
     date: db.date,
@@ -209,10 +251,6 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
 export const EFFICIENCY_MIN_COST = 100;
 
 const PAGE_SIZE = 1000;
-
-/** See claimAndMergeSubmissions: multi-row merges can lose history (#152). */
-const MERGES_PAUSED = true;
-export const MERGE_PAUSED_MESSAGE = "Merging is temporarily paused";
 const MAX_ROWS = 200_000;
 
 export async function fetchAllPages<T>(
@@ -519,7 +557,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     const dailyRows = data.ccData.daily.map((day) => {
       const prior = dailyMap.get(day.date);
       const { contributions, aggregate, retainedPrior } = mergeMachineContribution(
-        prior?.machine_contributions ?? null,
+        storedContributions(prior),
         machineId,
         dailyEntryToContribution(day),
         // A day inside a month the user cleared takes the lower number — but
@@ -1089,12 +1127,6 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       };
     }
 
-    // Multi-row merges are paused: the merge below prefers OAuth rows per day
-    // and then deletes the rest, so a shorter web upload can permanently erase
-    // a longer CLI history (#152). Single-row claims above are lossless and
-    // stay open. Lifted by the lossless merge.
-    if (MERGES_PAUSED) throw new Error(MERGE_PAUSED_MESSAGE);
-
     // Merge submissions
     const baseSubmission =
       oauthSubmissions[0] ||
@@ -1119,33 +1151,31 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       "daily breakdowns for claim merge"
     );
 
-    // Merge daily data (OAuth takes priority)
-    const dailyMap = new Map<string, DbDailyBreakdown>();
-    for (const submission of submissions) {
-      const isOauth = submission.source === "oauth";
-      const daily = allDailyBreakdowns.filter(
-        (d) => d.submission_id === submission.id
-      );
-      for (const day of daily) {
-        if (isOauth || !dailyMap.has(day.date)) {
-          dailyMap.set(day.date, day);
-        }
-      }
+    // Combine every row's per-machine slices for each date. This used to pick
+    // one whole row per day with OAuth taking priority, then delete the rest —
+    // so a shorter web upload erased a longer CLI history (#152). Now the same
+    // machine seen twice keeps its larger observation, distinct machines sum,
+    // and nothing any row held is dropped.
+    const mapsByDate = new Map<string, Array<Record<string, MachineContribution>>>();
+    for (const day of allDailyBreakdowns) {
+      const maps = mapsByDate.get(day.date) ?? [];
+      maps.push(storedContributions(day)!);
+      mapsByDate.set(day.date, maps);
     }
 
-    const mergedDaily = Array.from(dailyMap.values()).sort((a, b) =>
-      a.date.localeCompare(b.date)
-    );
+    const mergedDaily = Array.from(mapsByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, maps]) => ({ date, ...combineContributionMaps(maps) }));
 
     // Calculate new totals
     const totals = mergedDaily.reduce(
-      (acc, day) => ({
-        totalTokens: acc.totalTokens + day.total_tokens,
-        totalCost: acc.totalCost + Number(day.total_cost),
-        inputTokens: acc.inputTokens + day.input_tokens,
-        outputTokens: acc.outputTokens + day.output_tokens,
-        cacheCreationTokens: acc.cacheCreationTokens + day.cache_creation_tokens,
-        cacheReadTokens: acc.cacheReadTokens + day.cache_read_tokens,
+      (acc, { aggregate }) => ({
+        totalTokens: acc.totalTokens + aggregate.totalTokens,
+        totalCost: acc.totalCost + aggregate.totalCost,
+        inputTokens: acc.inputTokens + aggregate.inputTokens,
+        outputTokens: acc.outputTokens + aggregate.outputTokens,
+        cacheCreationTokens: acc.cacheCreationTokens + aggregate.cacheCreationTokens,
+        cacheReadTokens: acc.cacheReadTokens + aggregate.cacheReadTokens,
       }),
       {
         totalTokens: 0,
@@ -1163,7 +1193,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     };
 
     const allModels = Array.from(
-      new Set(mergedDaily.flatMap((d) => d.models_used || []))
+      new Set(mergedDaily.flatMap((d) => d.aggregate.modelsUsed))
     );
     // Union tools from the submission rows AND the merged daily agents, so
     // tools set by an earlier normalized submission survive a claim/merge even
@@ -1171,11 +1201,28 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     const allTools = Array.from(
       new Set([
         ...submissions.flatMap((s) => s.tools || []),
-        ...mergedDaily.flatMap((d) => d.agents || []),
+        ...mergedDaily.flatMap((d) => d.aggregate.agents),
       ])
     ).sort();
 
-    // Update base submission
+    // Write the merged days onto the base submission first. Upsert rather than
+    // delete-then-insert: the merged dates are a superset of the base's own,
+    // so every existing row is overwritten in place and a failed write leaves
+    // the base as it was instead of empty.
+    const { error: upsertError } = await this.client.from("daily_breakdowns").upsert(
+      mergedDaily.map(({ date, contributions, aggregate }) => ({
+        submission_id: baseSubmission.id,
+        date,
+        ...aggregateToDailyColumns(aggregate),
+        machine_contributions: contributions,
+      })),
+      { onConflict: "submission_id,date" }
+    );
+
+    if (upsertError) {
+      throw new Error("Failed to write merged daily breakdowns: " + upsertError.message);
+    }
+
     const { error: updateError } = await this.client
       .from("submissions")
       .update({
@@ -1197,37 +1244,6 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     if (updateError) {
       throw new Error("Failed to update merged submission: " + updateError.message);
-    }
-
-    // Replace daily breakdowns on the base submission with the merged set.
-    const { error: deleteError } = await this.client
-      .from("daily_breakdowns")
-      .delete()
-      .eq("submission_id", baseSubmission.id);
-
-    if (deleteError) {
-      throw new Error("Failed to clear daily breakdowns: " + deleteError.message);
-    }
-
-    const { error: insertError } = await this.client.from("daily_breakdowns").insert(
-      mergedDaily.map((d) => ({
-        submission_id: baseSubmission.id,
-        date: d.date,
-        input_tokens: d.input_tokens,
-        output_tokens: d.output_tokens,
-        cache_creation_tokens: d.cache_creation_tokens,
-        cache_read_tokens: d.cache_read_tokens,
-        total_tokens: d.total_tokens,
-        total_cost: d.total_cost,
-        models_used: d.models_used,
-        agents: d.agents || [],
-        model_breakdowns: d.model_breakdowns ?? null,
-        machine_contributions: d.machine_contributions ?? null,
-      }))
-    );
-
-    if (insertError) {
-      throw new Error("Failed to insert merged daily breakdowns: " + insertError.message);
     }
 
     // Delete other submissions (cascade deletes their daily breakdowns).
@@ -1302,7 +1318,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     } else if (unverifiedCount > 0 && submissions.length === 1) {
       actionNeeded = "claim";
       actionText = "Verify your submission";
-    } else if (submissions.length > 1 && !MERGES_PAUSED) {
+    } else if (submissions.length > 1) {
       actionNeeded = "merge";
       actionText = `Merge ${submissions.length} submissions into one`;
     }
