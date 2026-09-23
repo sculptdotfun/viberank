@@ -53,14 +53,19 @@ export const authOptions: NextAuthOptions = {
      * sign-in. It also keeps the address off the session, so it never
      * reaches the browser — the only reader is a service-role query.
      */
-    async signIn({ user, profile }) {
-      const username = (profile as GitHubProfile | undefined)?.login;
+    //
+    // Unlike the jwt callback, this event is handed the *normalized* user from
+    // profile() above, not GitHub's raw profile — so the handle is `username`,
+    // and reading `login` here silently skipped every sign-in.
+    async signIn({ user }) {
+      const username = (user as { username?: string } | undefined)?.username;
       const email = user?.email;
       if (!username || !email) return;
 
       try {
         const data = createSupabaseServerDataLayer();
-        await data.profiles.recordSignInEmail(username, email);
+        const result = await data.profiles.recordSignInEmail(username, email);
+        if (!result.success) console.error("[auth] failed to record sign-in email", result.error);
       } catch (error) {
         // A missing service-role key or a transient write failure must not
         // cost the user their sign-in; the next one will try again.
