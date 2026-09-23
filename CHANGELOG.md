@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — sign-in emails are actually kept (September 2026)
+
+### Fixed
+- **The #148 email capture never wrote a row.** `events.signIn` receives the normalized user from `profile()`, not GitHub's raw profile, so reading `profile.login` returned undefined and the handler exited early on every sign-in. It now reads `user.username`, and a failed write is logged instead of ignored. (Hidden until now by the sign-in outage fixed in #156.)
+
 ## Site — reconstructed days stay out of the reports (September 2026)
 
 ### Changed
