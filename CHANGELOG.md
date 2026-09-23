@@ -1,5 +1,11 @@
 # Changelog
 
+## Site — one row per developer (September 2026)
+
+### Fixed
+- **Every submission from a user lands in the same row.** Rows were keyed by source (CLI vs web) and overlapping date range, so switching methods or submitting a non-overlapping range created a second row; 79 users had 171 rows and the board ranked each separately. Per-machine slices already make a single row safe to share.
+- **Unverified submissions can no longer write into a verified profile.** A username claim without a token could merge into a verified CLI row and flip it back to unverified. Once a username is verified, unverified submissions to it get a 403 that says to run `npx viberank-cli login`, and the refusal doesn't spend the rate limit.
+
 ## Site — machine IDs are private again (September 2026)
 
 ### Fixed

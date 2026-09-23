@@ -260,6 +260,12 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
 export const EFFICIENCY_MIN_COST = 100;
 
 const PAGE_SIZE = 1000;
+
+/** Refusal for an unverified submission to a verified username (see findTargetSubmission). */
+export const VERIFIED_PROFILE_ERROR = "is verified";
+function verifiedProfileMessage(username: string): string {
+  return `@${username} ${VERIFIED_PROFILE_ERROR}, so submissions to it need to be signed. Run \`npx viberank-cli login\`, then submit again.`;
+}
 const MAX_ROWS = 200_000;
 
 export async function fetchAllPages<T>(
@@ -356,6 +362,11 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     // to find out whether the fix worked (#150).
     this.validateSubmitData(data);
 
+    // Resolved before the limiter for the same reason: a submission refused
+    // for targeting a verified profile shouldn't cost the hourly slot either.
+    const existing = await this.findTargetSubmission(data);
+    const existingSubmissions = existing ? [existing] : [];
+
     // Check rate limit
     const rateLimitResult = await this.rateLimiter.checkLimit(
       "submitData",
@@ -381,24 +392,6 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     const tools =
       data.ccData.tools ??
       Array.from(new Set(data.ccData.daily.flatMap((day) => day.agents ?? [])));
-
-    // Check for existing submission with overlapping date range
-    // Use ilike for case-insensitive username matching
-    const { data: existingSubmissions, error: existingSubmissionsError } = await this.client
-      .from("submissions")
-      .select("*")
-      .ilike("username", data.username)
-      .eq("source", data.source)
-      .or(
-        `and(date_range_start.lte.${dateRangeEnd},date_range_end.gte.${dateRangeStart})`
-      )
-      .limit(1);
-
-    if (existingSubmissionsError) {
-      throw new Error(
-        `Failed to query existing submissions: ${existingSubmissionsError.message}`
-      );
-    }
 
     // Identify the contributing machine so overlapping dates from distinct
     // machines sum while a same-machine re-submit replaces only its slice (#43).
@@ -445,6 +438,39 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     }
 
     return submissionId;
+  }
+
+  /**
+   * The one row a submission belongs in. Rows used to be keyed by source and
+   * overlapping date range, so a user who switched from web upload to the CLI,
+   * or whose ranges didn't overlap, got a second row — 79 users had 171 rows,
+   * and the board ranked each row separately. Per-machine slices already make
+   * one row safe to share, so every submission from a user lands in the same
+   * row, with one exception:
+   *
+   * An unverified submission is only a claim to the username, so it never
+   * writes into a verified row — before, it could, and it flipped the row back
+   * to unverified. Once a username is verified, unverified submissions under
+   * it are refused with a pointer to `login` instead.
+   */
+  private async findTargetSubmission(data: SubmitData): Promise<DbSubmission | null> {
+    const { data: rows, error } = await this.client
+      .from("submissions")
+      .select("*")
+      .ilike("username", data.username)
+      .order("total_cost", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      throw new Error(`Failed to query existing submissions: ${error.message}`);
+    }
+
+    const verifiedRow = (rows ?? []).find((row) => row.verified);
+    const unverifiedRow = (rows ?? []).find((row) => !row.verified);
+
+    if (data.verified) return verifiedRow ?? unverifiedRow ?? null;
+    if (verifiedRow) throw new Error(verifiedProfileMessage(data.username));
+    return unverifiedRow ?? null;
   }
 
   private validateSubmitData(data: SubmitData): void {

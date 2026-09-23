@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
 import { normalizeCcData } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
+import { VERIFIED_PROFILE_ERROR } from "@/lib/data/supabase/client";
 import { getCliNotice } from "@/lib/sponsor";
 import { bearerFrom } from "@/lib/tokens";
 import { getTier } from "@/lib/tiers";
@@ -400,6 +401,10 @@ export async function POST(request: NextRequest) {
             }
           }
         );
+      }
+
+      if (error.message.includes(VERIFIED_PROFILE_ERROR)) {
+        return NextResponse.json({ error: error.message }, { status: 403 });
       }
 
       // Handle validation errors with 400 status. Only genuine problems with
