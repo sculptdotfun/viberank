@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   Calendar,
   Zap,
@@ -48,20 +49,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
   const username = decodeURIComponent(raw);
   const profileData = await getProfileCached(username);
 
-  if (!profileData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold mb-2">Profile not found</h1>
-          <p className="text-muted mb-6">No profile found for @{username}</p>
-          <Link href="/" className="inline-flex items-center gap-2 text-accent hover:text-accent-hover transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Back to leaderboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // A real 404, not a 200 that says "not found": deleted and never-existing
+  // profiles shouldn't read as live pages to crawlers or monitors.
+  if (!profileData) notFound();
 
   const submissions = profileData.submissions ?? [];
   const latestSubmission = submissions[0];
