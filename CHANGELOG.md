@@ -1,10 +1,12 @@
 # Changelog
 
-## Site — stop merges from losing history (September 2026)
+## Site — merges and uploads never delete history (September 2026)
 
 ### Fixed
+- **Merging submissions is lossless and back on.** The merge now combines every row's per-machine slices per day: the same machine seen twice keeps its larger observation, distinct machines sum, and nothing a row held is dropped. It used to pick one whole row per day with web uploads winning, then delete the rest (#152). Dry-run against every user with duplicate rows: the merged total always lands between their largest row and the sum of rows. Rule from @cjrogerlo's #153.
+- **A web upload (no machine ID) no longer wipes other machines' or tools' data for its days** (#138), and a CLI submission no longer drops an earlier web upload's days. Unattributed data now sits beside per-machine data; the day shows whichever is larger, never the sum (#81 still holds).
+- **Legacy days (pre-#43) are kept** when a newer CLI first submits them, instead of being replaced.
 - **A rejected submission no longer spends the hourly rate limit.** Validation ran after the limiter, so a user whose data failed a check had to wait an hour to retry a fix (#150).
-- **Merging several submissions is paused.** The merge preferred web-upload rows per day and deleted the rest, so a shorter upload could erase a longer CLI history (#152). Single-submission verification still works; merging returns once it is lossless.
 
 ## Site — GitHub sign-in works again (September 2026)
 

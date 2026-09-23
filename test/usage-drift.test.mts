@@ -86,19 +86,20 @@ const slice = (cost: number, tokens = Math.round(cost * 1000)) => ({
 }
 
 {
-  // Unattributable submissions still own the whole day (#81) — a web upload or
-  // older CLI can't be high-water compared against an id'd slice.
+  // Unattributable submissions sit beside id'd slices instead of replacing
+  // them (#138): a small web upload can't wipe a machine's history, and it
+  // never adds to it either (#81).
   const prior = { "machine-a": slice(9999) };
-  const { contributions, retainedPrior } = mergeMachineContribution(
+  const { contributions, aggregate, retainedPrior } = mergeMachineContribution(
     prior,
     DEFAULT_MACHINE_ID,
     slice(5)
   );
 
-  assert.deepEqual(Object.keys(contributions), [DEFAULT_MACHINE_ID]);
-  assert.equal(contributions[DEFAULT_MACHINE_ID].totalCost, 5);
-  assert.equal(retainedPrior, false, "replacing an unattributable day is not a drift signal");
-  check("unattributable submissions still replace the day (#81 preserved)");
+  assert.deepEqual(Object.keys(contributions).sort(), [DEFAULT_MACHINE_ID, "machine-a"]);
+  assert.equal(aggregate.totalCost, 9999);
+  assert.equal(retainedPrior, false, "a first unattributed observation is not a drift signal");
+  check("unattributable submissions no longer wipe id'd history (#138)");
 }
 
 {
