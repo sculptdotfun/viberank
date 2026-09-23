@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — machine IDs are private again (September 2026)
+
+### Fixed
+- **CLI machine IDs were readable through the public API.** `daily_breakdowns.machine_contributions` is keyed by machine ID and the table is public-read, while `/privacy` lists the machine ID as server-only. Browser-reachable reads now name their columns, and migration 017 withholds that column from the anon and authenticated roles.
+
 ## Site — cheap models can submit (September 2026)
 
 ### Fixed

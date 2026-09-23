@@ -195,6 +195,15 @@ function storedContributions(
   };
 }
 
+/**
+ * Every daily_breakdowns column except `machine_contributions`, whose keys are
+ * the CLI's machine IDs. Those are server-only (see /privacy), and migration
+ * 017 revokes the column from the anon role, so any read that can run in the
+ * browser must name its columns rather than select("*").
+ */
+const DAILY_PUBLIC_COLUMNS =
+  "id, submission_id, date, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, total_cost, models_used, agents, model_breakdowns";
+
 /** The daily_breakdowns columns for one day's aggregate. */
 function aggregateToDailyColumns(aggregate: DailyAggregate) {
   return {
@@ -946,7 +955,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       (chunk, from, to) =>
         this.client
           .from("daily_breakdowns")
-          .select("*")
+          .select(DAILY_PUBLIC_COLUMNS)
           .in("submission_id", chunk)
           .gte("date", params.dateFrom)
           .lte("date", params.dateTo)
@@ -1019,7 +1028,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     const { data: dailyBreakdowns } = await this.client
       .from("daily_breakdowns")
-      .select("*")
+      .select(DAILY_PUBLIC_COLUMNS)
       .eq("submission_id", id)
       .order("date");
 
@@ -1044,7 +1053,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       (chunk, from, to) =>
         this.client
           .from("daily_breakdowns")
-          .select("*")
+          .select(DAILY_PUBLIC_COLUMNS)
           .in("submission_id", chunk)
           .order("submission_id", { ascending: true })
           .order("date", { ascending: true })
@@ -1390,7 +1399,7 @@ export class SupabaseProfilesService implements ProfilesService {
       (chunk, from, to) =>
         this.client
           .from("daily_breakdowns")
-          .select("*")
+          .select(DAILY_PUBLIC_COLUMNS)
           .in("submission_id", chunk)
           .order("submission_id", { ascending: true })
           .order("date", { ascending: true })
