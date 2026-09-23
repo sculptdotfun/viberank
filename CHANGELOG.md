@@ -1,5 +1,13 @@
 # Changelog
 
+## MCP v1.1.0 — signed submissions (September 2026)
+
+### Fixed
+- **The MCP server signs submissions with the CLI's API token** (`VIBERANK_TOKEN` or `~/.viberank/config.json`) and sends the CLI's machine ID. It only ever sent `X-GitHub-User`, which the server now refuses for verified usernames, and without a machine ID its uploads couldn't be told apart from the same machine's CLI runs.
+
+### Docs
+- README, CLI README, VALIDATION.md and the MCP README describe the lossless merge, one row per user, the verified-profile 403, the per-model cost floor, and the 017 deploy-order exception.
+
 ## Site — sign-in emails are actually kept (September 2026)
 
 ### Fixed
