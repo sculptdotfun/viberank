@@ -1,5 +1,11 @@
 # Changelog
 
+## Site — stop merges from losing history (September 2026)
+
+### Fixed
+- **A rejected submission no longer spends the hourly rate limit.** Validation ran after the limiter, so a user whose data failed a check had to wait an hour to retry a fix (#150).
+- **Merging several submissions is paused.** The merge preferred web-upload rows per day and deleted the rest, so a shorter upload could erase a longer CLI history (#152). Single-submission verification still works; merging returns once it is lossless.
+
 ## Site — GitHub sign-in works again (September 2026)
 
 ### Fixed

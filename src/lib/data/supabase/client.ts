@@ -209,6 +209,10 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
 export const EFFICIENCY_MIN_COST = 100;
 
 const PAGE_SIZE = 1000;
+
+/** See claimAndMergeSubmissions: multi-row merges can lose history (#152). */
+const MERGES_PAUSED = true;
+export const MERGE_PAUSED_MESSAGE = "Merging is temporarily paused";
 const MAX_ROWS = 200_000;
 
 export async function fetchAllPages<T>(
@@ -300,6 +304,11 @@ export class SupabaseSubmissionsService implements SubmissionsService {
   }
 
   async submit(data: SubmitData): Promise<string> {
+    // Validate before touching the rate limiter: a rejected submission must not
+    // spend the user's hourly slot, or fixing the data means waiting an hour
+    // to find out whether the fix worked (#150).
+    this.validateSubmitData(data);
+
     // Check rate limit
     const rateLimitResult = await this.rateLimiter.checkLimit(
       "submitData",
@@ -313,9 +322,6 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         `Rate limit exceeded. Please wait ${waitSeconds} seconds before submitting again.`
       );
     }
-
-    // Validate data (same logic as Convex)
-    this.validateSubmitData(data);
 
     // Extract date range and models
     const dates = data.ccData.daily.map((d) => d.date).sort();
@@ -1083,6 +1089,12 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       };
     }
 
+    // Multi-row merges are paused: the merge below prefers OAuth rows per day
+    // and then deletes the rest, so a shorter web upload can permanently erase
+    // a longer CLI history (#152). Single-row claims above are lossless and
+    // stay open. Lifted by the lossless merge.
+    if (MERGES_PAUSED) throw new Error(MERGE_PAUSED_MESSAGE);
+
     // Merge submissions
     const baseSubmission =
       oauthSubmissions[0] ||
@@ -1290,7 +1302,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     } else if (unverifiedCount > 0 && submissions.length === 1) {
       actionNeeded = "claim";
       actionText = "Verify your submission";
-    } else if (submissions.length > 1) {
+    } else if (submissions.length > 1 && !MERGES_PAUSED) {
       actionNeeded = "merge";
       actionText = `Merge ${submissions.length} submissions into one`;
     }

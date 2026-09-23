@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer } from "@/lib/data";
+import { MERGE_PAUSED_MESSAGE } from "@/lib/data/supabase/client";
 
 export async function POST() {
   const session = await getServerSession(authOptions);
@@ -22,6 +23,10 @@ export async function POST() {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Claim/merge error:", { username: session.user.username, message });
+
+    if (message === MERGE_PAUSED_MESSAGE) {
+      return NextResponse.json({ error: message }, { status: 503 });
+    }
 
     if (message === "No submissions found") {
       return NextResponse.json({ error: message }, { status: 404 });
