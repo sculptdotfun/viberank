@@ -1,5 +1,11 @@
 # Changelog
 
+## Site — cheap models can submit (September 2026)
+
+### Fixed
+- **The cost-per-token floor is priced per model.** A flat 1e-7 floor assumed frontier-lab cache pricing, so honest reports from DeepSeek (cache hits at 2% of a miss) and OpenCode's MiMo/MiniMax/big-pickle models could never submit (#150, #154). Each model's tokens are now held to that model's floor; reports using only standard models are checked exactly as before, and a cheap model can't launder inflated tokens from another model in the same report. Replayed all 3,666 archived submissions: none newly rejected.
+- DeepSeek Harness is a recognised tool (`/tool/deepseek`), from @dprvda's #154.
+
 ## Site — merges and uploads never delete history (September 2026)
 
 ### Fixed

@@ -30,6 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
   pi: "pi",
   codebuff: "Codebuff",
   kilo: "Kilo",
+  deepseek: "DeepSeek Harness",
 };
 
 export function toolLabel(tool: string): string {
@@ -48,6 +49,7 @@ export const FEATURED_TOOLS: { key: string; blurb: string }[] = [
   { key: "openclaw", blurb: "the OpenClaw personal AI assistant" },
   { key: "pi", blurb: "the Pi coding agent from pi.dev" },
   { key: "kimi", blurb: "Moonshot AI's Kimi Code CLI" },
+  { key: "deepseek", blurb: "DeepSeek's DeepSeek Harness agent" },
 ];
 
 export function toolBlurb(tool: string): string {
