@@ -328,14 +328,19 @@ async function main() {
   // (#141). Validation cannot catch it: "Matt" is a perfectly well-formed
   // GitHub handle. So the guess is shown in the question and the field starts
   // empty, which costs one line of typing to the people it would have misfiled.
-  const guessed = source === 'gitconfig' && githubUser;
+  //
+  // A handle this machine already submitted under beats both guesses: it is
+  // the one answer we know is right, and pre-filling it means a stray reply to
+  // the prompt ("NO") can't quietly start a second profile (#151).
+  const remembered = looksLikeGithubHandle(readConfig().username ?? '') ? readConfig().username : null;
+  const guessed = !remembered && source === 'gitconfig' && githubUser;
   const response = await prompts({
     type: 'text',
     name: 'username',
     message: guessed
       ? `GitHub username (git config says "${githubUser}" — type it if that's right)`
       : 'GitHub username:',
-    initial: source === 'remote' && looksLikeGithubHandle(githubUser) ? githubUser : '',
+    initial: remembered ?? (source === 'remote' && looksLikeGithubHandle(githubUser) ? githubUser : ''),
     validate: (value) =>
       looksLikeGithubHandle(value.trim()) ||
       'That is not a valid GitHub username (1-39 letters, digits, single hyphens)'
@@ -347,6 +352,16 @@ async function main() {
   }
   
   githubUser = response.username.trim();
+
+  if (remembered && githubUser.toLowerCase() !== remembered.toLowerCase()) {
+    const switchResponse = await prompts({
+      type: 'confirm',
+      name: 'switch',
+      message: `This machine submitted as @${remembered} before. Submit as @${githubUser} instead? That is a separate profile.`,
+      initial: false
+    });
+    if (!switchResponse.switch) githubUser = remembered;
+  }
   // Remember it: a scheduled --quiet run has no TTY to ask on.
   try { writeConfig({ username: githubUser }); } catch { /* best effort */ }
 
@@ -410,7 +425,7 @@ async function main() {
   const confirmResponse = await prompts({
     type: 'confirm',
     name: 'submit',
-    message: 'Submit to Viberank leaderboard?',
+    message: `Submit to Viberank as @${githubUser} (${SITE}/profile/${githubUser})?`,
     initial: true
   });
 
