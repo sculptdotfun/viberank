@@ -1,5 +1,16 @@
 # Changelog
 
+## CLI v1.11.0 — no more accidental second profiles (September 2026)
+
+### Fixed
+- **The username prompt pre-fills the handle this machine last submitted as**, and switching to a different one asks first (default: no). A stray reply to the prompt created the `NO` profile next to its owner's real one (#151), and a guessed default created `Matt` (#141).
+- The final prompt names the profile it will write to: `Submit to Viberank as @you (https://www.viberank.app/profile/you)?`
+
+## Site — missing profiles return 404
+
+### Fixed
+- `/profile/<unknown>` rendered "Profile not found" with a 200 status; it now returns a real 404 with the same page.
+
 ## Site — one row per developer (September 2026)
 
 ### Fixed
