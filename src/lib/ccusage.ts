@@ -260,6 +260,57 @@ export interface DailyAggregate {
 export const DEFAULT_MACHINE_ID = "default";
 
 /**
+ * A machine's estimated slice: Claude Code days rebuilt from
+ * ~/.claude/stats-cache.json after the transcripts behind them were deleted
+ * (#138). It is keyed apart from the machine's measured slice so the two sum
+ * rather than compete for the per-machine high-water mark: the measured slice
+ * on those days is usually another tool (Codex), which an estimate must not
+ * displace.
+ */
+export const ESTIMATED_SLICE_SUFFIX = ":estimated";
+
+/** The only tool stats-cache.json can speak for. */
+const ESTIMATED_AGENT = "claude";
+
+export function estimatedSliceKey(machineId: string): string {
+  return `${machineId}${ESTIMATED_SLICE_SUFFIX}`;
+}
+
+export function isEstimatedSliceKey(key: string): boolean {
+  return key.endsWith(ESTIMATED_SLICE_SUFFIX);
+}
+
+function measuresEstimatedAgent(slice: MachineContribution): boolean {
+  return (
+    slice.agents.includes(ESTIMATED_AGENT) ||
+    slice.modelsUsed.some((model) => inferToolFromModel(model) === ESTIMATED_AGENT)
+  );
+}
+
+/**
+ * The slices that count toward a day. An estimate stands in for Claude usage
+ * nobody can measure any more, so once any measured slice reports Claude for
+ * the day — from any machine, whichever arrived first — every estimate steps
+ * aside. Keyed to the day rather than to the machine because the machine id
+ * is the client's own claim: an estimate under an invented id must not add to
+ * Claude that was measured under the real one.
+ */
+function countedSlices(
+  contributions: Record<string, MachineContribution>
+): Record<string, MachineContribution> {
+  const measuredClaude = Object.entries(contributions).some(
+    ([key, slice]) => !isEstimatedSliceKey(key) && measuresEstimatedAgent(slice)
+  );
+  if (!measuredClaude) return contributions;
+  return Object.fromEntries(Object.entries(contributions).filter(([key]) => !isEstimatedSliceKey(key)));
+}
+
+/** Whether an estimated slice counts toward this day (see countedSlices). */
+export function dayIsEstimated(contributions: Record<string, MachineContribution>): boolean {
+  return Object.keys(countedSlices(contributions)).some(isEstimatedSliceKey);
+}
+
+/**
  * Whether observation `a` of one day should win over `b`. Cost decides; total
  * tokens break ties so unpriced models ($0) still keep the larger observation.
  * Compared whole rather than per-field, so the winner is a slice that was
@@ -276,7 +327,7 @@ export function outweighs(
 export function aggregateContributions(
   contributions: Record<string, MachineContribution>
 ): DailyAggregate {
-  const { [DEFAULT_MACHINE_ID]: unattributed, ...attributed } = contributions;
+  const { [DEFAULT_MACHINE_ID]: unattributed, ...attributed } = countedSlices(contributions);
   const summed = sumContributions(Object.values(attributed));
   // max(unattributed, Σ attributed): the unattributed slice may be any of the
   // id'd machines, so it can hold a day up but never add to it (#81).
@@ -431,7 +482,9 @@ export function mergeMachineContribution(
     // An unattributed slice for the same day is left alone: nothing ties it
     // to this machine's deletion, and dropping it is how history got lost.
     slice = lowerOneAgent(prior, incoming, CORPUS_AGENT) ?? incoming;
-  } else if (prior && outweighs(prior, incoming)) {
+  } else if (prior && outweighs(prior, incoming) && !isEstimatedSliceKey(machineId)) {
+    // (Not for an estimate: it is recomputed, not re-read, so the rationale
+    // above doesn't apply and a newer estimate replaces the older one.)
     slice = prior;
     retainedPrior = true;
   }

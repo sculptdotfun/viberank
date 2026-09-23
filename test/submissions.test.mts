@@ -454,4 +454,132 @@ const { SupabaseStatsService } = await import("../src/lib/data/supabase/client.t
   check("global stats chunks large id lists instead of reporting 0 days");
 }
 
+// ---------------------------------------------------------------------------
+// #138 — estimated days: their own slice, flagged, and the flag is sticky
+// ---------------------------------------------------------------------------
+
+{
+  const DATE = "2026-05-01";
+  const slice = (cost: number, models: string[], agents: string[]) => ({
+    inputTokens: cost * 100, outputTokens: cost * 10, cacheCreationTokens: 0, cacheReadTokens: 0,
+    totalTokens: cost * 110, totalCost: cost, modelsUsed: models, agents,
+  });
+  const storedDay = (id: string, submissionId: string, contributions: Record<string, unknown>, estimated: boolean) => ({
+    id, submission_id: submissionId, date: DATE,
+    input_tokens: 0, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 0,
+    total_tokens: 0, total_cost: 0, models_used: [], agents: [], model_breakdowns: null,
+    machine_contributions: contributions, estimated,
+  });
+  const claudeDay = { date: DATE, ...slice(60, ["claude-opus-4-8"], ["claude"]) };
+  const estimate: SubmitData = {
+    username: "backfiller", githubUsername: "backfiller", source: "cli", verified: false,
+    machineId: "machine-a", estimated: true,
+    ccData: {
+      totals: { inputTokens: 6000, outputTokens: 600, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 6600, totalCost: 60 },
+      daily: [claudeDay], tools: ["claude"],
+    },
+  };
+  const dayWrite = (client: FakeClient) =>
+    (client.calls.find((c) => c.table === "daily_breakdowns" && c.operation === "upsert")!.payload as Array<Record<string, unknown>>)
+      .find((row) => row.date === DATE)!;
+
+  {
+    const { client, service } = makeService({
+      submissions: [{ id: "submission-1", models_used: [], tools: ["codex"] }],
+      daily_breakdowns: [storedDay("day-1", "submission-1", { "machine-a": slice(40, ["gpt-5.5"], ["codex"]) }, false)],
+      profiles: [{ id: "profile-1", total_submissions: 1 }],
+    });
+    await service.submit(estimate);
+    const row = dayWrite(client);
+    const keys = Object.keys(row.machine_contributions as object).sort().join(",");
+    assert.equal(keys, "machine-a,machine-a:estimated");
+    assert.equal(row.total_cost, 100, `estimate should add to the measured Codex slice, got ${row.total_cost}`);
+    assert.equal(row.estimated, true);
+    check("an estimate lands in the machine's own estimated slice, sums, and flags the day");
+  }
+
+  {
+    // A day flagged by hand (#163) must stay flagged when a measured
+    // submission touches it — the flag is not re-derived from the slices.
+    const { client, service } = makeService({
+      submissions: [{ id: "submission-1", models_used: [], tools: ["claude"] }],
+      daily_breakdowns: [storedDay("day-1", "submission-1", { default: slice(90, ["claude-opus-4-8"], ["claude"]) }, true)],
+      profiles: [{ id: "profile-1", total_submissions: 1 }],
+    });
+    await service.submit({ ...estimate, estimated: undefined, ccData: { ...estimate.ccData, daily: [{ ...claudeDay, ...slice(10, ["gpt-5.5"], ["codex"]) }] } });
+    assert.equal(dayWrite(client).estimated, true);
+    check("a hand-set estimated flag survives a later measured submission");
+  }
+
+  {
+    // A flag an estimated slice explains is recomputed, so once measured
+    // Claude arrives the day stops being estimated — the same result the
+    // reverse arrival order gives.
+    const { client, service } = makeService({
+      submissions: [{ id: "submission-1", models_used: [], tools: ["claude", "codex"] }],
+      daily_breakdowns: [storedDay("day-1", "submission-1", {
+        "machine-a": slice(40, ["gpt-5.5"], ["codex"]),
+        "machine-a:estimated": slice(60, ["claude-opus-4-8"], ["claude"]),
+      }, true)],
+      profiles: [{ id: "profile-1", total_submissions: 1 }],
+    });
+    await service.submit({ ...estimate, machineId: "machine-b", estimated: undefined, ccData: { ...estimate.ccData, daily: [{ ...claudeDay, ...slice(25, ["claude-opus-4-8"], ["claude"]) }] } });
+    const row = dayWrite(client);
+    assert.equal(row.total_cost, 65, `measured Claude should replace the estimate, got ${row.total_cost}`);
+    assert.equal(row.estimated, false);
+    check("a derived flag clears once measured Claude replaces the estimate, whatever the arrival order");
+  }
+
+  {
+    // The #163 case: a hand-flagged day whose unattributed Claude outranks a
+    // later estimate. The estimate explains nothing there, so the hand-set
+    // flag must survive this write and the next.
+    const handSet = storedDay("day-1", "submission-1", {
+      default: slice(90, ["claude-opus-4-8"], ["claude"]),
+      "machine-a:estimated": slice(60, ["claude-opus-4-8"], ["claude"]),
+    }, true);
+    const { client, service } = makeService({
+      submissions: [{ id: "submission-1", models_used: [], tools: ["claude"] }],
+      daily_breakdowns: [handSet],
+      profiles: [{ id: "profile-1", total_submissions: 1 }],
+    });
+    await service.submit({ ...estimate, machineId: "machine-b", estimated: undefined, ccData: { ...estimate.ccData, daily: [{ ...claudeDay, ...slice(10, ["gpt-5.5"], ["codex"]) }] } });
+    const row = dayWrite(client);
+    assert.equal(row.estimated, true, "a hand-set flag the slices don't explain must survive");
+    check("a hand-set flag survives even when an estimate it outranks is on the day");
+  }
+
+  {
+    let limiterCalls = 0;
+    const client = new FakeClient({ submissions: [], daily_breakdowns: [], profiles: [] });
+    const service = new SupabaseSubmissionsService(client as never, {
+      checkLimit: async () => { limiterCalls++; return { allowed: true, remaining: 1 }; },
+    } as never);
+    await assert.rejects(service.submit({ ...estimate, machineId: undefined }), /machine id/);
+    assert.equal(limiterCalls, 0, "a refused estimate must not spend the hourly slot");
+    check("an estimate without a machine id is refused before the rate limiter");
+  }
+
+  {
+    // Claim merge: an estimated row and a measured row for the same day
+    // combine into one row that still carries the flag.
+    const { client, service } = makeService({
+      submissions: [
+        { id: "s-old", source: "cli", verified: false, submitted_at: "2026-09-01T00:00:00Z", tools: ["codex"] },
+        { id: "s-new", source: "cli", verified: false, submitted_at: "2026-09-02T00:00:00Z", tools: ["claude"] },
+      ],
+      daily_breakdowns: [
+        storedDay("day-1", "s-old", { "machine-a": slice(40, ["gpt-5.5"], ["codex"]) }, false),
+        storedDay("day-2", "s-new", { "machine-a:estimated": slice(60, ["claude-opus-4-8"], ["claude"]) }, true),
+      ],
+      profiles: [{ id: "profile-1", total_submissions: 2 }],
+    });
+    await service.claimAndMergeSubmissions("backfiller");
+    const row = dayWrite(client);
+    assert.equal(row.total_cost, 100, `claim merge should sum the estimate with the measured slice, got ${row.total_cost}`);
+    assert.equal(row.estimated, true);
+    check("claim merge keeps an estimated day flagged and summed");
+  }
+}
+
 console.log(`\n${passed} passed, 0 failed`);

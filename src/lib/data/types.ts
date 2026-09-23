@@ -135,6 +135,13 @@ export interface SubmitData {
    * deletion from a transcript the runtime rewrote. Absent for older CLIs.
    */
   corpus?: Record<string, { files: number; bytes: number }>;
+  /**
+   * Days rebuilt from ~/.claude/stats-cache.json rather than read from
+   * transcripts (#138). Stored as the machine's separate estimated slice and
+   * flagged `estimated`, so they count on the board but stay out of the
+   * monthly reports. Requires `machineId`.
+   */
+  estimated?: boolean;
   ccData: {
     totals: {
       inputTokens: number;

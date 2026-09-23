@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 // Dynamic import: Node's native .ts loader reparses as ESM at runtime, so a
 // static `import {…} from "….ts"` fails name resolution; dynamic import works.
-const { normalizeCcData, validateCcData, mergeMachineContribution, combineContributionMaps } = await import("../src/lib/ccusage.ts");
+const { normalizeCcData, validateCcData, mergeMachineContribution, combineContributionMaps, estimatedSliceKey, dayIsEstimated } = await import("../src/lib/ccusage.ts");
 
 let passed = 0;
 let failed = 0;
@@ -411,6 +411,62 @@ console.log("\n[10] Claim merge combines rows without losing any (#152)");
   // Unpriced models: tokens break the $0 tie.
   const unpriced = combineContributionMaps([{ machineA: contrib(0, 1_000) }, { machineA: contrib(0, 5_000) }]);
   ok("tokens break ties for unpriced models", unpriced.aggregate.totalTokens === 5_000, `got ${unpriced.aggregate.totalTokens}`);
+}
+
+console.log("\n[10b] Estimated slices sum with measured ones, and step aside for measured Claude (#138)");
+{
+  const contrib = (cost: number, models: string[], agents: string[]) => ({
+    inputTokens: cost * 100, outputTokens: cost * 10, cacheCreationTokens: 0, cacheReadTokens: 0,
+    totalTokens: cost * 110, totalCost: cost, modelsUsed: models, agents,
+  });
+  const codex = contrib(40, ["gpt-5.5"], ["codex"]);
+  const claude = contrib(25, ["claude-opus-4-8"], ["claude"]);
+  const est = estimatedSliceKey("machineA");
+
+  // The case the flag exists for: the machine measured Codex that day, and
+  // Claude's transcripts are gone. Under one machine key the high-water mark
+  // would keep only the larger of the two; as its own slice the estimate adds.
+  const e1 = mergeMachineContribution({ machineA: codex }, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("estimate adds to the machine's measured Codex ($40+$60=$100)", e1.aggregate.totalCost === 100, `got ${e1.aggregate.totalCost}`);
+  ok("the day counts as estimated", dayIsEstimated(e1.contributions));
+  ok("the measured slice is untouched", e1.contributions.machineA.totalCost === 40);
+
+  // Re-running the backfill is a high-water mark like any slice, never a sum.
+  const e2 = mergeMachineContribution(e1.contributions, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("re-submitting the same estimate does not double ($100)", e2.aggregate.totalCost === 100, `got ${e2.aggregate.totalCost}`);
+  // An estimate is recomputed, not re-read, so a lower re-estimate replaces
+  // the older one instead of losing to it under the high-water mark (#83).
+  const lower = mergeMachineContribution(e1.contributions, est, contrib(48, ["claude-opus-4-8"], ["claude"]));
+  ok("a lower re-estimate replaces the older one ($40+$48=$88)", lower.aggregate.totalCost === 88, `got ${lower.aggregate.totalCost}`);
+  ok("and is not reported as drift", !lower.retainedPrior);
+
+  // Once Claude is measured for the day, the estimate stops counting — in
+  // either arrival order.
+  const e3 = mergeMachineContribution(e1.contributions, "machineA", contrib(65, ["gpt-5.5", "claude-opus-4-8"], ["codex", "claude"]));
+  ok("measured Claude replaces the estimate ($65, not $125)", e3.aggregate.totalCost === 65, `got ${e3.aggregate.totalCost}`);
+  ok("and the day no longer counts as estimated", !dayIsEstimated(e3.contributions));
+  const e4 = mergeMachineContribution({ machineA: claude }, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("an estimate arriving after measured Claude adds nothing ($25)", e4.aggregate.totalCost === 25, `got ${e4.aggregate.totalCost}`);
+
+  // Legacy slices without agents still count as Claude by model name.
+  const e5 = mergeMachineContribution({ machineA: contrib(25, ["claude-opus-4-8"], []) }, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("measured Claude is recognised by model name too ($25)", e5.aggregate.totalCost === 25, `got ${e5.aggregate.totalCost}`);
+
+  // The machine id is the client's claim, so an estimate filed under another
+  // (or invented) id must not add to Claude measured under the real one.
+  const e6 = mergeMachineContribution({ machineB: claude }, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("measured Claude from any machine cancels the estimate ($25)", e6.aggregate.totalCost === 25, `got ${e6.aggregate.totalCost}`);
+  const e7 = mergeMachineContribution({ default: contrib(20, ["claude-opus-4-8"], ["claude"]) }, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("so does unattributed Claude ($20)", e7.aggregate.totalCost === 20, `got ${e7.aggregate.totalCost}`);
+
+  // An estimate is attributed: a Codex-only unattributed slice still only holds the day up.
+  const e8 = mergeMachineContribution({ default: contrib(150, ["gpt-5.5"], ["codex"]) }, est, contrib(60, ["claude-opus-4-8"], ["claude"]));
+  ok("a larger unattributed slice still holds the day ($150)", e8.aggregate.totalCost === 150, `got ${e8.aggregate.totalCost}`);
+
+  // The claim merge keeps the same rules.
+  const merged = combineContributionMaps([{ machineA: codex }, { [est]: contrib(60, ["claude-opus-4-8"], ["claude"]) }]);
+  ok("claim merge sums an estimate from another row ($100)", merged.aggregate.totalCost === 100, `got ${merged.aggregate.totalCost}`);
+  ok("measured-only days are not estimated", !dayIsEstimated({ machineA: codex }));
 }
 
 console.log("\n[11] Cost floor is priced per model (#150, #154)");
