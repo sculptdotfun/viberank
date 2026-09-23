@@ -18,7 +18,10 @@ totalTokens >= inputTokens + outputTokens + cacheCreationTokens + cacheReadToken
 
 ### Cost per token ratio
 
-`totalCost / totalTokens` must fall within a realistic band (`1e-7` … `0.1` USD/token). This is the primary anti-inflation guard now that the token-sum check is one-sided: inflating tokens pushes the ratio below the floor, inflating cost pushes it above the ceiling.
+This is the primary anti-inflation guard now that the token-sum check is one-sided: inflating tokens pushes the cost below what those tokens must cost, inflating cost pushes it above the ceiling.
+
+- **Floor, per model:** the report's cost must cover each model's tokens at that model's floor. `1e-9` USD/token for `deepseek`, `mimo`, `minimax` and `big-pickle` models, whose cache reads cost ~2% of fresh input, and agentic loops are ~99% cache reads ([#150](https://github.com/sculptdotfun/viberank/issues/150), [#154](https://github.com/sculptdotfun/viberank/pull/154)). `1e-7` for every other model. Tokens a day reports beyond its per-model split are charged at the cheapest floor present that day. The floor follows the model name, not the tool, so a cheap model can't cover for inflated tokens from another model in the same report. With only default-floor models this reduces exactly to `totalCost / totalTokens >= 1e-7`.
+- **Ceiling:** `totalCost / totalTokens <= 0.1`.
 
 ### No negative values
 

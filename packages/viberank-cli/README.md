@@ -103,7 +103,9 @@ curl -X POST https://www.viberank.app/api/submit \
 
 Submissions made with a token (`viberank login`) are **verified** and get a blue check immediately.
 
-Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set that, so those rows appear with a `cli` badge (unverified). Sign in to [viberank.app](https://www.viberank.app) with the same GitHub account and the site will offer to verify or merge them into your profile.
+Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set that, so those rows appear with a `cli` badge (unverified). Once a username is verified, unverified submissions to it are refused: run `npx viberank-cli login` and submit again.
+
+The username prompt pre-fills the handle this machine last submitted as, and asks before switching to a different one, so a stray answer can't start a second profile.
 
 ## Troubleshooting
 
@@ -112,13 +114,15 @@ Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set 
 - **"GitHub username not found"** — just type it at the prompt. The CLI no longer pre-fills `git config user.name`, because that is usually a display name and accepting it created profiles belonging to nobody (#141)
 - **"No usage data"** — make sure you've used a supported AI coding tool at least once on this machine
 - **Autosubmit isn't firing** — `npx viberank-cli status` prints the schedule state and the last few log lines from `~/.viberank/autosubmit.log`
+- **"@you is verified, so submissions to it need to be signed"** — your profile is verified and this run had no token. Run `npx viberank-cli login`, then submit again
+- **"Cost per token ratio is unrealistic"** — the report claims more tokens than its cost could buy at those models' prices. Regenerate with the latest `ccusage`; if it still fails with honest data from a cheap model, open an issue with the model names
 - **"Invalid token"** — it may have been revoked; mint a fresh one at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens) and run `login` again
 
 ## Data validation
 
 Submissions are validated server-side:
 - **Token math** — `totalTokens >= input + output + cache_creation + cache_read`. The total may exceed the components because reasoning/thinking tokens (Gemini, Codex, Claude extended thinking) are counted in the total but not broken out by `ccusage`
-- **Cost/token ratio** must fall in a realistic band (the anti-inflation guard)
+- **Cost floor, per model** — each model's tokens must be covered at that model's price floor (the anti-inflation guard; cheap-cache models like DeepSeek and MiMo have a lower floor)
 - No negative values; dates must be valid `YYYY-MM-DD` and not past end-of-tomorrow UTC
 - Implausibly high totals are rejected; unusually high daily usage may be flagged for review
 

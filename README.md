@@ -28,8 +28,8 @@ Live at **[viberank.app](https://www.viberank.app)**.
 - 🧮 **[`/calculator`](https://www.viberank.app/calculator)** — which subscription tier your actual usage justifies, based on your real `ccusage` numbers rather than a guess
 - ⚔️ **[Head-to-head comparisons](https://www.viberank.app/compare)** — `/compare/claude-vs-codex` and every other tool matchup, with live adoption numbers from the board
 - 🎖️ **README badges** — `https://www.viberank.app/api/badge/{username}` for rank, cost, or tokens
-- 🛡️ **Input validation** — one-sided token math (reasoning-token aware), cost/token ratio guard, date sanity, realistic-range ceilings
-- 🔄 **Merge flow** — re-submitting the same range overwrites prior daily entries; merging combines unverified CLI rows into your verified profile
+- 🛡️ **Input validation** — one-sided token math (reasoning-token aware), a per-model cost floor, date sanity, realistic-range ceilings
+- 🔄 **One row per developer** — every submission lands in your single profile row; history is never deleted, only added to or held at its high-water mark
 - ✍️ **Blog** — data-backed posts on AI coding costs at [viberank.app/blog](https://www.viberank.app/blog) ([RSS](https://www.viberank.app/feed.xml)); [`llms.txt`](https://www.viberank.app/llms.txt) for AI search engines
 
 ## Submitting your usage data
@@ -75,7 +75,7 @@ curl -X POST https://www.viberank.app/api/submit \
 2. Click **Submit Stats** → **Upload cc.json**
 3. Drop your `cc.json` file
 
-Web uploads come back with a verified badge automatically. CLI submissions show as unverified until you sign in and merge them via the prompt on the homepage.
+Web uploads come back with a verified badge automatically. CLI submissions are verified when the CLI has a token (`npx viberank-cli login`); without one they're an unverified claim to the username. Once a username is verified, unverified submissions to it are refused with a pointer to `login`, so nobody else can write to your profile.
 
 ### Option 4: MCP server
 
@@ -90,7 +90,7 @@ npx viberank-mcp
 Submissions are checked at the API level. Anything that fails these rules is rejected:
 
 - **Token math** — `total >= input + output + cache_creation + cache_read`. The total may legitimately *exceed* the four components because reasoning/thinking tokens (Gemini, Codex, Claude extended thinking) are counted in `totalTokens` but not broken out by `ccusage`. We only reject a total that is *less* than its known parts.
-- **Cost/token ratio** — must fall within a realistic band; this is the primary guard against inflated token counts now that the token-sum check is one-sided
+- **Cost floor, per model** — every model's tokens have to be paid for at that model's own floor (`1e-9`/token for DeepSeek, MiMo, MiniMax and big-pickle, whose cache reads cost ~2% of a miss; `1e-7` for everything else), plus a `0.1`/token ceiling. This is the primary guard against inflated token counts now that the token-sum check is one-sided
 - **No negative values** anywhere in totals or daily breakdowns
 - **Valid date format** — `YYYY-MM-DD`
 - **Not too far in the future** — dates after tomorrow-UTC are rejected (covers users at any global timezone offset)
@@ -102,18 +102,21 @@ See [VALIDATION.md](./VALIDATION.md) for the full ruleset.
 
 ## Merging multiple submissions
 
-If you submit via the CLI before signing in, the row lands on the leaderboard as **unverified** (`cli` pill). Once you sign in with the matching GitHub account, the homepage shows a banner offering to verify or merge. That hits an authenticated `/api/claim` endpoint which:
+Every submission from a user goes to the same row, so new duplicates don't form. Older profiles can still have more than one row; signing in with the matching GitHub account shows a banner offering to verify or merge them. That hits an authenticated `/api/claim` endpoint which:
 
 1. Finds all submissions under your GitHub username
-2. Picks a base submission (OAuth-verified row wins; else most recent)
-3. Merges daily breakdowns — overlapping dates take the OAuth version
-4. Recomputes totals, sets `verified: true`, deletes the duplicates
+2. Combines each day's per-machine slices across the rows: the same machine seen twice keeps its larger figure, different machines add up
+3. Writes the result onto one row, recomputes totals, sets `verified: true`, and removes the now-empty duplicates
+
+Nothing any row held is dropped: the merged total is always at least your largest row and at most the sum of your rows.
 
 ## Submitting from more than one machine
 
 Supported — a laptop and a desktop sum into one profile rather than overwriting each other ([#43](https://github.com/sculptdotfun/viberank/issues/43)).
 
 Each machine generates an anonymous random UUID on first run, stored at `~/.viberank/machine-id`. The server keeps usage as a **per-machine slice** and re-sums them, so re-submitting from one machine replaces only that machine's contribution and leaves the others intact. No hardware or identifying information is involved.
+
+Uploads with no machine ID (web uploads, cURL, very old CLIs) are kept as an unattributed slice next to the per-machine ones. Because it may be the same machine's data, it's never added on top: a day shows whichever is larger, the unattributed slice or the sum of the machine slices.
 
 Two consequences worth knowing:
 
@@ -172,7 +175,7 @@ Apply the schema:
 #   014_reload_schema_cache.sql # refresh PostgREST's cached schema
 ```
 
-> **Applying migrations to an existing instance:** apply the SQL **before** deploying the app code. Every migration is additive — new columns default to empty and new tables are created `IF NOT EXISTS` — so each is safe to run ahead of its deploy.
+> **Applying migrations to an existing instance:** apply the SQL **before** deploying the app code. Migrations are additive — new columns default to empty and new tables are created `IF NOT EXISTS` — so each is safe to run ahead of its deploy, **except `017_private_machine_ids.sql`**, which revokes a column from the anon role: deploy the app code that names its `daily_breakdowns` columns first, then run 017. A new `daily_breakdowns` column is not readable by the browser until it is added to 017's grant and to `DAILY_PUBLIC_COLUMNS`.
 >
 > Run `014_reload_schema_cache.sql` last, and again after any future migration that adds a column. PostgREST serves a cached copy of the schema, so a newly added column is invisible to the API until that cache is reloaded — writes to it fail with `PGRST204: Could not find the '<column>' column of '<table>' in the schema cache` even though the column exists.
 
@@ -226,7 +229,7 @@ Submit usage data. Authenticated submissions (with a NextAuth session cookie) ar
 |---|---|---|
 | `Authorization: Bearer vbr_…` | ✅ | API token; works headlessly, which is what `autosubmit` uses |
 | NextAuth session cookie | ✅ | Web upload |
-| `X-GitHub-User: <name>` | ❌ | Unauthenticated; anyone can set it, so the row shows a `cli` pill |
+| `X-GitHub-User: <name>` | ❌ | Unauthenticated; anyone can set it, so the row shows a `cli` pill. Refused with `403` once the username is verified |
 
 **Response**:
 
@@ -241,7 +244,7 @@ Submit usage data. Authenticated submissions (with a NextAuth session cookie) ar
 
 ### `POST /api/claim`
 
-Authenticated — merges unverified CLI submissions into the caller's verified profile. Username is taken from the session, not the request body. Returns 401 without a session.
+Authenticated — merges the caller's submission rows into one verified row without dropping any day's data (see [Merging multiple submissions](#merging-multiple-submissions)). Username is taken from the session, not the request body. Returns 401 without a session.
 
 ### `GET|POST /api/tokens`, `DELETE /api/tokens/{id}`
 
