@@ -152,7 +152,7 @@ Show me the top 20 users on Viberank
 1. **Usage Collection**: The MCP server runs `ccusage` to collect your Claude Code usage statistics
 2. **Data Processing**: Statistics are parsed and validated
 3. **Submission**: Data is sent to the Viberank API with your GitHub username
-4. **Verification**: CLI submissions are marked as unverified (use OAuth on the website for verified submissions)
+4. **Verification**: if you've run `npx viberank-cli login` (or set `VIBERANK_TOKEN`), the MCP server signs submissions with that token and they're verified. Otherwise they're an unverified claim to the username, which the server refuses once that username is verified
 
 ## Troubleshooting
 
@@ -173,7 +173,7 @@ Show me the top 20 users on Viberank
 - Your usage data is only sent to Viberank when you explicitly use the `submit_to_viberank` tool
 - No data is collected or transmitted without your action
 - GitHub usernames from git config are only read locally
-- All submissions via MCP are marked as "unverified" (use OAuth on the website for verified submissions)
+- The API token is read from `VIBERANK_TOKEN` or the CLI's `~/.viberank/config.json`, and the CLI's machine ID from `~/.viberank/machine-id`, so MCP and CLI submissions from one machine count once
 
 ## Development
 

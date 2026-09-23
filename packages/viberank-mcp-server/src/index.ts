@@ -12,6 +12,40 @@ import path from 'path';
 import os from 'os';
 import fetch from 'node-fetch';
 
+// The CLI's saved state (~/.viberank), reused so an MCP submission is signed
+// the same way a CLI one is. Without a token the server treats the username as
+// an unverified claim, and it refuses those for verified profiles.
+const VIBERANK_DIR = path.join(os.homedir(), '.viberank');
+
+function readSavedToken(): string | null {
+  const fromEnv = process.env.VIBERANK_TOKEN;
+  if (fromEnv?.startsWith('vbr_')) return fromEnv;
+  try {
+    const { token } = JSON.parse(fs.readFileSync(path.join(VIBERANK_DIR, 'config.json'), 'utf8'));
+    return typeof token === 'string' && token.startsWith('vbr_') ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+function readMachineId(): string | null {
+  try {
+    return fs.readFileSync(path.join(VIBERANK_DIR, 'machine-id'), 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function submitHeaders(username: string): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = readSavedToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  else headers['X-GitHub-User'] = username;
+  const machineId = readMachineId();
+  if (machineId) headers['X-Machine-Id'] = machineId;
+  return headers;
+}
+
 interface CCUsageData {
   daily: Array<{
     date: string;
@@ -297,10 +331,7 @@ class ViberankMCPServer {
       // Submit to Viberank API
       const response = await fetch('https://www.viberank.app/api/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-GitHub-User': username,
-        },
+        headers: submitHeaders(username),
         body: JSON.stringify(usageResponse.data),
       });
 
