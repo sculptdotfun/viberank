@@ -90,7 +90,7 @@ npx viberank-mcp
 Submissions are checked at the API level. Anything that fails these rules is rejected:
 
 - **Token math** — `total >= input + output + cache_creation + cache_read`. The total may legitimately *exceed* the four components because reasoning/thinking tokens (Gemini, Codex, Claude extended thinking) are counted in `totalTokens` but not broken out by `ccusage`. We only reject a total that is *less* than its known parts.
-- **Cost floor, per model** — every model's tokens have to be paid for at that model's own floor (`1e-9`/token for DeepSeek, MiMo, MiniMax and big-pickle, whose cache reads cost ~2% of a miss; `1e-7` for everything else), plus a `0.1`/token ceiling. This is the primary guard against inflated token counts now that the token-sum check is one-sided
+- **Cost floor, per model** — every model's tokens have to be paid for at that model's own floor (`1e-9`/token for DeepSeek, MiMo, MiniMax and big-pickle, whose cache reads cost ~2% of a miss, and for Muse Spark; `1e-7` for everything else), plus a `0.1`/token ceiling. This is the primary guard against inflated token counts now that the token-sum check is one-sided
 - **No negative values** anywhere in totals or daily breakdowns
 - **Valid date format** — `YYYY-MM-DD`
 - **Not too far in the future** — dates after tomorrow-UTC are rejected (covers users at any global timezone offset)
