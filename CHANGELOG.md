@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — Muse Spark clears the cost floor (September 2026)
+
+### Fixed
+- **Muse Spark models get the cheap-model floor.** pi running Meta's Muse Spark over OpenCode Go is priced by ccusage at ~4.6e-9 per token, so a real multi-agent report where pi is 91% of the tokens landed at 3.6e-8 and was rejected as "Cost per token ratio is unrealistic". `muse-spark` now joins `deepseek`, `mimo`, `minimax` and `big-pickle` at `1e-9`; every other model keeps `1e-7`, and the floor still follows the model name, not the tool.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
