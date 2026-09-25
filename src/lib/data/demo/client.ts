@@ -18,6 +18,14 @@ import type {
   Submission,
   SubmitData,
 } from "../types";
+import {
+  EMPTY_REAL_SPEND,
+  aggregateRealSpendStats,
+  last30Start,
+  summarizeRealSpend,
+  type RealSpendDayRow,
+  type RealSpendTotalRow,
+} from "@/lib/real-spend";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const START = Date.UTC(2026, 4, 6);
@@ -325,6 +333,53 @@ function profileFromSubmission(submission: Submission): ProfileWithSubmissions {
   };
 }
 
+/**
+ * One developer's OpenRouter ledger, so the profile block renders in demo
+ * mode. Dated relative to today because the block is about the last 30 days.
+ * A single reporter also exercises /stats's threshold: its section stays
+ * hidden, as it would on a real site with fewer than five.
+ */
+const DEMO_REAL_SPEND_USER = "b-etterdigital";
+
+function demoRealSpendDays(): RealSpendDayRow[] {
+  const models = [
+    { model: "anthropic/claude-sonnet-4.5", share: 0.55 },
+    { model: "openai/gpt-5", share: 0.3 },
+    { model: "deepseek/deepseek-v3.2", share: 0.15 },
+  ];
+  const today = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+  const rows: RealSpendDayRow[] = [];
+  for (let back = 30; back >= 1; back--) {
+    if (back % 7 === 3) continue; // a few idle days, like a real ledger
+    const cost = Math.round((4 + ((back * 37) % 23)) * 100) / 100;
+    const requests = 40 + ((back * 13) % 90);
+    rows.push({
+      date: new Date(today - back * DAY_MS).toISOString().slice(0, 10),
+      cost_usd: cost,
+      byok_cost_usd: back % 5 === 0 ? 1.25 : 0,
+      requests,
+      prompt_tokens: requests * 9_000,
+      completion_tokens: requests * 700,
+      models: models.map((m) => ({
+        model: m.model,
+        usage: Math.round(cost * m.share * 100) / 100,
+        byok: 0,
+        requests: Math.round(requests * m.share),
+        promptTokens: Math.round(requests * m.share * 9_000),
+        completionTokens: Math.round(requests * m.share * 700),
+      })),
+    });
+  }
+  return rows;
+}
+
+const DEMO_REAL_SPEND_TOTAL: RealSpendTotalRow = {
+  scope: "account",
+  lifetime_usd: 1843.57,
+  lifetime_byok_usd: null,
+  observed_at: new Date().toISOString(),
+};
+
 export function createDemoDataLayer(): DataLayer {
   return {
     // The demo backend is read-only and has no accounts, so it mints nothing
@@ -341,6 +396,22 @@ export function createDemoDataLayer(): DataLayer {
       },
       async resolve() {
         return null;
+      },
+    },
+    spend: {
+      async upsertRealSpend(): Promise<never> {
+        throw new Error("Demo data is read-only");
+      },
+      async getRealSpend(username: string) {
+        if (username.toLowerCase() !== DEMO_REAL_SPEND_USER) return EMPTY_REAL_SPEND;
+        return summarizeRealSpend(demoRealSpendDays(), DEMO_REAL_SPEND_TOTAL);
+      },
+      async getRealSpendStats() {
+        const from = last30Start();
+        return aggregateRealSpendStats(
+          [DEMO_REAL_SPEND_TOTAL],
+          demoRealSpendDays().filter((d) => d.date >= from)
+        );
       },
     },
     submissions: {

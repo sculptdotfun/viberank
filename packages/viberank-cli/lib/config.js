@@ -4,7 +4,8 @@ import os from 'os';
 import path from 'path';
 
 /**
- * On-disk state for the CLI: the API token and the machine id.
+ * On-disk state for the CLI: the API token, the machine id and the optional
+ * OpenRouter key.
  *
  * Kept in one place so `login`, `submit` and `autosubmit` agree on where the
  * token lives, and so the file permissions are set in exactly one spot.
@@ -34,8 +35,10 @@ export function readConfig() {
 export function writeConfig(patch) {
   const next = { ...readConfig(), ...patch };
   fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  // 0600: the token is a password equivalent, so it must not be group- or
-  // world-readable on a shared machine.
+  // 0600: the token (and the OpenRouter key, which can spend money) are
+  // password equivalents, so they must not be group- or world-readable on a
+  // shared machine. chmod as well as `mode`, because `mode` only applies when
+  // the file is created.
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), { mode: 0o600 });
   try {
     fs.chmodSync(CONFIG_FILE, 0o600);
@@ -63,6 +66,32 @@ export function clearToken() {
   delete config.username;
   fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+}
+
+/**
+ * The saved OpenRouter key, or null.
+ *
+ * Config only, never the environment: OPENROUTER_API_KEY is commonly set for
+ * other tools, and reading it here would start publishing someone's spend
+ * from a scheduled run they never opted into. `viberank-cli openrouter` reads
+ * the environment once, with the user present, and saves what they confirm.
+ */
+export function getOpenRouterKey() {
+  const { openrouterKey } = readConfig();
+  return typeof openrouterKey === 'string' && openrouterKey ? openrouterKey : null;
+}
+
+export function clearOpenRouterKey() {
+  const config = readConfig();
+  delete config.openrouterKey;
+  delete config.openrouterLastSync;
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try {
+    fs.chmodSync(CONFIG_FILE, 0o600);
+  } catch {
+    // See writeConfig.
+  }
 }
 
 /**

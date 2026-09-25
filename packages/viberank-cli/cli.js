@@ -10,7 +10,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import prompts from 'prompts';
 import fetch from 'node-fetch';
-import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
+import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR, getOpenRouterKey, clearOpenRouterKey } from './lib/config.js';
+import { looksLikeOpenRouterKey, readOpenRouterSpend, postSpend, describePayload } from './lib/openrouter.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus } from './lib/corpus.js';
 import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
@@ -78,6 +79,8 @@ ${chalk.yellow.bold('viberank')} — submit your AI coding usage
   ${chalk.bold('npx viberank-cli autosubmit')}      submit once a day in the background
   ${chalk.bold('npx viberank-cli autosubmit off')}  stop submitting automatically
   ${chalk.bold('npx viberank-cli status')}          show token and schedule state
+  ${chalk.bold('npx viberank-cli openrouter')}      publish what you actually pay on OpenRouter
+  ${chalk.bold('npx viberank-cli openrouter off')}  stop publishing it and forget the key
 
 Most people run ${chalk.bold('login')} once, then ${chalk.bold('autosubmit')} once, and never think
 about it again — your rank stays current instead of freezing on the day you
@@ -163,6 +166,8 @@ function showStatus() {
   console.log(`  token       ${token ? chalk.green('saved') : chalk.gray('none — run `viberank login`')}`);
   console.log(`  autosubmit  ${s.enabled ? chalk.green(`on (${s.scheduler})`) : chalk.gray('off')}`);
   console.log(`  machine id  ${getMachineId()}`);
+  const orSync = readConfig().openrouterLastSync;
+  console.log(`  openrouter  ${getOpenRouterKey() ? chalk.green(`key saved${orSync ? `, last synced ${orSync}` : ''}`) : chalk.gray('off')}`);
 
   if (s.log.length) {
     console.log(chalk.gray('\n  recent runs:'));
@@ -266,6 +271,7 @@ async function quietSubmit() {
         writeConfig({ lastAutosubmit: new Date().toISOString() });
         console.log(`${stamp()} submitted ${ccData.daily?.length ?? '?'} days — ${result.profileUrl ?? ''}`);
         try { fs.unlinkSync(ccJsonPath); } catch { /* fine */ }
+        await syncOpenRouterQuietly((line) => console.log(`${stamp()} ${line}`));
         return;
       }
       lastError = new Error(result.error || `server returned ${response.status}`);
@@ -560,6 +566,7 @@ async function main() {
         if (result.notice) {
           console.log(chalk.gray(result.notice) + '\n');
         }
+        await syncOpenRouterQuietly((line) => console.log(chalk.gray(`  ${line}\n`)));
         break; // Success, exit the retry loop
       } else {
         submitSpinner.fail('Failed to submit to Viberank');
@@ -681,6 +688,123 @@ async function offerAutosubmit(ccData) {
   }
 }
 
+/**
+ * Sync OpenRouter spend if a key is saved. Never throws: this rides along with
+ * a usage submission and a failure here must not turn a good submission into
+ * a failed run, so it logs one line and moves on.
+ */
+async function syncOpenRouterQuietly(log) {
+  const key = getOpenRouterKey();
+  const token = getToken();
+  if (!key || !token) return;
+  try {
+    const { payload } = await readOpenRouterSpend(key, fetch);
+    await postSpend(payload, { site: SITE, token, cliVersion: CLI_VERSION, fetchImpl: fetch });
+    writeConfig({ openrouterLastSync: new Date().toISOString() });
+    log(`openrouter: synced ${describePayload(payload)}`);
+  } catch (error) {
+    log(`openrouter: sync failed (${error.message}); usage submission unaffected`);
+  }
+}
+
+/**
+ * `viberank-cli openrouter [off]`: opt in to publishing real OpenRouter spend.
+ *
+ * Real money, kept apart from the leaderboard: tools that route through
+ * OpenRouter are already counted by ccusage from their local logs, so the
+ * server shows this beside the board and never adds it to it.
+ */
+async function openrouterCommand(arg) {
+  if (arg === 'off' || arg === 'disable') {
+    clearOpenRouterKey();
+    console.log(chalk.green('\n✓ OpenRouter key removed. Spend already published stays on your profile.\n'));
+    return;
+  }
+
+  console.log(chalk.yellow.bold('\nPublish your real OpenRouter spend\n'));
+  console.log('  Your profile shows what you actually paid OpenRouter, next to (never added to)');
+  console.log('  the leaderboard total, which is already counted from your local logs.\n');
+  console.log(`  ${chalk.bold('Recommended: a management key')} (openrouter.ai/settings/management-keys).`);
+  console.log('  It can read your all-time account spend and 30 days of per-model detail.');
+  console.log('  A normal API key only shows that one key\'s spend, labelled "this API key only".\n');
+  console.log(chalk.gray('  The key never leaves this machine: the CLI asks OpenRouter directly and sends'));
+  console.log(chalk.gray('  viberank only daily totals and the all-time total.\n'));
+
+  // A signed endpoint: spend is published under the token's owner, so there
+  // is no way to post it for someone else.
+  if (!getToken()) {
+    console.log(chalk.yellow('Publishing spend needs a viberank API token first.'));
+    if (QUIET || !(await acquireToken())) {
+      console.log(`Run ${chalk.bold('npx viberank-cli login')}, then try again.\n`);
+      process.exit(1);
+    }
+  }
+
+  // The environment is read here, with the user present, and only saved once
+  // they confirm. The scheduled run reads the saved key alone (see config.js).
+  const fromEnv = [process.env.OPENROUTER_MANAGEMENT_KEY, process.env.OPENROUTER_API_KEY]
+    .find((v) => looksLikeOpenRouterKey(v));
+  let key = null;
+  if (fromEnv) {
+    const name = fromEnv === process.env.OPENROUTER_MANAGEMENT_KEY ? 'OPENROUTER_MANAGEMENT_KEY' : 'OPENROUTER_API_KEY';
+    const { useEnv } = QUIET
+      ? { useEnv: true }
+      : await prompts({ type: 'confirm', name: 'useEnv', message: `Use the key in ${name}?`, initial: true });
+    if (useEnv) key = fromEnv.trim();
+  }
+  if (!key) {
+    if (QUIET) {
+      console.error('No OpenRouter key: set OPENROUTER_MANAGEMENT_KEY or run this in a terminal.');
+      process.exit(1);
+    }
+    const answer = await prompts({
+      type: 'password',
+      name: 'key',
+      message: 'OpenRouter key:',
+      validate: (v) => looksLikeOpenRouterKey(v) || 'That does not look like an OpenRouter key (sk-or-…)',
+    });
+    if (!answer.key) {
+      console.log(chalk.gray('\nNo key entered.'));
+      return;
+    }
+    key = answer.key.trim();
+  }
+
+  // Read before saving, so a typo fails here rather than in tomorrow's
+  // scheduled run.
+  const spinner = ora('Reading spend from OpenRouter…').start();
+  let payload;
+  try {
+    ({ payload } = await readOpenRouterSpend(key, fetch));
+  } catch (error) {
+    spinner.fail(error.message);
+    process.exit(1);
+  }
+  spinner.succeed(`OpenRouter: ${describePayload(payload)}`);
+
+  writeConfig({ openrouterKey: key });
+  console.log(chalk.gray(`  Key saved to ${CONFIG_DIR}/config.json (owner-only).`));
+
+  const posting = ora('Publishing to viberank…').start();
+  try {
+    const result = await postSpend(payload, { site: SITE, token: getToken(), cliVersion: CLI_VERSION, fetchImpl: fetch });
+    writeConfig({ openrouterLastSync: new Date().toISOString() });
+    posting.succeed('Published');
+    if (result.profileUrl) console.log(`\n  Profile: ${chalk.green(result.profileUrl)}`);
+  } catch (error) {
+    posting.fail(`Could not publish: ${error.message}`);
+    process.exit(1);
+  }
+
+  console.log(
+    chalk.gray(
+      autosubmit.status().enabled
+        ? '\n  Autosubmit keeps it current once a day.\n'
+        : `\n  Run ${chalk.bold('npx viberank-cli autosubmit')} to keep it current, or re-run this any time.\n`
+    )
+  );
+}
+
 const [command, arg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 
 const run = async () => {
@@ -696,6 +820,8 @@ const run = async () => {
       return showStatus();
     case 'autosubmit':
       return autosubmitCommand(arg);
+    case 'openrouter':
+      return openrouterCommand(arg);
     case 'help':
     case '--help':
     case '-h':

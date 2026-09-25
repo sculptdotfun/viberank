@@ -450,8 +450,31 @@ export interface LeaguesService {
   listForUser(username: string): Promise<League[]>;
 }
 
+/**
+ * Real money paid to a provider (OpenRouter), published by the CLI. A separate
+ * ledger from the leaderboard: see src/lib/real-spend.ts for why it is never
+ * added to submission totals.
+ */
+export interface SpendService {
+  /**
+   * Store a validated sync for `username`: days are upserted per date
+   * (replacing what that date held), days outside the payload are kept, and
+   * the all-time snapshot is replaced. Rate limited per user.
+   */
+  upsertRealSpend(
+    username: string,
+    source: import("@/lib/real-spend").RealSpendSource,
+    payload: import("@/lib/real-spend").RealSpendPayload
+  ): Promise<{ days: number }>;
+  /** A developer's real spend; empty (lifetime null, no days) when none is on file. */
+  getRealSpend(username: string): Promise<import("@/lib/real-spend").RealSpend>;
+  /** Site aggregate for /stats; null when unavailable (e.g. the migration isn't applied). */
+  getRealSpendStats(): Promise<import("@/lib/real-spend").RealSpendStats | null>;
+}
+
 export interface DataLayer {
   tokens: TokensService;
+  spend: SpendService;
   submissions: SubmissionsService;
   profiles: ProfilesService;
   stats: StatsService;

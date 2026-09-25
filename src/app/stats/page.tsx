@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame } from "lucide-react";
+import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame, Wallet } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, prettyModelName } from "@/lib/utils";
 import { seriesColor } from "@/lib/chartColors";
 import { TIERS } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
+import { MIN_STATS_DEVELOPERS } from "@/lib/real-spend";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 
@@ -109,10 +110,18 @@ const datasetLd = {
 
 export default async function StatsPage() {
   const dataLayer = await getServerDataLayer();
-  const [site, global] = await Promise.all([
+  const [site, global, realSpend] = await Promise.all([
     dataLayer.stats.getSiteStats().catch(() => null),
     dataLayer.stats.getGlobalStats().catch(() => null),
+    dataLayer.spend.getRealSpendStats().catch(() => null),
   ]);
+  // Below the threshold an aggregate is a handful of named people's bills.
+  const showRealSpend = realSpend !== null && realSpend.developers >= MIN_STATS_DEVELOPERS;
+  const realSpendModels = new Map<string, number>();
+  for (const { model, usd } of realSpend?.topModels ?? []) {
+    const name = prettyModelName(model);
+    realSpendModels.set(name, (realSpendModels.get(name) ?? 0) + usd);
+  }
 
   const totalUsers = site?.totalUsers ?? global?.totalUsers ?? 0;
   const totalSubmissions = site?.totalSubmissions ?? global?.totalSubmissions ?? 0;
@@ -373,6 +382,51 @@ export default async function StatsPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Real spend: a separate ledger of money actually paid, never added to
+            the API-equivalent totals above (see src/lib/real-spend.ts). */}
+        {showRealSpend && realSpend && (
+          <div className="bg-surface-1 border border-border rounded-lg p-5 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-medium flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-accent" />
+                Real spend (OpenRouter)
+              </h2>
+              <span className="micro-label">money actually paid</span>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-3 lg:col-span-2 content-start">
+                <StatTile icon={<Users className="w-3.5 h-3.5" />} label="Reporting" value={formatNumber(realSpend.developers)} sub="developers" />
+                <StatTile icon={<DollarSign className="w-3.5 h-3.5" />} label="All-time" value={`$${formatNumber(realSpend.lifetimeUsd)}`} sub="sum of reported totals" />
+                <StatTile icon={<CalendarDays className="w-3.5 h-3.5" />} label="Last 30 days" value={`$${formatNumber(realSpend.last30Usd)}`} sub="all reporters" />
+                <StatTile icon={<BarChart3 className="w-3.5 h-3.5" />} label="Median all-time" value={`$${formatCurrency(realSpend.medianLifetimeUsd)}`} sub="per developer" />
+              </div>
+              {realSpendModels.size > 0 && (
+                <div>
+                  <p className="micro-label mb-3">Top models · 30 days</p>
+                  <BarList
+                    rows={Array.from(realSpendModels.entries())
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([label, value]) => ({ label, value }))}
+                    format={(v) => `$${formatNumber(v)}`}
+                  />
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-muted/70 mt-3">
+              Published with <code className="font-mono">npx viberank-cli openrouter</code> from OpenRouter&apos;s billing API.
+              Not part of the totals above, which already count OpenRouter-routed tools from local logs. All-time
+              figures from a normal API key cover that key only. Shown once at least {MIN_STATS_DEVELOPERS} developers report.
+            </p>
+          </div>
+        )}
+
+        {!showRealSpend && realSpend !== null && (
+          <p className="text-xs text-muted/70 mt-6">
+            Real OpenRouter spend (money actually paid, kept apart from the totals above) appears here once at least{" "}
+            {MIN_STATS_DEVELOPERS} developers publish it with <code className="font-mono text-accent">npx viberank-cli openrouter</code>.
+          </p>
         )}
 
         <p className="text-xs text-muted/70 mt-6">

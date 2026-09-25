@@ -36,7 +36,22 @@ import type {
   TokensService,
   ApiTokenSummary,
   TokenOwner,
+  SpendService,
 } from "../types";
+import {
+  EMPTY_REAL_SPEND,
+  aggregateRealSpendStats,
+  last30Start,
+  summarizeRealSpend,
+  toDayRows,
+  toTotalRow,
+  type RealSpend,
+  type RealSpendDayRow,
+  type RealSpendPayload,
+  type RealSpendSource,
+  type RealSpendStats,
+  type RealSpendTotalRow,
+} from "@/lib/real-spend";
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
@@ -2076,6 +2091,131 @@ export class SupabaseTokensService implements TokensService {
   }
 }
 
+// ============================================================================
+// SUPABASE SPEND SERVICE (real money paid, migration 019)
+// ============================================================================
+
+const REAL_SPEND_DAY_COLUMNS =
+  "date, cost_usd, byok_cost_usd, requests, prompt_tokens, completion_tokens, models";
+const REAL_SPEND_TOTAL_COLUMNS = "scope, lifetime_usd, lifetime_byok_usd, observed_at";
+
+/**
+ * Real spend lives in its own tables and never touches `submissions` or
+ * `daily_breakdowns`: OpenRouter traffic from tools like OpenCode is already
+ * in the ccusage logs the board ranks, so adding it there would double count.
+ */
+export class SupabaseSpendService implements SpendService {
+  constructor(
+    private client: SupabaseClient,
+    private rateLimiter: RateLimitChecker = new SupabaseRateLimiter(client)
+  ) {}
+
+  async upsertRealSpend(
+    username: string,
+    source: RealSpendSource,
+    payload: RealSpendPayload
+  ): Promise<{ days: number }> {
+    // The caller validated the payload, so nothing is left that could reject
+    // it after the slot is spent (the #150 lesson from submit).
+    const limit = await this.rateLimiter.checkLimit("spendSync", username.toLowerCase());
+    if (!limit.allowed) {
+      const waitSeconds = Math.ceil(((limit.retryAfter || Date.now() + 3600000) - Date.now()) / 1000);
+      throw new Error(`Rate limit exceeded. Please wait ${waitSeconds} seconds before syncing again.`);
+    }
+
+    const now = new Date();
+    const dayRows = toDayRows(username, source, payload, now);
+
+    // Replace, not merge: each row carries OpenRouter's own figure for that
+    // day, which is authoritative. Dates the payload doesn't carry — older
+    // than OpenRouter's 30-day window — are left as they were.
+    if (dayRows.length > 0) {
+      const { error } = await this.client
+        .from("real_spend_days")
+        .upsert(dayRows, { onConflict: "username,source,date" });
+      if (error) throw new Error(`Failed to update real spend days: ${error.message}`);
+    }
+
+    // Days first, snapshot second: a failure between them leaves the old
+    // all-time figure beside new days, never a new figure with nothing under it.
+    const { error: totalError } = await this.client
+      .from("real_spend_totals")
+      .upsert(toTotalRow(username, source, payload, now), { onConflict: "username,source" });
+    if (totalError) throw new Error(`Failed to update real spend total: ${totalError.message}`);
+
+    return { days: dayRows.length };
+  }
+
+  async getRealSpend(username: string): Promise<RealSpend> {
+    const user = username.toLowerCase();
+
+    // The snapshot first: it is one row, and its error code tells a missing
+    // table (deploy ahead of migration 019) from a real failure.
+    const { data: totals, error } = await this.client
+      .from("real_spend_totals")
+      .select(REAL_SPEND_TOTAL_COLUMNS)
+      .eq("username", user)
+      .eq("source", "openrouter")
+      .limit(1);
+    if (error) {
+      if (MISSING_TABLE_CODES.has(error.code)) return EMPTY_REAL_SPEND;
+      throw new Error(`Failed to query real spend: ${error.message}`);
+    }
+
+    const days = await fetchAllPages<RealSpendDayRow>(
+      (from, to) =>
+        this.client
+          .from("real_spend_days")
+          .select(REAL_SPEND_DAY_COLUMNS)
+          .eq("username", user)
+          .eq("source", "openrouter")
+          .order("date", { ascending: true })
+          .range(from, to),
+      "real spend days"
+    );
+
+    return summarizeRealSpend(days, ((totals ?? [])[0] as RealSpendTotalRow | undefined) ?? null);
+  }
+
+  async getRealSpendStats(): Promise<RealSpendStats | null> {
+    const { count, error } = await this.client
+      .from("real_spend_totals")
+      .select("username", { count: "exact", head: true })
+      .eq("source", "openrouter");
+    if (error) {
+      if (MISSING_TABLE_CODES.has(error.code)) return null;
+      throw new Error(`Failed to query real spend stats: ${error.message}`);
+    }
+    if (!count) return aggregateRealSpendStats([], []);
+
+    const [totals, recent] = await Promise.all([
+      fetchAllPages<RealSpendTotalRow>(
+        (from, to) =>
+          this.client
+            .from("real_spend_totals")
+            .select(`username, ${REAL_SPEND_TOTAL_COLUMNS}`)
+            .eq("source", "openrouter")
+            .order("username", { ascending: true })
+            .range(from, to),
+        "real spend totals"
+      ),
+      fetchAllPages<RealSpendDayRow>(
+        (from, to) =>
+          this.client
+            .from("real_spend_days")
+            .select(`username, ${REAL_SPEND_DAY_COLUMNS}`)
+            .eq("source", "openrouter")
+            .gte("date", last30Start())
+            .order("username", { ascending: true })
+            .order("date", { ascending: true })
+            .range(from, to),
+        "real spend days"
+      ),
+    ]);
+
+    return aggregateRealSpendStats(totals, recent);
+  }
+}
 
 class SupabaseLeaguesService implements LeaguesService {
   constructor(private client: SupabaseClient) {}
@@ -2263,6 +2403,7 @@ function randomToken(bytes: number): string {
 
 class SupabaseDataLayer implements DataLayer {
   tokens: TokensService;
+  spend: SpendService;
   submissions: SubmissionsService;
   profiles: ProfilesService;
   stats: StatsService;
@@ -2270,6 +2411,7 @@ class SupabaseDataLayer implements DataLayer {
 
   constructor(client: SupabaseClient) {
     this.tokens = new SupabaseTokensService(client);
+    this.spend = new SupabaseSpendService(client);
     this.submissions = new SupabaseSubmissionsService(client);
     this.profiles = new SupabaseProfilesService(client);
     this.stats = new SupabaseStatsService(client);

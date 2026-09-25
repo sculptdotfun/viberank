@@ -1,5 +1,16 @@
 # Changelog
 
+## Site + CLI — real OpenRouter spend (September 2026)
+
+### Added
+- **`npx viberank-cli openrouter` publishes what you actually paid OpenRouter.** With a management key it reads the account's all-time spend (`/credits`) and 30 days of per-day, per-model detail (`/activity`). A normal API key falls back to that key's own usage (`/key`), labelled "this API key only". The key stays on the machine: only daily totals and the all-time total are sent, signed with the CLI's API token. Autosubmit refreshes it daily, best effort. `openrouter off` forgets the key.
+- **Profiles show a "Real spend · OpenRouter" block** after the stat tiles: all-time spend, the last 30 days, requests, a per-model split, and BYOK spend billed by your own provider keys, shown separately.
+- **/stats has a "Real spend (OpenRouter)" section**: developers reporting, all-time and 30-day sums, the median all-time spend, and top models by 30-day spend. It stays hidden until at least 5 developers report.
+- Migration 019 adds `real_spend_days` and `real_spend_totals` (public read, service-role writes). `POST /api/spend/openrouter` takes a bearer API token only (no session, no `X-GitHub-User`), validates strictly and is rate limited to 12 syncs an hour.
+
+### Not counted twice
+- Real spend is a separate ledger. It is never added to submission totals, ranks or `daily_breakdowns`: tools that route through OpenRouter (OpenClaw, OpenCode, Hermes, …) are already on the board from their local ccusage logs.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed

@@ -15,12 +15,14 @@ import {
   Flame,
   Award,
   BarChart3,
+  Wallet,
 } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelName } from "@/lib/utils";
 import { seriesColor } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
 import { getServerDataLayer } from "@/lib/data";
+import { last30Start, type RealSpend } from "@/lib/real-spend";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
 import BadgeSnippet from "./BadgeSnippet";
@@ -167,6 +169,34 @@ export default async function ProfilePage({ params }: ProfileParams) {
   } catch {
     // rank is nice-to-have; render without it on failure
   }
+
+  // Real OpenRouter spend (migration 019): money actually paid, shown beside
+  // the board figures and never added to them — OpenRouter traffic from tools
+  // like OpenCode is already in the ccusage logs those figures come from.
+  let realSpend: RealSpend | null = null;
+  try {
+    const dataLayer = await getServerDataLayer();
+    const spend = await dataLayer.spend.getRealSpend(profileData.username);
+    if (spend.lifetime || spend.days.length > 0) realSpend = spend;
+  } catch {
+    // Optional block; the profile renders without it.
+  }
+  const spendFrom = last30Start();
+  const recentSpendDays = realSpend ? realSpend.days.filter((d) => d.date >= spendFrom) : [];
+  const spendRequests = recentSpendDays.reduce((s, d) => s + d.requests, 0);
+  const spendByok30 = recentSpendDays.reduce((s, d) => s + d.byokCostUsd, 0);
+  const spendModelTotals = new Map<string, number>();
+  for (const d of recentSpendDays) {
+    for (const m of d.models) {
+      const name = prettyModelName(m.model);
+      spendModelTotals.set(name, (spendModelTotals.get(name) ?? 0) + (Number(m.usage) || 0));
+    }
+  }
+  const spendModels = Array.from(spendModelTotals.entries())
+    .filter(([, usd]) => usd > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const spendByokLifetime = realSpend?.lifetime?.byokUsd ?? 0;
+  const spendScopeLabel = realSpend?.lifetime?.scope === "key" ? "this API key only" : "account";
 
   const tokenRows = [
     { label: "Input", value: tokenAgg.input, color: "bg-accent" },
@@ -317,6 +347,75 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <p className="text-xs text-muted mt-1">consecutive days</p>
             </div>
           </div>
+
+          {/* Real spend: money actually paid to OpenRouter. A separate ledger,
+              never added to the board total above (see src/lib/real-spend.ts). */}
+          {realSpend && (
+            <div className="bg-surface-1 border border-border rounded-lg p-4 mt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <span className="flex items-center gap-1.5 micro-label"><Wallet className="w-3.5 h-3.5" />Real spend · OpenRouter</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted/70">money actually paid</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="micro-label mb-1">All-time OpenRouter spend</p>
+                  <p className="text-xl font-bold font-mono">
+                    {realSpend.lifetime ? `$${formatCurrency(realSpend.lifetime.usd)}` : "—"}
+                  </p>
+                  <p className="text-xs text-muted mt-1">
+                    {spendScopeLabel}
+                    {realSpend.lifetime?.observedAt && (
+                      <> · as of {new Date(realSpend.lifetime.observedAt).toLocaleDateString("en", { month: "short", day: "numeric" })}</>
+                    )}
+                  </p>
+                  {spendByokLifetime > 0 && (
+                    <p className="text-xs text-muted mt-1">
+                      +${formatCurrency(spendByokLifetime)} billed by your own provider keys
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="micro-label mb-1">Last 30 days</p>
+                  <p className="text-xl font-bold font-mono">${formatCurrency(realSpend.last30Usd)}</p>
+                  <p className="text-xs text-muted mt-1">
+                    {spendRequests > 0 ? `${formatNumber(spendRequests)} requests` : `${recentSpendDays.length} day${recentSpendDays.length === 1 ? "" : "s"} reported`}
+                  </p>
+                  {spendByok30 > 0 && (
+                    <p className="text-xs text-muted mt-1">
+                      +${formatCurrency(spendByok30)} billed by your own provider keys
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="micro-label mb-1.5">By model · 30 days</p>
+                  {spendModels.length > 0 ? (
+                    <div className="space-y-1">
+                      {spendModels.slice(0, 4).map(([name, usd], i) => (
+                        <div key={name} className="flex justify-between items-center gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-mono truncate">
+                            <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+                            {name}
+                          </span>
+                          <span className="font-mono text-xs text-muted flex-shrink-0">${formatCurrency(usd)}</span>
+                        </div>
+                      ))}
+                      {spendModels.length > 4 && (
+                        <p className="text-[11px] text-muted/70">+{spendModels.length - 4} more models</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted">
+                      {realSpend.lifetime?.scope === "key" ? "Per-model detail needs a management key." : "No model detail yet."}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted/70 mt-3">
+                Paid to OpenRouter, read from its billing API by <code className="font-mono">npx viberank-cli openrouter</code>.
+                Not added to the leaderboard total: tools that route through OpenRouter are already counted there from local logs.
+              </p>
+            </div>
+          )}
 
           {/* Tier progress */}
           <div className="bg-surface-1 border border-border rounded-lg p-4 mt-3">
