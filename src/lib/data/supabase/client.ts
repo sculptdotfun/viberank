@@ -46,6 +46,7 @@ import {
   inferToolFromModel,
   mergeMachineContribution,
   combineContributionMaps,
+  aggregateContributions,
   DEFAULT_MACHINE_ID,
   type DailyAggregate,
   type MachineContribution,
@@ -335,6 +336,131 @@ async function fetchAllByIds<T>(
     all.push(...rows);
   }
   return all;
+}
+
+// ============================================================================
+// RECOMPUTE: days with an unattributed slice beside id'd ones
+// ============================================================================
+
+export interface RecomputedSubmission {
+  submissionId: string;
+  username: string;
+  days: number;
+  costBefore: number;
+  costAfter: number;
+  /** Written in this call; false for a dry run or past `limit`. */
+  applied: boolean;
+}
+
+/**
+ * Re-derive stored days that hold an unattributed slice next to id'd ones.
+ * Aggregates are written when a day is submitted, so a change to how
+ * `aggregateContributions` combines slices only reaches the days a user
+ * happens to re-submit. This brings the rest in line. Dry run unless `apply`.
+ *
+ * Only such mixed days can change: a default-only day (including every
+ * legacy row with no per-machine map) aggregates to itself either way.
+ * Idempotent, so `limit` lets a caller with a time budget apply the largest
+ * changes first and call again until nothing is left.
+ */
+export async function recomputeUnattributedDays(
+  client: SupabaseClient,
+  { apply, limit = Infinity }: { apply: boolean; limit?: number }
+): Promise<RecomputedSubmission[]> {
+  const rows = await fetchAllPages<DbDailyBreakdown>(
+    (from, to) =>
+      client
+        .from("daily_breakdowns")
+        .select("*")
+        .not(`machine_contributions->${DEFAULT_MACHINE_ID}`, "is", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    "daily breakdowns with an unattributed slice"
+  );
+
+  const changed = new Map<string, { row: DbDailyBreakdown; aggregate: DailyAggregate }[]>();
+  for (const row of rows) {
+    const contributions = row.machine_contributions;
+    if (!contributions || Object.keys(contributions).length < 2) continue;
+    const aggregate = aggregateContributions(contributions);
+    const sameCost = Math.abs(aggregate.totalCost - Number(row.total_cost)) < 0.005;
+    if (sameCost && aggregate.totalTokens === Number(row.total_tokens)) continue;
+    const list = changed.get(row.submission_id) ?? [];
+    list.push({ row, aggregate });
+    changed.set(row.submission_id, list);
+  }
+  if (changed.size === 0) return [];
+
+  const submissions = await fetchAllByIds<Pick<DbSubmission, "id" | "username" | "total_cost">>(
+    [...changed.keys()],
+    (chunk, from, to) =>
+      client
+        .from("submissions")
+        .select("id, username, total_cost")
+        .in("id", chunk)
+        .order("id", { ascending: true })
+        .range(from, to),
+    "submissions to recompute"
+  );
+
+  const report: RecomputedSubmission[] = submissions.map((submission) => {
+    const days = changed.get(submission.id) ?? [];
+    const delta = days.reduce(
+      (acc, { row, aggregate }) => acc + aggregate.totalCost - Number(row.total_cost),
+      0
+    );
+    return {
+      submissionId: submission.id,
+      username: submission.username,
+      days: days.length,
+      costBefore: Number(submission.total_cost),
+      costAfter: Number(submission.total_cost) + delta,
+      applied: false,
+    };
+  });
+  report.sort((a, b) => b.costAfter - b.costBefore - (a.costAfter - a.costBefore));
+
+  if (!apply) return report;
+
+  for (const entry of report.slice(0, limit)) {
+    for (const { row, aggregate } of changed.get(entry.submissionId) ?? []) {
+      const { error } = await client
+        .from("daily_breakdowns")
+        .update(aggregateToDailyColumns(aggregate))
+        .eq("id", row.id);
+      if (error) throw new Error(`Failed to update day ${row.id}: ${error.message}`);
+    }
+
+    // Totals from the rows themselves, as every merge path does, so the
+    // parent can't drift from its days.
+    const all = await fetchAllPages<DbDailyBreakdown>(
+      (from, to) =>
+        client
+          .from("daily_breakdowns")
+          .select("*")
+          .eq("submission_id", entry.submissionId)
+          .order("date", { ascending: true })
+          .range(from, to),
+      "daily breakdowns for recomputed totals"
+    );
+    const sum = (pick: (d: DbDailyBreakdown) => number) =>
+      all.reduce((acc, d) => acc + Number(pick(d) || 0), 0);
+    const { error } = await client
+      .from("submissions")
+      .update({
+        total_cost: sum((d) => d.total_cost),
+        total_tokens: sum((d) => d.total_tokens),
+        input_tokens: sum((d) => d.input_tokens),
+        output_tokens: sum((d) => d.output_tokens),
+        cache_creation_tokens: sum((d) => d.cache_creation_tokens),
+        cache_read_tokens: sum((d) => d.cache_read_tokens),
+      })
+      .eq("id", entry.submissionId);
+    if (error) throw new Error(`Failed to update submission ${entry.submissionId}: ${error.message}`);
+    entry.applied = true;
+  }
+
+  return report;
 }
 
 // ============================================================================
