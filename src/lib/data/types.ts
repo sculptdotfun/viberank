@@ -393,6 +393,8 @@ export interface RetiredMachinePreview {
   currentTotalCost: number;
   newTotalCost: number;
   unattributedSpan: { first: string; last: string } | null;
+  /** Days already counted as a retired machine: what an undo would restore. */
+  retiredDays: number;
 }
 
 export interface ProfilesService {

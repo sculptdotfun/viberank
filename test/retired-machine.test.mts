@@ -100,12 +100,12 @@ const service = new SupabaseSubmissionsService(client as never, { checkLimit: as
 const preview = await service.previewRetiredMachine("alice", "2025-01-01", "2025-01-01");
 assert.deepEqual(preview, {
   days: 1, unattributedCost: 12, currentTotalCost: 20, newTotalCost: 28,
-  unattributedSpan: { first: "2025-01-01", last: "2025-01-02" },
+  unattributedSpan: { first: "2025-01-01", last: "2025-01-02" }, retiredDays: 0,
 });
 assert.deepEqual(tables, original, "preview must be read only");
 
 const applied = await service.retireUnattributed("alice", "2025-01-01", "2025-01-01");
-assert.deepEqual(applied, preview);
+assert.deepEqual(applied, { ...preview, retiredDays: 1 }, "an undo is offered for the day just moved");
 assert.equal(tables.daily_breakdowns[0].total_cost, 18, "default plus named machine sum");
 assert.equal(tables.daily_breakdowns[1].total_cost, 6, "outside range stays unchanged");
 assert.equal(tables.daily_breakdowns[2].total_cost, 4, "legacy null row is retained as default");
@@ -123,7 +123,8 @@ assert.equal(noOp.days, 0);
 assert.equal(noOp.currentTotalCost, 28);
 assert.equal(client.writes.filter((write) => write.table === "daily_breakdowns").length, 1);
 
-await service.restoreUnattributed("alice");
+const restored = await service.restoreUnattributed("alice");
+assert.equal(restored.retiredDays, 0, "nothing left to undo");
 for (const [index, row] of tables.daily_breakdowns.entries()) {
   for (const field of ["input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens", "total_tokens", "total_cost"]) {
     assert.equal(row[field], original.daily_breakdowns[index][field], `undo restores ${field}`);

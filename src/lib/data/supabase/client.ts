@@ -378,6 +378,14 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     return { submissions, daily };
   }
 
+  private static retiredDays(daily: DbDailyBreakdown[]): number {
+    return new Set(
+      daily
+        .filter((row) => Object.keys(storedContributions(row) || {}).some((key) => key.startsWith("retired:")))
+        .map((row) => row.date)
+    ).size;
+  }
+
   private retiredMachineResult(
     submissions: Array<Pick<DbSubmission, "id" | "total_cost">>,
     daily: DbDailyBreakdown[],
@@ -400,6 +408,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       currentTotalCost,
       newTotalCost: currentTotalCost + difference,
       unattributedSpan: dates.length ? { first: dates[0], last: dates[dates.length - 1] } : null,
+      retiredDays: SupabaseSubmissionsService.retiredDays(daily),
     };
   }
 
@@ -430,7 +439,8 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     };
     const result = this.retiredMachineResult(submissions, daily, selected, transform);
     await this.writeRetiredMachineRows(username, daily, selected, transform);
-    return result;
+    // The write updated `daily` in place, so this counts the days just moved.
+    return { ...result, retiredDays: SupabaseSubmissionsService.retiredDays(daily) };
   }
 
   async restoreUnattributed(username: string): Promise<RetiredMachinePreview> {
@@ -450,7 +460,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     };
     const result = this.retiredMachineResult(submissions, daily, selected, transform);
     if (selected.length) await this.writeRetiredMachineRows(username, daily, selected, transform);
-    return result;
+    return { ...result, retiredDays: SupabaseSubmissionsService.retiredDays(daily) };
   }
 
   private async writeRetiredMachineRows(
@@ -478,12 +488,13 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     for (const id of affected) {
       const rows = daily.filter((row) => row.submission_id === id);
       const totals = rows.reduce((sum, row) => ({
+        // bigint and numeric columns can arrive as strings; never concatenate.
         total_cost: sum.total_cost + Number(row.total_cost),
-        total_tokens: sum.total_tokens + row.total_tokens,
-        input_tokens: sum.input_tokens + row.input_tokens,
-        output_tokens: sum.output_tokens + row.output_tokens,
-        cache_creation_tokens: sum.cache_creation_tokens + row.cache_creation_tokens,
-        cache_read_tokens: sum.cache_read_tokens + row.cache_read_tokens,
+        total_tokens: sum.total_tokens + Number(row.total_tokens),
+        input_tokens: sum.input_tokens + Number(row.input_tokens),
+        output_tokens: sum.output_tokens + Number(row.output_tokens),
+        cache_creation_tokens: sum.cache_creation_tokens + Number(row.cache_creation_tokens),
+        cache_read_tokens: sum.cache_read_tokens + Number(row.cache_read_tokens),
       }), { total_cost: 0, total_tokens: 0, input_tokens: 0, output_tokens: 0,
         cache_creation_tokens: 0, cache_read_tokens: 0 });
       const { error } = await this.client.from("submissions").update(totals).eq("id", id)

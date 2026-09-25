@@ -346,7 +346,7 @@ export function createDemoDataLayer(): DataLayer {
     },
     submissions: {
       async previewRetiredMachine(): Promise<RetiredMachinePreview> {
-        return { days: 0, unattributedCost: 0, currentTotalCost: 0, newTotalCost: 0, unattributedSpan: null };
+        return { days: 0, unattributedCost: 0, currentTotalCost: 0, newTotalCost: 0, unattributedSpan: null, retiredDays: 0 };
       },
       async retireUnattributed(): Promise<never> {
         throw new Error("Demo data is read-only");
