@@ -306,7 +306,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                   // stored ratio to order by, so offering the toggle here
                   // would show a cost ranking under an efficiency label.
                   ? "Efficiency ranks lifetime totals, so it doesn't combine with a date filter"
-                  : "Tokens per dollar, among developers who have spent at least $100"
+                  : "Tokens per dollar, weighted by volume: short histories are pulled toward the site median, so the ratio decides only once there's enough spend behind it. Developers with at least $100."
               }
               className={`px-2.5 py-1 text-xs font-mono font-medium rounded flex items-center gap-1 transition-colors ${
                 sortBy === "efficiency"

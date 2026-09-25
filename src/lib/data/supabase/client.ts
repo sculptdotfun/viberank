@@ -862,23 +862,19 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     return true;
   }
 
-  async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
-    const sortBy = params.sortBy || "cost";
-    const page = params.page || 0;
-    const pageSize = Math.min(params.pageSize || 25, 50);
-    const offset = page * pageSize;
-    const includeFlagged = params.includeFlagged || false;
-
+  /** One leaderboard page, ordered by `orderColumn`, with every filter applied. */
+  private buildLeaderboardQuery(
+    params: LeaderboardParams,
+    sortBy: NonNullable<LeaderboardParams["sortBy"]>,
+    orderColumn: string,
+    offset: number,
+    pageSize: number,
+    includeFlagged: boolean
+  ) {
     let query = this.client
       .from("submissions")
       .select("*", { count: "exact" })
-      // Efficiency is ranked on the stored tokens_per_dollar column (011) with
-      // a spend floor. Without the floor the board is topped by rounding noise:
-      // a $0.01 submission scored 7M tokens/$ against a median of 1.2M.
-      .order(
-        sortBy === "cost" ? "total_cost" : sortBy === "efficiency" ? "tokens_per_dollar" : "total_tokens",
-        { ascending: false, nullsFirst: false }
-      )
+      .order(orderColumn, { ascending: false, nullsFirst: false })
       .range(offset, offset + pageSize - 1);
 
     if (!includeFlagged) {
@@ -896,12 +892,33 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     // The spend floor is part of what the efficiency board *means*: below it
     // the ratio is rounding noise rather than a signal about how someone
-    // works. Applied as a filter so the count and hasMore agree with the rows.
+    // works (a $0.01 submission scored 7M tokens/$ against a median of 1.2M).
+    // Applied as a filter so the count and hasMore agree with the rows.
     if (sortBy === "efficiency") {
       query = query.gte("total_cost", EFFICIENCY_MIN_COST);
     }
 
-    const { data: submissions, count, error } = await query;
+    return query;
+  }
+
+  async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
+    const sortBy = params.sortBy || "cost";
+    const page = params.page || 0;
+    const pageSize = Math.min(params.pageSize || 25, 50);
+    const offset = page * pageSize;
+    const includeFlagged = params.includeFlagged || false;
+
+    // Efficiency is ranked on the volume-weighted efficiency_score (020, see
+    // src/lib/efficiency.ts) with a spend floor, so a short cheap history
+    // can't outrank a long one; before 020 is applied, on the raw ratio (011).
+    const run = (orderColumn: string) => this.buildLeaderboardQuery(params, sortBy, orderColumn, offset, pageSize, includeFlagged);
+    let result = await run(
+      sortBy === "cost" ? "total_cost" : sortBy === "efficiency" ? "efficiency_score" : "total_tokens"
+    );
+    if (sortBy === "efficiency" && result.error && MISSING_COLUMN_CODES.has(result.error.code ?? "")) {
+      result = await run("tokens_per_dollar");
+    }
+    const { data: submissions, count, error } = result;
 
     if (error) {
       throw new Error("Failed to fetch leaderboard: " + error.message);
@@ -1974,6 +1991,8 @@ export class SupabaseStatsService implements StatsService {
  * the migration.
  */
 const MISSING_TABLE_CODES = new Set(["PGRST205", "42P01"]);
+/** Undefined column (Postgres) / not in PostgREST's schema cache. */
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
 
 export class SupabaseTokensService implements TokensService {
   constructor(private client: SupabaseClient) {}

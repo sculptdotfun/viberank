@@ -1,3 +1,4 @@
+import { efficiencyScore } from "@/lib/efficiency";
 import type {
   ClaimResult,
   ClaimStatus,
@@ -257,10 +258,10 @@ function sortSubmissions(
   sortBy: "cost" | "tokens" | "efficiency" = "cost"
 ) {
   if (sortBy === "efficiency") {
-    // Mirrors the real backend: spend floor first, then tokens per dollar.
+    // Mirrors the real backend: spend floor first, then the volume-weighted score.
     return items
       .filter((item) => item.totalCost >= 100)
-      .sort((a, b) => b.totalTokens / b.totalCost - a.totalTokens / a.totalCost);
+      .sort((a, b) => (efficiencyScore(b.totalTokens, b.totalCost) ?? 0) - (efficiencyScore(a.totalTokens, a.totalCost) ?? 0));
   }
   return [...items].sort((a, b) =>
     sortBy === "tokens" ? b.totalTokens - a.totalTokens : b.totalCost - a.totalCost
