@@ -265,7 +265,7 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
                 },
                 {
                   title: "Climb the tiers",
-                  body: "Your total spend earns a tier, from Spark to Supernova. Sign in with GitHub for a verified badge and a shareable rank card.",
+                  body: "Your total spend earns a tier, from Spark to Hypernova. Sign in with GitHub for a verified badge and a shareable rank card.",
                 },
               ].map((step, i) => (
                 <div key={step.title} className="flex gap-4">
