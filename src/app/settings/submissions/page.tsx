@@ -7,6 +7,7 @@ import { getServerDataLayer } from "@/lib/data";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import SubmissionsClient from "./SubmissionsClient";
+import RetiredMachineClient from "./RetiredMachineClient";
 
 export const metadata: Metadata = {
   title: "Your submissions | Viberank",
@@ -74,7 +75,7 @@ export default async function SubmissionsSettingsPage() {
         </p>
 
         {session?.user?.username ? (
-          <SubmissionsClient initialRows={rows} />
+          <><SubmissionsClient initialRows={rows} /><RetiredMachineClient /></>
         ) : (
           <p className="text-sm text-muted">Sign in with GitHub to manage your submissions.</p>
         )}

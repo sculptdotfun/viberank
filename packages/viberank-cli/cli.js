@@ -78,6 +78,7 @@ ${chalk.yellow.bold('viberank')} — submit your AI coding usage
   ${chalk.bold('npx viberank-cli autosubmit')}      submit once a day in the background
   ${chalk.bold('npx viberank-cli autosubmit off')}  stop submitting automatically
   ${chalk.bold('npx viberank-cli status')}          show token and schedule state
+  ${chalk.bold('npx viberank-cli retired-machine')} preview or count a retired machine's history
 
 Most people run ${chalk.bold('login')} once, then ${chalk.bold('autosubmit')} once, and never think
 about it again — your rank stays current instead of freezing on the day you
@@ -169,6 +170,57 @@ function showStatus() {
     for (const line of s.log) console.log(chalk.gray(`    ${line}`));
   }
   console.log();
+}
+
+async function retiredMachineCommand(args) {
+  const token = getToken();
+  if (!token) throw new Error('Sign in first with `npx viberank-cli login`.');
+  const allowed = new Set(['--from', '--to', '--apply', '--undo']);
+  if (args.some((arg) => arg.startsWith('--') && !allowed.has(arg))) {
+    throw new Error('Unknown retired-machine option. Use --from, --to, --apply, or --undo.');
+  }
+  const option = (name) => {
+    const index = args.indexOf(name);
+    return index < 0 ? null : args[index + 1];
+  };
+  const fromOption = option('--from');
+  const toOption = option('--to');
+  const apply = args.includes('--apply');
+  const undo = args.includes('--undo');
+  if (apply && undo) throw new Error('Use either --apply or --undo.');
+  if ((args.includes('--from') && (!fromOption || fromOption.startsWith('--'))) ||
+      (args.includes('--to') && (!toOption || toOption.startsWith('--')))) {
+    throw new Error('--from and --to need YYYY-MM-DD dates.');
+  }
+  const call = async (method, from, to) => {
+    const query = method === 'GET' && from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
+    const res = await fetch(`${SITE}/api/profile/retired-machine${query}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}) },
+      body: method === 'POST' ? JSON.stringify({ from, to }) : undefined,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Retired machine request failed.');
+    return data;
+  };
+  if (undo) {
+    await call('DELETE');
+    console.log('Retired machine history restored.');
+    return;
+  }
+  const initial = await call('GET');
+  if (!initial.unattributedSpan) {
+    console.log('No unattributed history remains to count.');
+    return;
+  }
+  const from = fromOption || initial.unattributedSpan.first;
+  const to = toOption || initial.unattributedSpan.last;
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (!day.test(from) || !day.test(to)) throw new Error('Use YYYY-MM-DD dates.');
+  const result = await call(apply ? 'POST' : 'GET', from, to);
+  const money = (value) => `$${value.toFixed(2)}`;
+  console.log(`${apply ? 'Counted' : 'Adds'} ${money(result.newTotalCost - result.currentTotalCost)} across ${result.days} days. Your total goes from ${money(result.currentTotalCost)} to ${money(result.newTotalCost)}.`);
+  if (!apply && result.days > 0) console.log('Use --apply to count it, or --undo to restore it later.');
 }
 
 async function autosubmitCommand(arg) {
@@ -696,6 +748,8 @@ const run = async () => {
       return showStatus();
     case 'autosubmit':
       return autosubmitCommand(arg);
+    case 'retired-machine':
+      return retiredMachineCommand(process.argv.slice(3));
     case 'help':
     case '--help':
     case '-h':

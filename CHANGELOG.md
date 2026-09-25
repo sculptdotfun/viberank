@@ -1,5 +1,10 @@
 # Changelog
 
+## Site and CLI — retired machine history (September 2026)
+
+### Added
+- Profile owners can preview and count unattributed usage from a replaced or wiped machine as its own contribution, for a chosen date range. Settings and the CLI offer an undo. Existing unattributed usage remains under the conservative max rule until the owner opts in.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed

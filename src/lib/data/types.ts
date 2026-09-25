@@ -361,6 +361,9 @@ export interface FindProfilesResult {
 // ============================================================================
 
 export interface SubmissionsService {
+  previewRetiredMachine(username: string, from: string, to: string): Promise<RetiredMachinePreview>;
+  retireUnattributed(username: string, from: string, to: string): Promise<RetiredMachinePreview>;
+  restoreUnattributed(username: string): Promise<RetiredMachinePreview>;
   /**
    * Delete one of the caller's own submissions (#127): the row must belong to
    * `username` directly or be claimed by them. Returns false when no such row.
@@ -382,6 +385,14 @@ export interface SubmissionsService {
   checkClaimableSubmissions(githubUsername: string): Promise<ClaimStatus>;
   /** 1-based leaderboard position for a given total cost (by-cost ranking). */
   getGlobalRank(totalCost: number): Promise<number>;
+}
+
+export interface RetiredMachinePreview {
+  days: number;
+  unattributedCost: number;
+  currentTotalCost: number;
+  newTotalCost: number;
+  unattributedSpan: { first: string; last: string } | null;
 }
 
 export interface ProfilesService {

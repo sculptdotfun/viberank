@@ -17,6 +17,7 @@ import type {
   ProfileWithSubmissions,
   Submission,
   SubmitData,
+  RetiredMachinePreview,
 } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -344,6 +345,15 @@ export function createDemoDataLayer(): DataLayer {
       },
     },
     submissions: {
+      async previewRetiredMachine(): Promise<RetiredMachinePreview> {
+        return { days: 0, unattributedCost: 0, currentTotalCost: 0, newTotalCost: 0, unattributedSpan: null };
+      },
+      async retireUnattributed(): Promise<never> {
+        throw new Error("Demo data is read-only");
+      },
+      async restoreUnattributed(): Promise<never> {
+        throw new Error("Demo data is read-only");
+      },
       async deleteOwn(): Promise<boolean> {
         // Demo data is read-only.
         return false;

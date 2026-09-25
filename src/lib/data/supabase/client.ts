@@ -6,6 +6,7 @@
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { randomBytes } from "node:crypto";
 import type {
   DataLayer,
   SubmissionsService,
@@ -36,6 +37,7 @@ import type {
   TokensService,
   ApiTokenSummary,
   TokenOwner,
+  RetiredMachinePreview,
 } from "../types";
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
@@ -47,6 +49,8 @@ import {
   mergeMachineContribution,
   combineContributionMaps,
   DEFAULT_MACHINE_ID,
+  aggregateContributions,
+  outweighs,
   type DailyAggregate,
   type MachineContribution,
 } from "@/lib/ccusage";
@@ -354,6 +358,138 @@ export class SupabaseSubmissionsService implements SubmissionsService {
   ) {
     this.client = client;
     this.rateLimiter = rateLimiter;
+  }
+
+  private async retiredMachineRows(username: string) {
+    const submissions = await fetchAllPages<Pick<DbSubmission, "id" | "total_cost">>(
+      (from, to) => this.client.from("submissions")
+        .select("id, total_cost")
+        .or(`username.eq.${username},claimed_by.eq.${username}`)
+        .order("id", { ascending: true }).range(from, to),
+      "owned submissions for retired machine"
+    );
+    const daily = await fetchAllByIds<DbDailyBreakdown>(
+      submissions.map((row) => row.id),
+      (chunk, from, to) => this.client.from("daily_breakdowns")
+        .select("*").in("submission_id", chunk)
+        .order("id", { ascending: true }).range(from, to),
+      "owned daily breakdowns for retired machine"
+    );
+    return { submissions, daily };
+  }
+
+  private retiredMachineResult(
+    submissions: Array<Pick<DbSubmission, "id" | "total_cost">>,
+    daily: DbDailyBreakdown[],
+    selected: DbDailyBreakdown[],
+    transform: (map: Record<string, MachineContribution>) => Record<string, MachineContribution>
+  ): RetiredMachinePreview {
+    const defaultDays = daily.filter((row) => DEFAULT_MACHINE_ID in (storedContributions(row) || {}));
+    const dates = defaultDays.map((row) => row.date).sort();
+    const currentTotalCost = submissions.reduce((sum, row) => sum + Number(row.total_cost), 0);
+    const unattributedCost = selected.reduce(
+      (sum, row) => sum + Number(storedContributions(row)?.[DEFAULT_MACHINE_ID]?.totalCost || 0), 0
+    );
+    const difference = selected.reduce((sum, row) => {
+      const current = storedContributions(row)!;
+      return sum + aggregateContributions(transform(current)).totalCost - Number(row.total_cost);
+    }, 0);
+    return {
+      days: new Set(selected.map((row) => row.date)).size,
+      unattributedCost,
+      currentTotalCost,
+      newTotalCost: currentTotalCost + difference,
+      unattributedSpan: dates.length ? { first: dates[0], last: dates[dates.length - 1] } : null,
+    };
+  }
+
+  async previewRetiredMachine(username: string, from: string, to: string): Promise<RetiredMachinePreview> {
+    const { submissions, daily } = await this.retiredMachineRows(username);
+    const selected = daily.filter((row) => row.date >= from && row.date <= to &&
+      DEFAULT_MACHINE_ID in (storedContributions(row) || {}));
+    // Any non-default key sums, so a free placeholder has the same arithmetic as a retired key.
+    let previewKey = "retired:preview";
+    while (selected.some((row) => previewKey in (storedContributions(row) || {}))) previewKey += "_";
+    return this.retiredMachineResult(submissions, daily, selected, (map) => {
+      const { [DEFAULT_MACHINE_ID]: slice, ...rest } = map;
+      return { ...rest, [previewKey]: slice };
+    });
+  }
+
+  async retireUnattributed(username: string, from: string, to: string): Promise<RetiredMachinePreview> {
+    const { submissions, daily } = await this.retiredMachineRows(username);
+    const selected = daily.filter((row) => row.date >= from && row.date <= to &&
+      DEFAULT_MACHINE_ID in (storedContributions(row) || {}));
+    if (!selected.length) return this.retiredMachineResult(submissions, daily, [], (map) => map);
+    let key: string;
+    do { key = `retired:${randomBytes(4).toString("hex")}`; }
+    while (daily.some((row) => key in (storedContributions(row) || {})));
+    const transform = (map: Record<string, MachineContribution>) => {
+      const { [DEFAULT_MACHINE_ID]: slice, ...rest } = map;
+      return { ...rest, [key]: slice };
+    };
+    const result = this.retiredMachineResult(submissions, daily, selected, transform);
+    await this.writeRetiredMachineRows(username, daily, selected, transform);
+    return result;
+  }
+
+  async restoreUnattributed(username: string): Promise<RetiredMachinePreview> {
+    const { submissions, daily } = await this.retiredMachineRows(username);
+    const selected = daily.filter((row) => Object.keys(storedContributions(row) || {})
+      .some((key) => key.startsWith("retired:")));
+    const transform = (map: Record<string, MachineContribution>) => {
+      const restored = { ...map };
+      for (const [key, slice] of Object.entries(map)) {
+        if (!key.startsWith("retired:")) continue;
+        if (!restored[DEFAULT_MACHINE_ID] || outweighs(slice, restored[DEFAULT_MACHINE_ID])) {
+          restored[DEFAULT_MACHINE_ID] = slice;
+        }
+        delete restored[key];
+      }
+      return restored;
+    };
+    const result = this.retiredMachineResult(submissions, daily, selected, transform);
+    if (selected.length) await this.writeRetiredMachineRows(username, daily, selected, transform);
+    return result;
+  }
+
+  private async writeRetiredMachineRows(
+    username: string,
+    daily: DbDailyBreakdown[],
+    selected: DbDailyBreakdown[],
+    transform: (map: Record<string, MachineContribution>) => Record<string, MachineContribution>
+  ) {
+    const affected = new Set(selected.map((row) => row.submission_id));
+    // Update only owned, previously read rows; all parent totals use every day,
+    // including days outside the requested range.
+    for (let i = 0; i < selected.length; i += IN_FILTER_CHUNK) {
+      const batch = selected.slice(i, i + IN_FILTER_CHUNK);
+      const updates = batch.map((row) => {
+        const contributions = transform(storedContributions(row)!);
+        return { ...row,
+          machine_contributions: contributions,
+          ...aggregateToDailyColumns(aggregateContributions(contributions)) };
+      });
+      const { error } = await this.client.from("daily_breakdowns")
+        .upsert(updates, { onConflict: "id" });
+      if (error) throw new Error(`Failed to update retired machine days: ${error.message}`);
+      batch.forEach((row, index) => Object.assign(row, updates[index]));
+    }
+    for (const id of affected) {
+      const rows = daily.filter((row) => row.submission_id === id);
+      const totals = rows.reduce((sum, row) => ({
+        total_cost: sum.total_cost + Number(row.total_cost),
+        total_tokens: sum.total_tokens + row.total_tokens,
+        input_tokens: sum.input_tokens + row.input_tokens,
+        output_tokens: sum.output_tokens + row.output_tokens,
+        cache_creation_tokens: sum.cache_creation_tokens + row.cache_creation_tokens,
+        cache_read_tokens: sum.cache_read_tokens + row.cache_read_tokens,
+      }), { total_cost: 0, total_tokens: 0, input_tokens: 0, output_tokens: 0,
+        cache_creation_tokens: 0, cache_read_tokens: 0 });
+      const { error } = await this.client.from("submissions").update(totals).eq("id", id)
+        .or(`username.eq.${username},claimed_by.eq.${username}`);
+      if (error) throw new Error(`Failed to update retired machine submission: ${error.message}`);
+    }
   }
 
   async submit(data: SubmitData): Promise<string> {

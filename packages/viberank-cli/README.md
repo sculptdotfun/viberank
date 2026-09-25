@@ -42,6 +42,13 @@ To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `
 | `npx viberank-cli autosubmit` | Submit once a day in the background |
 | `npx viberank-cli autosubmit off` | Stop submitting automatically |
 | `npx viberank-cli status` | Show token and schedule state |
+| `npx viberank-cli retired-machine` | Preview unattributed history as a retired machine |
+
+If history without a machine ID came from a replaced or wiped machine, preview it with
+`npx viberank-cli retired-machine --from YYYY-MM-DD --to YYYY-MM-DD`, then add `--apply`
+to count it separately. The dates default to the full unattributed span. Use
+`npx viberank-cli retired-machine --undo` to restore the previous counting rule.
+Only apply this to a machine that no longer submits, or its usage may count twice.
 
 ### Global install (optional)
 
