@@ -15,11 +15,14 @@ import {
   Flame,
   Award,
   BarChart3,
+  Gauge,
 } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelName } from "@/lib/utils";
 import { seriesColor } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
+import { computeWorkInsights, percentile, type ComparableMetric } from "@/lib/work-insights";
+import { getWorkInsightBaselinesCached } from "@/lib/work-insight-baselines";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
@@ -74,6 +77,29 @@ export default async function ProfilePage({ params }: ProfileParams) {
     return true;
   });
   const dedupedSeries = uniqueDaily.map((d) => ({ date: d.date, cost: d.totalCost }));
+  const workInsights = computeWorkInsights(uniqueDaily);
+  const workBaselines = uniqueDaily.length >= 3
+    ? await getWorkInsightBaselinesCached().catch(() => null)
+    : null;
+  const comparison = (metric: ComparableMetric) => {
+    const values = workBaselines?.values[metric];
+    const ownValue = workBaselines?.byUser[profileData.username.toLowerCase()]?.[metric] ?? null;
+    const rank = values ? percentile(workInsights[metric], values, metric === "costPerMillionTokens" ? "lower" : "higher", ownValue) : null;
+    return rank === null ? null : `${metric === "costPerMillionTokens" ? "Lower" : "Higher"} than ${rank}% of developers`;
+  };
+  const pct = (value: number) => `${Math.round(value * 100)}%`;
+  const decimal = (value: number) => value.toFixed(1);
+  const workTiles = [
+    { label: "Cache hit rate", value: workInsights.cacheHitRate === null ? null : pct(workInsights.cacheHitRate), detail: "Input served from cache", comparison: comparison("cacheHitRate") },
+    { label: "Cache reuse", value: workInsights.cacheReuse === null ? null : `${decimal(workInsights.cacheReuse)}×`, detail: "Reads per cached token", comparison: comparison("cacheReuse") },
+    { label: "Cost per 1M tokens", value: workInsights.costPerMillionTokens === null ? null : `$${formatCurrency(workInsights.costPerMillionTokens)}`, detail: "Blended cost across all tokens", comparison: comparison("costPerMillionTokens") },
+    { label: "Output share", value: workInsights.outputShare === null ? null : pct(workInsights.outputShare), detail: "Tokens generated as output", comparison: comparison("outputShare") },
+    { label: "Parallel tools", value: workInsights.parallelToolShare === null ? null : pct(workInsights.parallelToolShare), detail: `Days with 2+ tools · ${decimal(workInsights.averageTools ?? 0)} avg/day`, comparison: null },
+    { label: "Parallel machines", value: workInsights.parallelMachineShare === null ? null : pct(workInsights.parallelMachineShare), detail: `Days with 2+ machines · ${decimal(workInsights.averageMachines ?? 0)} avg, ${workInsights.maxMachines} max`, comparison: null },
+    { label: "Models per active day", value: workInsights.averageModels === null ? null : decimal(workInsights.averageModels), detail: "Distinct models used each day", comparison: null },
+    { label: "Daily cost variation", value: workInsights.costVariation === null ? null : decimal(workInsights.costVariation), detail: "Coefficient of variation; lower is steadier", comparison: null },
+    { label: "Active days in span", value: workInsights.activeDayShare === null ? null : pct(workInsights.activeDayShare), detail: "First to last active day", comparison: null },
+  ].filter((tile) => tile.value !== null);
 
   // Model-stacked series for the usage chart: top 5 models by total cost keep
   // their own color; everything else (and legacy days without splits) folds
@@ -317,6 +343,25 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <p className="text-xs text-muted mt-1">consecutive days</p>
             </div>
           </div>
+
+          {workInsights.activeDays >= 3 && workTiles.length > 0 && (
+            <section className="mt-6" aria-labelledby="work-insights-heading">
+              <h2 id="work-insights-heading" className="text-base font-medium mb-3 flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-accent" />
+                How you work
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {workTiles.map((tile) => (
+                  <div key={tile.label} className="bg-surface-1 border border-border rounded-lg p-4 min-w-0">
+                    <p className="micro-label mb-1">{tile.label}</p>
+                    <p className="text-xl font-bold font-mono tabular-nums break-words">{tile.value}</p>
+                    <p className="text-xs text-muted mt-1">{tile.detail}</p>
+                    {tile.comparison && <p className="text-xs text-muted mt-2">{tile.comparison}</p>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Tier progress */}
           <div className="bg-surface-1 border border-border rounded-lg p-4 mt-3">
