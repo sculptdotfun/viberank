@@ -31,6 +31,11 @@ const TOOL_LABELS: Record<string, string> = {
   codebuff: "Codebuff",
   kilo: "Kilo",
   deepseek: "DeepSeek Harness",
+  // Read by ccusage 20 but unnamed here until now, so they showed as
+  // "Antigravity"-style fallbacks or "Zcode".
+  antigravity: "Antigravity",
+  grok: "Grok Build",
+  zcode: "ZCode",
 };
 
 export function toolLabel(tool: string): string {

@@ -28,8 +28,10 @@ export interface StackedDay {
 
 interface UsageChartProps {
   daily: StackedDay[];
-  /** Top models by total cost, in fixed color-assignment order (≤ 5). */
+  /** Top models by total cost, stack order (≤ 5). */
   modelKeys: string[];
+  /** One color per model key, by vendor (see modelColors), so the chart matches the model list. */
+  colors: string[];
 }
 
 function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
@@ -68,7 +70,7 @@ function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) 
   );
 }
 
-export default function UsageChart({ daily, modelKeys }: UsageChartProps) {
+export default function UsageChart({ daily, modelKeys, colors }: UsageChartProps) {
   const [range, setRange] = useState<"7d" | "30d" | "all">("30d");
 
   const data = [...daily]
@@ -85,7 +87,7 @@ export default function UsageChart({ daily, modelKeys }: UsageChartProps) {
   const series = legacyOnly
     ? [{ key: OTHER_KEY, label: "Spend", color: SERIES_COLORS[0] }]
     : [
-        ...modelKeys.map((key, i) => ({ key, label: key, color: SERIES_COLORS[i % SERIES_COLORS.length] })),
+        ...modelKeys.map((key, i) => ({ key, label: key, color: colors[i] ?? OTHER_COLOR })),
         ...(hasOther ? [{ key: OTHER_KEY, label: OTHER_KEY, color: OTHER_COLOR }] : []),
       ];
 
