@@ -1,5 +1,11 @@
 # Changelog
 
+## Site — tier ladder recalibrated, with a new top tier (September 2026)
+
+### Changed
+- **The top of the ladder means something again.** Tiers were calibrated in June 2026 (797 developers, top ≈ $57K) so that Supernova was the top 0.5%. Lifetime totals only grow; by September (1,216 developers, top ≈ $440K) the $50K Supernova held the top 6% and Inferno or better the top 17%. The lower rungs keep their thresholds, so getting started is as rewarding as before (Ember $100+, Flame $1K+, Blaze $5K+); the top is re-spaced: **Inferno $25K+** (≈ top 11%), **Supernova $100K+** (≈ top 2.5%) and a new **Hypernova $250K+** (top 0.5%, with its own glow). The legend, FAQ, home copy and the tokenmaxxing post follow.
+- `/stats` counts tiers in SQL; migration `021_tier_ladder.sql` redefines `get_site_stats()` with the new buckets (otherwise unchanged from 008), and `test/tiers.test.mts` fails if the SQL and `src/lib/tiers.ts` ever disagree again.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed

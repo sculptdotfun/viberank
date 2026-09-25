@@ -17,8 +17,13 @@ const SIZE_CLASSES = {
 
 export default function TierBadge({ totalCost, size = "sm", bare = false, className }: TierBadgeProps) {
   const tier = getTier(totalCost);
-  // White-hot top tier gets a faint glow.
-  const glow = tier.key === "supernova" ? { textShadow: "0 0 10px rgba(191, 219, 254, 0.5)" } : undefined;
+  // The two star tiers glow; the rarest one more.
+  const glow =
+    tier.key === "hypernova"
+      ? { textShadow: "0 0 12px rgba(240, 171, 252, 0.7)" }
+      : tier.key === "supernova"
+        ? { textShadow: "0 0 10px rgba(191, 219, 254, 0.5)" }
+        : undefined;
 
   if (bare) {
     return (
