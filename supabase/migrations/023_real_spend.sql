@@ -1,4 +1,4 @@
--- Migration 019: real spend — what developers actually paid OpenRouter.
+-- Real spend: what developers actually paid OpenRouter.
 --
 -- The leaderboard ranks API-equivalent usage that ccusage computes from local
 -- logs. Tools that route through OpenRouter (OpenClaw, OpenCode, Hermes, …)

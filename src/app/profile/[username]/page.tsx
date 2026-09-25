@@ -170,7 +170,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
     // rank is nice-to-have; render without it on failure
   }
 
-  // Real OpenRouter spend (migration 019): money actually paid, shown beside
+  // Real OpenRouter spend (migration 023): money actually paid, shown beside
   // the board figures and never added to them — OpenRouter traffic from tools
   // like OpenCode is already in the ccusage logs those figures come from.
   let realSpend: RealSpend | null = null;

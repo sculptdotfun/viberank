@@ -2092,7 +2092,7 @@ export class SupabaseTokensService implements TokensService {
 }
 
 // ============================================================================
-// SUPABASE SPEND SERVICE (real money paid, migration 019)
+// SUPABASE SPEND SERVICE (real money paid, migration 023)
 // ============================================================================
 
 const REAL_SPEND_DAY_COLUMNS =
@@ -2150,7 +2150,7 @@ export class SupabaseSpendService implements SpendService {
     const user = username.toLowerCase();
 
     // The snapshot first: it is one row, and its error code tells a missing
-    // table (deploy ahead of migration 019) from a real failure.
+    // table (deploy ahead of migration 023) from a real failure.
     const { data: totals, error } = await this.client
       .from("real_spend_totals")
       .select(REAL_SPEND_TOTAL_COLUMNS)

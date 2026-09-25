@@ -10,6 +10,7 @@ const {
   summarizeRealSpend,
   aggregateRealSpendStats,
   last30Start,
+  payAsYouGoFromRealSpend,
   SPEND_LIMITS,
 } = await import("../src/lib/real-spend.ts");
 const { SupabaseSpendService } = await import("../src/lib/data/supabase/client.ts");
@@ -207,6 +208,15 @@ const rejects = (input: unknown, pattern: RegExp) => {
   check("aggregateRealSpendStats: count, sums, median and top models");
 }
 
+{
+  const lifetime = { usd: 1843.57, byokUsd: 12, scope: "account" as const, observedAt: "" };
+  assert.deepEqual(payAsYouGoFromRealSpend({ lifetime }), { source: "OpenRouter", amount: 1843.57 });
+  assert.deepEqual(payAsYouGoFromRealSpend({ lifetime: { ...lifetime, usd: 0 } }), { source: "OpenRouter", amount: 0 });
+  assert.equal(payAsYouGoFromRealSpend({ lifetime: null }), null);
+  assert.equal(payAsYouGoFromRealSpend(null), null);
+  check("payAsYouGoFromRealSpend: all-time credits paid as { source, amount }, BYOK excluded");
+}
+
 // ---------------------------------------------------------------------------
 // Data layer: SupabaseSpendService against a fake client
 // ---------------------------------------------------------------------------
@@ -329,7 +339,7 @@ const valid = (() => {
 
   const missing = new FakeClient({}, { "real_spend_totals:select": { code: "PGRST205", message: "no table" } });
   const empty = await new SupabaseSpendService(missing as never, allow).getRealSpend("u");
-  assert.equal(empty.lifetime, null, "a deploy ahead of migration 019 reads as no spend");
+  assert.equal(empty.lifetime, null, "a deploy ahead of migration 023 reads as no spend");
   assert.equal(await new SupabaseSpendService(missing as never, allow).getRealSpendStats(), null);
   check("reads lowercase the username and degrade cleanly before the migration");
 }

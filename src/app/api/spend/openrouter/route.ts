@@ -11,7 +11,7 @@ import { profileUrl } from "@/lib/site";
  * money figure on someone's public profile, so it must be signed by that
  * someone. The token's owner is the only identity the body can write to.
  *
- * Stored in its own ledger (migration 019) and never added to submissions:
+ * Stored in its own ledger (migration 023) and never added to submissions:
  * OpenRouter traffic from tools like OpenCode is already in the ccusage logs
  * the board ranks, so adding it there would count it twice.
  */

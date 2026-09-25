@@ -8,7 +8,7 @@
  * those logs. Folding OpenRouter's figures into submission totals would count
  * that usage twice, so nothing here ever touches `submissions` or
  * `daily_breakdowns` — it lives in `real_spend_days` / `real_spend_totals`
- * (migration 019) and is only ever shown beside the board.
+ * (migration 023) and is only ever shown beside the board.
  *
  * Pure functions only, so every validation rule and aggregate is unit-tested
  * without a database or a request.
@@ -333,6 +333,23 @@ export function aggregateRealSpendStats(
       .slice(0, topN)
       .map(([model, usd]) => ({ model, usd })),
   };
+}
+
+/**
+ * One pay-as-you-go line for a profile's money-vs-value comparison: the
+ * all-time USD actually paid, or null when nothing is on file.
+ *
+ * Kept deliberately small so a profile section that lists what someone pays
+ * per source can take it as-is. Only credits paid to OpenRouter count; BYOK
+ * spend was billed by the user's own provider and is left out rather than
+ * guessed at (OpenRouter's account-wide total doesn't report it).
+ */
+export function payAsYouGoFromRealSpend(
+  spend: Pick<RealSpend, "lifetime"> | null | undefined
+): { source: "OpenRouter"; amount: number } | null {
+  const amount = spend?.lifetime?.usd;
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
+  return { source: "OpenRouter", amount };
 }
 
 /** Rows for the upsert, one per day. Username is lowercased: GitHub handles are case-insensitive. */
