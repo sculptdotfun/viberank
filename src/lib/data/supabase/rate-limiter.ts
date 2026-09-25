@@ -29,6 +29,13 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
     periodMs: 60 * 1000, // 60 per minute
     capacity: 10,
   },
+  // Real-spend syncs (/api/spend/openrouter). The CLI sends one per day; the
+  // headroom covers someone re-running `viberank-cli openrouter` by hand while
+  // setting it up, without letting a loop hammer the upsert.
+  spendSync: {
+    rate: 12,
+    periodMs: 60 * 60 * 1000, // 12 per hour
+  },
   failedSubmissions: {
     rate: 10,
     periodMs: 60 * 60 * 1000, // 10 per hour

@@ -42,6 +42,8 @@ To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `
 | `npx viberank-cli autosubmit` | Submit once a day in the background |
 | `npx viberank-cli autosubmit off` | Stop submitting automatically |
 | `npx viberank-cli status` | Show token and schedule state |
+| `npx viberank-cli openrouter` | Publish what you actually pay on OpenRouter |
+| `npx viberank-cli openrouter off` | Stop publishing it and forget the key |
 
 ### Global install (optional)
 
@@ -67,6 +69,26 @@ VIBERANK_TOKEN=vbr_… npx viberank-cli
 ```
 
 Only the SHA-256 of a token is ever stored server-side; the plaintext is shown once and is unrecoverable. Revoke a leaked one from the same page.
+
+## Real OpenRouter spend
+
+The leaderboard ranks **API-equivalent** usage that ccusage computes from local logs. If you pay OpenRouter, you can also publish what you **actually paid**:
+
+```bash
+npx viberank-cli openrouter
+```
+
+Your profile then shows a separate "Real spend · OpenRouter" block: your all-time spend, the last 30 days, and a per-model split. It is **never added to your leaderboard total or rank**. Tools that route through OpenRouter (OpenClaw, OpenCode, Hermes, …) are already counted there from their local logs, so adding OpenRouter's figures would count that usage twice.
+
+**Use a management key** (create one at [openrouter.ai/settings/management-keys](https://openrouter.ai/settings/management-keys)). It can read your account's all-time spend and 30 days of per-day, per-model detail. A normal API key works too, but it only exposes that one key's spend, so the profile labels it "this API key only" and has no per-model split.
+
+**The key never leaves your machine.** The CLI calls OpenRouter directly and sends viberank only daily totals (spend, BYOK spend, requests, tokens, per-model split) and the all-time total. The key is saved to `~/.viberank/config.json` at mode `0600`, next to your viberank token.
+
+- It needs a viberank token (`npx viberank-cli login`), because spend is published under a signed identity.
+- `OPENROUTER_MANAGEMENT_KEY` or `OPENROUTER_API_KEY` is offered if set. Scheduled runs only use the key you saved with this command, never the environment, so an unrelated `OPENROUTER_API_KEY` can't start publishing your spend.
+- With `autosubmit` on, each daily run refreshes it after the usage submission. That step is best effort: a failure logs one line and never fails the submission.
+- BYOK spend (billed by your own provider keys through OpenRouter) is shown separately.
+- `npx viberank-cli openrouter off` forgets the key. Spend already published stays on the profile.
 
 ## Multiple machines
 
