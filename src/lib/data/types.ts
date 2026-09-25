@@ -135,6 +135,11 @@ export interface SubmitData {
    * deletion from a transcript the runtime rewrote. Absent for older CLIs.
    */
   corpus?: Record<string, { files: number; bytes: number }>;
+  /**
+   * Hash of the directory the corpus was counted in. Corpora are only compared
+   * within one scope; "" for clients that don't send one.
+   */
+  corpusScope?: string;
   ccData: {
     totals: {
       inputTokens: number;

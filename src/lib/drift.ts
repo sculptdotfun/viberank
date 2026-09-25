@@ -125,3 +125,13 @@ export function monthsUserDeleted(
 
   return deleted;
 }
+
+/**
+ * The corpus's scope: a 16-hex hash of the directory the client counted.
+ * Anything else, including its absence from older clients, is the shared ""
+ * scope — which compares exactly as every corpus did before scopes existed.
+ */
+export function readCorpusScope(payload: unknown): string {
+  const raw = (payload as { drift?: { scope?: unknown } })?.drift?.scope;
+  return typeof raw === "string" && /^[0-9a-f]{16}$/.test(raw) ? raw : "";
+}

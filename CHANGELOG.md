@@ -1,5 +1,11 @@
 # Changelog
 
+## Site + CLI — a different folder's smaller count is not a deletion (September 2026)
+
+### Fixed
+- **Totals no longer drop when two submitters on one machine count different folders.** Drift detection (#112) compares a machine's per-month transcript count with its last one and honours lower totals when the count shrinks. A machine with a script that counts a folder merged from several hosts and the CLI counting `~/.claude/projects` sends both under one machine id; the CLI's smaller count read as deleted history and lowered the account every night until the script ran again (seen in production: −$17.6K and −32.6B tokens overnight). The CLI now sends a 16-hex hash of the counted folder with its corpus, and the server compares corpora only within the same scope. A new scope has no prior, so it yields no deletion verdict and the high-water mark holds. Clients without a scope keep comparing exactly as before.
+- Migration `019_corpus_scope.sql` adds the `scope` column and re-keys `corpus_observations` on it. Until it is applied, the server falls back to the unscoped comparison.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed

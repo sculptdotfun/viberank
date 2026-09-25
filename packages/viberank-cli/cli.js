@@ -12,7 +12,7 @@ import prompts from 'prompts';
 import fetch from 'node-fetch';
 import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
 import * as autosubmit from './lib/autosubmit.js';
-import { collectCorpus } from './lib/corpus.js';
+import { collectCorpus, corpusScope } from './lib/corpus.js';
 import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
 import { runNpx } from './lib/npx.js';
 
@@ -243,7 +243,7 @@ async function quietSubmit() {
   const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
   try {
     const corpus = collectCorpus();
-    if (corpus) ccData.drift = { corpus };
+    if (corpus) ccData.drift = { corpus, scope: corpusScope() };
   } catch { /* best effort */ }
 
   const githubUser = readConfig().username || 'autosubmit';
@@ -456,7 +456,7 @@ async function main() {
       // fails must never block a submission.
       try {
         const corpus = collectCorpus();
-        if (corpus) ccData.drift = { corpus };
+        if (corpus) ccData.drift = { corpus, scope: corpusScope() };
       } catch {
         // No corpus block; the server falls back to holding the high-water mark.
       }
