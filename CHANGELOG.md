@@ -1,5 +1,12 @@
 # Changelog
 
+## Site — profiles whose handle exists in two casings open again (September 2026)
+
+### Fixed
+- **Every casing of a handle with more than one profile row returned 404.** `profiles.username` is unique case-sensitively and the submit path looked profiles up by exact match, so an `X-GitHub-User` header typed as `some-dev` next to an existing `Some-Dev` inserted a second row. `getProfile` then read both with `ilike` + `.single()`, which errors on two rows, so the page, the modal and the README badge all reported "not found" for either casing while the leaderboard kept listing the user. The sitemap shows 22 such handles today.
+- `getProfile` now resolves any casing to one canonical row (most submissions, then oldest), and the submit path matches profiles case-insensitively, so a new casing updates the existing profile instead of creating another.
+- Usernames in these lookups are escaped for `ilike`, so `%`, `_` and `*` in a URL match literally instead of matching other profiles.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
