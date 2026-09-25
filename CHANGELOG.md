@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — the efficiency board weighs volume (September 2026)
+
+### Fixed
+- **A short, cheap history no longer tops the efficiency board.** Ranking on raw tokens per dollar rewarded having spent little: 1B tokens for $120 scored 8.3M/$ and ranked #1 over developers with hundreds of billions of tokens at 3–4M/$. The board now ranks on a volume-weighted score — each ratio shrunk toward the site median (1.2M tokens/$) by a prior worth $1,000 of spend — so short histories report roughly the median and long ones their own ratio. The displayed number is still the raw tokens per dollar, and the $100 floor stays. Constants live in `src/lib/efficiency.ts`; migration `020_efficiency_score.sql` stores the score as a generated column, and the board falls back to the raw ratio until it is applied.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
