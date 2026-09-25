@@ -348,7 +348,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
             <section className="mt-6" aria-labelledby="work-insights-heading">
               <h2 id="work-insights-heading" className="text-base font-medium mb-3 flex items-center gap-2">
                 <Gauge className="w-4 h-4 text-accent" />
-                How you work
+                Workflow
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {workTiles.map((tile) => (
