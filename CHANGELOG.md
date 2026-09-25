@@ -1,5 +1,14 @@
 # Changelog
 
+## Site — usage from a machine that no longer submits stays counted (September 2026)
+
+### Fixed
+- **Unattributed usage is compared model by model, not as a whole day.** A day holding both a no-machine-id slice (web uploads, pre-1.2 CLIs) and id'd machine slices showed only the larger of the two (#81), so a replaced or wiped machine's history hid every other machine's usage that day. Where both sides carry a complete per-model split, each model now takes the larger side and models only one side used are added. A copy of an id'd machine's day still matches it model for model and adds nothing, including across ccusage model renames (date suffixes, provider paths, dotted versions); the tool prefix counts as usage, so `[openclaw] claude-opus-4-6` is not folded into `claude-opus-4-6`. Days without a complete split keep the whole-day rule.
+- Same-model days from a retired machine can't be told apart from a copy automatically and remain counted once.
+
+### Operations
+- `POST /api/admin/recompute-unattributed` re-derives stored days that hold an unattributed slice beside id'd ones, since aggregates are written at submit time. Admin only. `{}` reports what would change; `{ "apply": true, "limit": 50 }` writes the largest changes first and re-sums each affected submission. Idempotent: repeat until `pending` is 0.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed

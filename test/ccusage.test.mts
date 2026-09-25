@@ -413,6 +413,67 @@ console.log("\n[10] Claim merge combines rows without losing any (#152)");
   ok("tokens break ties for unpriced models", unpriced.aggregate.totalTokens === 5_000, `got ${unpriced.aggregate.totalTokens}`);
 }
 
+console.log("\n[10b] Unattributed usage is compared model by model");
+{
+  const model = (modelName: string, cost: number) => ({
+    modelName, inputTokens: cost * 100, outputTokens: cost * 10, cacheCreationTokens: 0, cacheReadTokens: 0, cost,
+  });
+  const slice = (models: ReturnType<typeof model>[], agents = ["claude"]) => ({
+    inputTokens: models.reduce((a, m) => a + m.inputTokens, 0),
+    outputTokens: models.reduce((a, m) => a + m.outputTokens, 0),
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: models.reduce((a, m) => a + m.inputTokens + m.outputTokens, 0),
+    totalCost: models.reduce((a, m) => a + m.cost, 0),
+    modelsUsed: models.map((m) => m.modelName),
+    agents,
+    modelBreakdowns: models,
+  });
+
+  // A retired machine's web upload used a model the current machine never
+  // touched that day. Whole-day max showed $60 and lost the $20 CLI day.
+  const retired = { default: slice([model("claude-opus-4-8", 60)]) };
+  const current = { machineA: slice([model("gpt-6-astra", 20)], ["codex"]) };
+  const disjoint = combineContributionMaps([retired, current]);
+  ok("a model only the unattributed slice used is added ($80)", disjoint.aggregate.totalCost === 80, `got ${disjoint.aggregate.totalCost}`);
+  ok("both tools are listed", disjoint.aggregate.agents.sort().join(",") === "claude,codex");
+
+  // #81 still holds: a copy of an id'd machine's day adds nothing, even when
+  // a newer ccusage renamed the model (date suffix, provider path, dots).
+  const copy = combineContributionMaps([
+    { default: slice([model("anthropic/claude-opus-4.8-20260101", 30)]) },
+    { machineA: slice([model("claude-opus-4-8", 30)]) },
+  ]);
+  ok("a renamed copy of the same day is not doubled ($30)", copy.aggregate.totalCost === 30, `got ${copy.aggregate.totalCost}`);
+
+  // Same model on both sides: the larger wins per model, never the sum.
+  const overlap = combineContributionMaps([
+    { default: slice([model("claude-opus-4-8", 50), model("claude-haiku-4-5", 5)]) },
+    { machineA: slice([model("claude-opus-4-8", 30)]), machineB: slice([model("claude-opus-4-8", 10)]) },
+  ]);
+  ok("shared models take the larger side, others add ($50 + $5)", overlap.aggregate.totalCost === 55, `got ${overlap.aggregate.totalCost}`);
+
+  // The tool prefix is usage, not a rename: openclaw's opus is separate.
+  const tools = combineContributionMaps([
+    { default: slice([model("[openclaw] anthropic/claude-opus-4.8", 12)]) },
+    { machineA: slice([model("claude-opus-4-8", 30)]) },
+  ]);
+  ok("a different tool's use of the same model is added ($42)", tools.aggregate.totalCost === 42, `got ${tools.aggregate.totalCost}`);
+
+  // Without a complete split on both sides, the whole-day rule applies.
+  const noSplit = combineContributionMaps([
+    { default: { ...slice([model("claude-opus-4-8", 60)]), modelBreakdowns: undefined } },
+    current,
+  ]);
+  ok("no split falls back to the whole-day max ($60)", noSplit.aggregate.totalCost === 60, `got ${noSplit.aggregate.totalCost}`);
+
+  const partial = combineContributionMaps([
+    { default: { ...slice([model("claude-opus-4-8", 60)]), totalCost: 90 } },
+    current,
+  ]);
+  ok("a split that misses part of the day falls back ($90)", partial.aggregate.totalCost === 90, `got ${partial.aggregate.totalCost}`);
+}
+
 console.log("\n[11] Cost floor is priced per model (#150, #154)");
 {
   const mb = (modelName: string, cacheRead: number, io: number, cost: number) => ({
