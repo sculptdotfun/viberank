@@ -216,7 +216,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
   }
   const toolEntries = Array.from(toolDays.entries()).sort((a, b) => b[1] - a[1]);
 
-  // Money vs value. The owner's declared plans are public (migration 019);
+  // Money vs value. The owner's declared plans are public (migration 022);
   // a read failure or a deploy ahead of the migration falls back to the
   // estimate rather than breaking the page.
   let subscriptions: ProfileSubscription[] = [];

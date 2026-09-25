@@ -1515,7 +1515,7 @@ export class SupabaseProfilesService implements ProfilesService {
       .order("created_at", { ascending: true });
 
     if (error) {
-      // Code deployed ahead of migration 019: the profile renders its
+      // Code deployed ahead of migration 022: the profile renders its
       // estimate instead of failing.
       if (MISSING_TABLE_CODES.has(error.code)) return [];
       throw new Error(`Failed to load subscriptions: ${error.message}`);
@@ -2007,7 +2007,7 @@ export class SupabaseStatsService implements StatsService {
   }
 
   async getDeclaredSpendCohort(): Promise<DeclaredSpendRow[]> {
-    // Aggregated in-database (migration 019) so /stats doesn't page through
+    // Aggregated in-database (migration 022) so /stats doesn't page through
     // every submission to find the few dozen declarers.
     const { data, error } = await this.client.rpc("get_declared_spend_cohort");
     if (error || !Array.isArray(data)) {

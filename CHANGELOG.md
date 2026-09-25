@@ -4,7 +4,7 @@
 
 ### Added
 - **Profiles separate what was paid from what the usage was worth.** Every dollar on a profile is ccusage's API-equivalent value, and most developers pay a flat subscription that subsidises it many times over. A new "Money vs value" section puts the API-equivalent total ("API-equivalent value, not money spent") next to the plans the owner declares, priced from `src/lib/plans.ts` over the profile's recorded months, and shows the subsidy multiple: "Every $1 paid bought $X of API-equivalent usage."
-- **Declare what you pay** at `/settings/submissions`: tool, plan, from and optional to. Stored in `profile_subscriptions` (migration 019), public-read like the rest of the profile, written only through `/api/profile/subscriptions` with the GitHub session's username.
+- **Declare what you pay** at `/settings/submissions`: tool, plan, from and optional to. Stored in `profile_subscriptions` (migration 022), public-read like the rest of the profile, written only through `/api/profile/subscriptions` with the GitHub session's username.
 - Profiles with nothing declared show an **Estimated** subscription cost instead: the cheapest plan sized for each month's usage, per tool. It is labelled as an estimate, never produces a multiple, and names the tools it can't price (no plans on file, or Copilot, which publishes no usage tiers).
 - `/stats` shows the median subsidy multiple among developers who declared, withheld until at least 5 have.
 

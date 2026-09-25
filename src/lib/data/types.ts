@@ -92,7 +92,7 @@ export interface ProfileWithSubmissions extends Profile {
 }
 
 /**
- * A plan the profile owner says they paid for (migration 019). `tool` and
+ * A plan the profile owner says they paid for (migration 022). `tool` and
  * `planId` are ids from TOOL_PLANS in src/lib/plans.ts; `endedOn` is null
  * while they still pay. Public: the owner chose to publish it.
  */
@@ -438,7 +438,7 @@ export interface ProfilesService {
     githubUsername: string,
     email: string
   ): Promise<{ success: boolean; error?: string }>;
-  /** Declared subscriptions for a profile, oldest first. [] before migration 019. */
+  /** Declared subscriptions for a profile, oldest first. [] before migration 022. */
   getSubscriptions(username: string): Promise<ProfileSubscription[]>;
   /** Add a declaration for `username`. Input must already be validated. */
   addSubscription(username: string, input: NewProfileSubscription): Promise<ProfileSubscription>;
@@ -467,7 +467,7 @@ export interface StatsService {
   getUserMonthStats(month: string, username: string): Promise<UserMonthStats | null>;
   /** Raw rows for the /calculator spend curve. */
   getSpendRows(): Promise<import("@/lib/spend-curve").BurnRow[]>;
-  /** Everyone who declared a subscription, via get_declared_spend_cohort() (migration 019); [] if unavailable. */
+  /** Everyone who declared a subscription, via get_declared_spend_cohort() (migration 022); [] if unavailable. */
   getDeclaredSpendCohort(): Promise<DeclaredSpendRow[]>;
 }
 
