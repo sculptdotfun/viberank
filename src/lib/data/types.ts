@@ -91,6 +91,38 @@ export interface ProfileWithSubmissions extends Profile {
   submissions: Submission[];
 }
 
+/**
+ * A plan the profile owner says they paid for (migration 019). `tool` and
+ * `planId` are ids from TOOL_PLANS in src/lib/plans.ts; `endedOn` is null
+ * while they still pay. Public: the owner chose to publish it.
+ */
+export interface ProfileSubscription {
+  id: string;
+  username: string;
+  tool: string;
+  planId: string;
+  startedOn: string; // YYYY-MM-DD
+  endedOn: string | null; // YYYY-MM-DD
+  createdAt: number; // Unix timestamp in ms
+}
+
+export interface NewProfileSubscription {
+  tool: string;
+  planId: string;
+  startedOn: string;
+  endedOn: string | null;
+}
+
+/** One declarer on /stats: their plans next to their profile's value and range. */
+export interface DeclaredSpendRow {
+  username: string;
+  /** API-equivalent total across the profile's unflagged submissions. */
+  value: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  subscriptions: NewProfileSubscription[];
+}
+
 // ============================================================================
 // QUERY/MUTATION PARAMETERS
 // ============================================================================
@@ -406,6 +438,15 @@ export interface ProfilesService {
     githubUsername: string,
     email: string
   ): Promise<{ success: boolean; error?: string }>;
+  /** Declared subscriptions for a profile, oldest first. [] before migration 019. */
+  getSubscriptions(username: string): Promise<ProfileSubscription[]>;
+  /** Add a declaration for `username`. Input must already be validated. */
+  addSubscription(username: string, input: NewProfileSubscription): Promise<ProfileSubscription>;
+  /**
+   * Remove one of `username`'s own declarations. Scoped by username as well
+   * as id, so a guessed uuid can't remove someone else's. False when no such row.
+   */
+  removeSubscription(username: string, id: string): Promise<boolean>;
   deleteByPattern(
     patterns: string[],
     options: PatternSearchOptions & { dryRun?: boolean }
@@ -426,6 +467,8 @@ export interface StatsService {
   getUserMonthStats(month: string, username: string): Promise<UserMonthStats | null>;
   /** Raw rows for the /calculator spend curve. */
   getSpendRows(): Promise<import("@/lib/spend-curve").BurnRow[]>;
+  /** Everyone who declared a subscription, via get_declared_spend_cohort() (migration 019); [] if unavailable. */
+  getDeclaredSpendCohort(): Promise<DeclaredSpendRow[]>;
 }
 
 export interface LeaguesService {

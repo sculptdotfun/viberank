@@ -110,8 +110,9 @@ export default function ProfileSheet(props: ProfileSheetProps) {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="rounded-lg bg-background border border-border-subtle p-3">
-              <p className="micro-label mb-1">Spent</p>
+              <p className="micro-label mb-1">Value</p>
               <p className="font-mono font-bold text-accent">${formatNumber(props.totalCost)}</p>
+              <p className="text-[10px] text-muted mt-0.5">API-equivalent</p>
             </div>
             <div className="rounded-lg bg-background border border-border-subtle p-3">
               <p className="micro-label mb-1">Tokens</p>

@@ -20,10 +20,13 @@ import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelNam
 import { seriesColor } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
+import { moneyVsValue, type PayAsYouGo } from "@/lib/money";
+import type { ProfileSubscription } from "@/lib/data";
 import { getServerDataLayer } from "@/lib/data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
 import BadgeSnippet from "./BadgeSnippet";
+import MoneyVsValue from "./MoneyVsValue";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
@@ -213,6 +216,21 @@ export default async function ProfilePage({ params }: ProfileParams) {
   }
   const toolEntries = Array.from(toolDays.entries()).sort((a, b) => b[1] - a[1]);
 
+  // Money vs value. The owner's declared plans are public (migration 019);
+  // a read failure or a deploy ahead of the migration falls back to the
+  // estimate rather than breaking the page.
+  let subscriptions: ProfileSubscription[] = [];
+  try {
+    const dataLayer = await getServerDataLayer();
+    subscriptions = await dataLayer.profiles.getSubscriptions(profileData.username);
+  } catch {
+    // estimate only
+  }
+  // Pay-as-you-go bills from a connected source (OpenRouter, an API console).
+  // Nothing feeds this yet; the row renders only once it is non-empty.
+  const payAsYouGo: PayAsYouGo[] = [];
+  const money = moneyVsValue({ value: totalCost, days: uniqueDaily, subscriptions, payAsYouGo });
+
   return (
     <div className="min-h-screen bg-background">
       <NavBar />
@@ -287,7 +305,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
           {/* Key stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><DollarSign className="w-3.5 h-3.5" />Total spent</p>
+              <p className="flex items-center gap-1.5 micro-label mb-1"><DollarSign className="w-3.5 h-3.5" />API-equivalent</p>
               <p className="text-xl font-bold font-mono text-accent">${formatNumber(totalCost)}</p>
               <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
             </div>
@@ -317,6 +335,8 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <p className="text-xs text-muted mt-1">consecutive days</p>
             </div>
           </div>
+
+          <MoneyVsValue summary={money} usedTools={toolEntries.map(([tool]) => tool)} />
 
           {/* Tier progress */}
           <div className="bg-surface-1 border border-border rounded-lg p-4 mt-3">

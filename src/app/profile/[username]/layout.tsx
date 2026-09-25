@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       tools.length === 0 ? "AI coding tools" : tools.map(cap).join(", ");
 
     const title = `${display} — ${cost} on ${toolsShort} | Viberank`;
-    const description = `${display} has spent ${cost} across ${tokensB} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
+    const description = `${display} has used ${cost} of API-equivalent usage across ${tokensB} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
     const canonical = `https://www.viberank.app/profile/${encodeURIComponent(profile.username)}`;
 
     // Rich share card: avatar, rank, tier, cost, tokens. Rank and tier match
@@ -182,7 +182,7 @@ export default async function ProfileLayout({
           "sameAs": profile.githubUsername
             ? [`https://github.com/${profile.githubUsername}`]
             : undefined,
-          "description": `AI coding user, ${profile.totalSubmissions} submission${profile.totalSubmissions === 1 ? "" : "s"} totaling $${totalCost.toFixed(0)} on Viberank.`,
+          "description": `AI coding user, ${profile.totalSubmissions} submission${profile.totalSubmissions === 1 ? "" : "s"} totaling $${totalCost.toFixed(0)} of API-equivalent usage on Viberank.`,
         },
       }
     : null;
