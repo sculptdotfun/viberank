@@ -484,6 +484,9 @@ export function createDemoDataLayer(): DataLayer {
       },
     },
     stats: {
+      async getWorkInsightBaselines() {
+        return { values: { cacheHitRate: [], cacheReuse: [], costPerMillionTokens: [], outputShare: [] }, byUser: {} };
+      },
       // The demo backend has no site-wide rollup table; returning null is the
       // documented "not available" signal and callers already handle it.
       async getSiteStats(): Promise<SiteStats | null> {

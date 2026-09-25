@@ -26,6 +26,8 @@ export interface DailyBreakdown {
   totalCost: number;
   modelsUsed: string[];
   agents?: string[]; // tools that contributed to this day
+  /** Server-derived count only; machine IDs never leave the data layer. */
+  machineCount?: number;
   /** Per-model token/cost split for this day. Null/absent on rows ingested before migration 004. */
   modelBreakdowns?: ModelBreakdown[];
 }
@@ -418,6 +420,7 @@ export interface ProfilesService {
 
 export interface StatsService {
   getGlobalStats(): Promise<GlobalStats>;
+  getWorkInsightBaselines(): Promise<import("@/lib/work-insights").WorkInsightBaselines>;
   /** Exact aggregates via get_site_stats() (migration 007); null if the function isn't deployed. */
   getSiteStats(): Promise<SiteStats | null>;
   /** One month's aggregates via get_month_stats() (migration 013); null if unavailable. */

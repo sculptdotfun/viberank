@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — profile work insights (September 2026)
+
+### Added
+- Profiles with at least three active days now show cache use, blended token cost, output share, daily tool and model mix, machine concurrency when available, and activity steadiness. Four token metrics include comparisons with developers who have at least $100 in unflagged submissions; the shared baseline is cached for two minutes. Machine IDs stay server-only.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed

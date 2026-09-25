@@ -41,6 +41,7 @@ import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import type { BurnRow } from "@/lib/spend-curve";
+import { buildWorkInsightBaselines, type WorkInsightBaselines } from "@/lib/work-insights";
 import {
   validateCcData,
   inferToolFromModel,
@@ -97,7 +98,7 @@ interface DbDailyBreakdown {
   model_breakdowns: ModelBreakdown[] | null;
   // Per-machine slices of this day, keyed by machine id. NULL on legacy rows
   // that predate per-machine tracking (#43).
-  machine_contributions: Record<string, MachineContribution> | null;
+  machine_contributions?: Record<string, MachineContribution> | null;
 }
 
 interface DbProfile {
@@ -231,6 +232,9 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
     modelsUsed: db.models_used || [],
     agents: db.agents || [],
     modelBreakdowns: db.model_breakdowns || undefined,
+    ...(db.machine_contributions ? {
+      machineCount: Math.max(1, Object.keys(db.machine_contributions).filter((id) => id !== DEFAULT_MACHINE_ID).length),
+    } : {}),
   };
 }
 
@@ -1391,7 +1395,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 export class SupabaseProfilesService implements ProfilesService {
   private client: SupabaseClient;
 
-  constructor(client: SupabaseClient) {
+  constructor(client: SupabaseClient, private serverRead = false) {
     this.client = client;
   }
 
@@ -1422,14 +1426,24 @@ export class SupabaseProfilesService implements ProfilesService {
     const submissionIds = (submissions || []).map((s) => s.id);
     const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
       submissionIds,
-      (chunk, from, to) =>
-        this.client
+      (chunk, from, to) => {
+        if (this.serverRead) {
+          return this.client
+            .from("daily_breakdowns")
+            .select("*")
+            .in("submission_id", chunk)
+            .order("submission_id", { ascending: true })
+            .order("date", { ascending: true })
+            .range(from, to);
+        }
+        return this.client
           .from("daily_breakdowns")
           .select(DAILY_PUBLIC_COLUMNS)
           .in("submission_id", chunk)
           .order("submission_id", { ascending: true })
           .order("date", { ascending: true })
-          .range(from, to),
+          .range(from, to);
+      },
       "daily breakdowns for profile"
     );
 
@@ -1899,6 +1913,35 @@ export class SupabaseStatsService implements StatsService {
     return data as SiteStats;
   }
 
+  async getWorkInsightBaselines(): Promise<WorkInsightBaselines> {
+    const rows = await fetchAllPages<{
+      username: string;
+      input_tokens: number;
+      output_tokens: number;
+      cache_creation_tokens: number;
+      cache_read_tokens: number;
+      total_tokens: number;
+      total_cost: number;
+    }>(
+      (from, to) => this.client
+        .from("submissions")
+        .select("username,input_tokens,output_tokens,cache_creation_tokens,cache_read_tokens,total_tokens,total_cost")
+        .or("flagged_for_review.is.null,flagged_for_review.eq.false")
+        .order("id", { ascending: true })
+        .range(from, to),
+      "work insight baselines"
+    );
+    return buildWorkInsightBaselines(rows.map((row) => ({
+      username: row.username,
+      inputTokens: Number(row.input_tokens),
+      outputTokens: Number(row.output_tokens),
+      cacheCreationTokens: Number(row.cache_creation_tokens),
+      cacheReadTokens: Number(row.cache_read_tokens),
+      totalTokens: Number(row.total_tokens),
+      totalCost: Number(row.total_cost),
+    })), EFFICIENCY_MIN_COST);
+  }
+
   async getMonthStats(month: string): Promise<MonthStats | null> {
     // Exact per-month aggregates (migration 013). The function validates the
     // month format server-side; invalid input returns an empty-month object.
@@ -2268,10 +2311,10 @@ class SupabaseDataLayer implements DataLayer {
   stats: StatsService;
   leagues: LeaguesService;
 
-  constructor(client: SupabaseClient) {
+  constructor(client: SupabaseClient, serverRead = false) {
     this.tokens = new SupabaseTokensService(client);
     this.submissions = new SupabaseSubmissionsService(client);
-    this.profiles = new SupabaseProfilesService(client);
+    this.profiles = new SupabaseProfilesService(client, serverRead);
     this.stats = new SupabaseStatsService(client);
     this.leagues = new SupabaseLeaguesService(client);
   }
@@ -2305,5 +2348,5 @@ export function createSupabaseServerDataLayer(): DataLayer {
   }
 
   const client = createClient(supabaseUrl, supabaseServiceKey);
-  return new SupabaseDataLayer(client);
+  return new SupabaseDataLayer(client, true);
 }
