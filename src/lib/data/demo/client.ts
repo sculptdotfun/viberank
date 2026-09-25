@@ -17,6 +17,8 @@ import type {
   ProfileWithSubmissions,
   Submission,
   SubmitData,
+  ProfileSubscription,
+  DeclaredSpendRow,
 } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -252,6 +254,23 @@ const submissions: Submission[] = [
 
 const openToWork = new Set(["B-EtterDigital", "azamara", "dprvda"]);
 
+// Five declarers, so /stats can show its median (it withholds it below five),
+// and the rest left undeclared so profiles also show the estimate path.
+// Dates sit inside the demo's May–June 2026 activity window.
+const demoSubscriptions: ProfileSubscription[] = [
+  { username: "b-etterdigital", tool: "claude", planId: "max20", startedOn: "2026-03-01", endedOn: null },
+  { username: "b-etterdigital", tool: "codex", planId: "pro200", startedOn: "2026-05-15", endedOn: null },
+  { username: "iabdulwasey", tool: "claude", planId: "max20", startedOn: "2026-01-10", endedOn: null },
+  { username: "iabdulwasey", tool: "codex", planId: "plus", startedOn: "2026-04-01", endedOn: "2026-05-31" },
+  { username: "azamara", tool: "claude", planId: "max5", startedOn: "2026-05-01", endedOn: null },
+  { username: "startupbros", tool: "claude", planId: "max20", startedOn: "2025-11-01", endedOn: null },
+  { username: "sahir2k", tool: "claude", planId: "max20", startedOn: "2026-05-06", endedOn: null },
+].map((sub, index) => ({
+  ...sub,
+  id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+  createdAt: Date.UTC(2026, 5, 1),
+}));
+
 function sortSubmissions(
   items: Submission[],
   sortBy: "cost" | "tokens" | "efficiency" = "cost"
@@ -423,6 +442,16 @@ export function createDemoDataLayer(): DataLayer {
       async recordSignInEmail(): Promise<{ success: boolean; error?: string }> {
         return { success: false, error: "Demo data is read-only" };
       },
+      async getSubscriptions(username: string): Promise<ProfileSubscription[]> {
+        const normalized = username.toLowerCase();
+        return demoSubscriptions.filter((sub) => sub.username === normalized);
+      },
+      async addSubscription(): Promise<ProfileSubscription> {
+        throw new Error("Demo data is read-only");
+      },
+      async removeSubscription(): Promise<boolean> {
+        return false;
+      },
       async getHireListings(): Promise<HireListing[]> {
         const ranked = sortSubmissions(submissions, "cost");
         return ranked
@@ -500,6 +529,23 @@ export function createDemoDataLayer(): DataLayer {
       // /calculator render its no-cohort state rather than invent a curve.
       async getSpendRows() {
         return [];
+      },
+      async getDeclaredSpendCohort(): Promise<DeclaredSpendRow[]> {
+        const byUser = new Map<string, ProfileSubscription[]>();
+        for (const sub of demoSubscriptions) {
+          byUser.set(sub.username, [...(byUser.get(sub.username) ?? []), sub]);
+        }
+        return Array.from(byUser.entries()).flatMap(([username, subs]) => {
+          const submission = findSubmission(username);
+          if (!submission) return [];
+          return [{
+            username,
+            value: submission.totalCost,
+            firstDate: submission.dateRange.start,
+            lastDate: submission.dateRange.end,
+            subscriptions: subs.map(({ tool, planId, startedOn, endedOn }) => ({ tool, planId, startedOn, endedOn })),
+          }];
+        });
       },
       async getGlobalStats(): Promise<GlobalStats> {
         const ranked = sortSubmissions(submissions, "cost");

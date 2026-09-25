@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame } from "lucide-react";
+import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame, Scale } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, prettyModelName } from "@/lib/utils";
 import { seriesColor } from "@/lib/chartColors";
 import { TIERS } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
+import { declaredCohortSummary, formatMultiple, MIN_DECLARED_FOR_STATS } from "@/lib/money";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 
@@ -109,10 +110,22 @@ const datasetLd = {
 
 export default async function StatsPage() {
   const dataLayer = await getServerDataLayer();
-  const [site, global] = await Promise.all([
+  const [site, global, declarers] = await Promise.all([
     dataLayer.stats.getSiteStats().catch(() => null),
     dataLayer.stats.getGlobalStats().catch(() => null),
+    dataLayer.stats.getDeclaredSpendCohort().catch(() => []),
   ]);
+
+  // Money vs value across developers who declared what they pay. Withheld
+  // below MIN_DECLARED_FOR_STATS: with a handful of rows the median is close
+  // to publishing one person's plan.
+  const subsidy = declaredCohortSummary(
+    declarers.map((d) => ({
+      value: d.value,
+      range: d.firstDate && d.lastDate ? { start: d.firstDate, end: d.lastDate } : null,
+      subscriptions: d.subscriptions,
+    }))
+  );
 
   const totalUsers = site?.totalUsers ?? global?.totalUsers ?? 0;
   const totalSubmissions = site?.totalSubmissions ?? global?.totalSubmissions ?? 0;
@@ -216,6 +229,32 @@ export default async function StatsPage() {
               value={`${Math.round(cacheShare * 100)}%`}
               sub="of all tokens"
             />
+          )}
+        </div>
+
+        {/* Subsidy multiple among declarers */}
+        <div className="bg-surface-1 border border-border rounded-lg p-4 mb-4 flex items-start gap-3">
+          <Scale className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+          {subsidy.medianMultiple !== null ? (
+            <p className="text-sm m-0">
+              Among the {formatNumber(subsidy.declared)} developers who declared what they pay, the median $1 paid
+              bought{" "}
+              <span className="font-mono font-bold text-accent">${formatMultiple(subsidy.medianMultiple)}</span> of
+              API-equivalent usage.{" "}
+              <span className="text-muted">
+                Declared plans at list price, counted in whole months over each profile&apos;s recorded range. Shown
+                once at least {MIN_DECLARED_FOR_STATS} developers have declared.
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted m-0">
+              What developers actually pay versus the API-equivalent value they use appears here once at least{" "}
+              {MIN_DECLARED_FOR_STATS} have declared their plans ({subsidy.declared} so far).{" "}
+              <Link href="/settings/submissions" className="text-accent hover:underline">
+                Declare yours
+              </Link>
+              .
+            </p>
           )}
         </div>
 

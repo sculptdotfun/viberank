@@ -36,6 +36,9 @@ import type {
   TokensService,
   ApiTokenSummary,
   TokenOwner,
+  ProfileSubscription,
+  NewProfileSubscription,
+  DeclaredSpendRow,
 } from "../types";
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
@@ -1503,6 +1506,56 @@ export class SupabaseProfilesService implements ProfilesService {
     return { success: true };
   }
 
+  async getSubscriptions(username: string): Promise<ProfileSubscription[]> {
+    const { data, error } = await this.client
+      .from("profile_subscriptions")
+      .select(SUBSCRIPTION_COLUMNS)
+      .eq("username", username.toLowerCase())
+      .order("started_on", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      // Code deployed ahead of migration 022: the profile renders its
+      // estimate instead of failing.
+      if (MISSING_TABLE_CODES.has(error.code)) return [];
+      throw new Error(`Failed to load subscriptions: ${error.message}`);
+    }
+    return (data ?? []).map(mapSubscription);
+  }
+
+  async addSubscription(
+    username: string,
+    input: NewProfileSubscription
+  ): Promise<ProfileSubscription> {
+    const { data, error } = await this.client
+      .from("profile_subscriptions")
+      .insert({
+        username: username.toLowerCase(),
+        tool: input.tool,
+        plan_id: input.planId,
+        started_on: input.startedOn,
+        ended_on: input.endedOn,
+      })
+      .select(SUBSCRIPTION_COLUMNS)
+      .single();
+
+    if (error) throw new Error(`Failed to save subscription: ${error.message}`);
+    return mapSubscription(data);
+  }
+
+  async removeSubscription(username: string, id: string): Promise<boolean> {
+    // Username in the filter is the ownership guard, same as token revoke.
+    const { data, error } = await this.client
+      .from("profile_subscriptions")
+      .delete()
+      .eq("id", id)
+      .eq("username", username.toLowerCase())
+      .select("id");
+
+    if (error) throw new Error(`Failed to remove subscription: ${error.message}`);
+    return (data ?? []).length > 0;
+  }
+
   async getHireListings(): Promise<HireListing[]> {
     const { data: profiles } = await this.client
       .from("profiles")
@@ -1952,6 +2005,48 @@ export class SupabaseStatsService implements StatsService {
       end: r.date_range_end,
     }));
   }
+
+  async getDeclaredSpendCohort(): Promise<DeclaredSpendRow[]> {
+    // Aggregated in-database (migration 022) so /stats doesn't page through
+    // every submission to find the few dozen declarers.
+    const { data, error } = await this.client.rpc("get_declared_spend_cohort");
+    if (error || !Array.isArray(data)) {
+      if (error) console.error("get_declared_spend_cohort failed:", error.message);
+      return [];
+    }
+    return (data as DeclaredSpendRow[]).map((row) => ({
+      ...row,
+      value: Number(row.value),
+    }));
+  }
+}
+
+// ============================================================================
+// PROFILE SUBSCRIPTIONS
+// ============================================================================
+
+const SUBSCRIPTION_COLUMNS = "id, username, tool, plan_id, started_on, ended_on, created_at";
+
+interface DbProfileSubscription {
+  id: string;
+  username: string;
+  tool: string;
+  plan_id: string;
+  started_on: string;
+  ended_on: string | null;
+  created_at: string;
+}
+
+function mapSubscription(row: DbProfileSubscription): ProfileSubscription {
+  return {
+    id: row.id,
+    username: row.username,
+    tool: row.tool,
+    planId: row.plan_id,
+    startedOn: row.started_on,
+    endedOn: row.ended_on,
+    createdAt: new Date(row.created_at).getTime(),
+  };
 }
 
 // ============================================================================
