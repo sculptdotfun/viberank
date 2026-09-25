@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -162,6 +163,17 @@ function monthsSpanned(first, last) {
     if (++m > 12) { m = 1; y++; }
   }
   return months;
+}
+
+/**
+ * Which directory a corpus was counted in, as a short hash so the path itself
+ * never leaves the machine. The server only compares corpora of the same
+ * scope: a script that counts a folder merged from several hosts and this CLI
+ * counting ~/.claude/projects share a machine id, and without the scope the
+ * CLI's smaller count read as history the user had deleted.
+ */
+export function corpusScope(root = DEFAULT_ROOT) {
+  return crypto.createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 16);
 }
 
 /**

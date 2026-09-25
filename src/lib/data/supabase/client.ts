@@ -495,12 +495,30 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     const incoming = data.corpus;
     if (!incoming || Object.keys(incoming).length === 0) return new Set();
 
+    // Only a corpus counted in the same directory is comparable. One machine
+    // can have two submitters that count different folders (a script over a
+    // folder merged from several hosts, and this CLI over ~/.claude/projects);
+    // across scopes a smaller count is not a deletion.
+    const scope = data.corpusScope ?? "";
+
     try {
-      const { data: rows, error } = await this.client
+      let scoped = true;
+      let { data: rows, error } = await this.client
         .from("corpus_observations")
         .select("month, files, bytes")
         .ilike("username", data.username)
-        .eq("machine_id", machineId);
+        .eq("machine_id", machineId)
+        .eq("scope", scope);
+
+      // Before migration 019 there is no scope column: compare as before.
+      if (error && MISSING_COLUMN_CODES.has(error.code)) {
+        scoped = false;
+        ({ data: rows, error } = await this.client
+          .from("corpus_observations")
+          .select("month, files, bytes")
+          .ilike("username", data.username)
+          .eq("machine_id", machineId));
+      }
 
       if (error) {
         if (MISSING_TABLE_CODES.has(error.code)) return new Set();
@@ -522,18 +540,19 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         Object.entries(incoming).map(([month, size]) => ({
           username: data.username,
           machine_id: machineId,
+          ...(scoped ? { scope } : {}),
           month,
           files: Math.max(0, Math.trunc(Number(size.files) || 0)),
           bytes: Math.max(0, Math.trunc(Number(size.bytes) || 0)),
           observed_at: new Date().toISOString(),
         })),
-        { onConflict: "username,machine_id,month" }
+        { onConflict: scoped ? "username,machine_id,scope,month" : "username,machine_id,month" }
       );
       if (upsertError) console.error("Corpus observation upsert failed:", upsertError.message);
 
       if (deleted.size > 0) {
         console.warn(
-          `Corpus shrank for ${data.username} (machine ${machineId}) in ${[...deleted].join(", ")} — honouring the lower totals rather than holding the high-water mark (#112).`
+          `Corpus shrank for ${data.username} (machine ${machineId}, scope ${scope || "none"}) in ${[...deleted].join(", ")} — honouring the lower totals rather than holding the high-water mark (#112).`
         );
       }
 
@@ -1974,6 +1993,8 @@ export class SupabaseStatsService implements StatsService {
  * the migration.
  */
 const MISSING_TABLE_CODES = new Set(["PGRST205", "42P01"]);
+/** Undefined column (Postgres) / not in PostgREST's schema cache. */
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
 
 export class SupabaseTokensService implements TokensService {
   constructor(private client: SupabaseClient) {}
