@@ -16,8 +16,7 @@ import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, getGitHubAvata
 import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
-
-type SortBy = "cost" | "tokens" | "efficiency";
+import { boardQueryKey, hasDateRange, leaderboardQuery, type SortBy } from "@/lib/leaderboard-query";
 
 interface LeaderboardProps {
   // Server-fetched first page + stats so the board renders in the SSR HTML.
@@ -69,8 +68,10 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   const { data: liveStats } = useGlobalStats();
   const globalStats = liveStats ?? initialStats;
 
-  const ITEMS_PER_PAGE = 25;
-  const isDateFiltered = dateFrom && dateTo;
+  const filters = { sortBy, tool, verifiedOnly, dateFrom, dateTo };
+  const isDateFiltered = hasDateRange(filters);
+  const query = leaderboardQuery(filters, page);
+  const queryKey = boardQueryKey(filters);
 
   // Filters ⇄ URL. Parsed once on mount (not useSearchParams — that would
   // opt the ISR'd home page out of static rendering), then mirrored back via
@@ -131,17 +132,13 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     !isDateFiltered;
 
   const { data: regularResult, isLoading } = useLeaderboard(
-    !isDateFiltered && !isSeededDefaultView
-      ? { sortBy, page, pageSize: ITEMS_PER_PAGE, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
-      : "skip"
+    query.kind === "all-time" && !isSeededDefaultView ? query.params : "skip"
   );
 
   const hasMore = regularResult?.hasMore ?? (isSeededDefaultView ? initialHasMore ?? false : false);
 
-  const { data: dateFilteredResult } = useLeaderboardByDateRange(
-    isDateFiltered
-      ? { dateFrom, dateTo, sortBy: sortBy === "efficiency" ? "cost" : sortBy, limit: 100, tool: tool ?? undefined, verifiedOnly: verifiedOnly || undefined }
-      : "skip"
+  const { data: dateFilteredResult, isLoading: isDateLoading } = useLeaderboardByDateRange(
+    query.kind === "date-range" ? query.params : "skip"
   );
 
   // Tools available to filter by, sourced from the global per-tool stats.
@@ -152,6 +149,10 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   useEffect(() => {
     // Keep the server-seeded items on first render; only reset when a filter
     // actually changes (avoids clearing the SSR'd rows during hydration).
+    //
+    // Keyed on the query, not the raw inputs: one end of a custom date range
+    // changes dateFrom/dateTo but not what the hooks fetch, and emptying the
+    // list with no fetch coming to refill it left the board blank.
     if (firstRender.current) {
       firstRender.current = false;
       return;
@@ -159,7 +160,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     hasChangedFilters.current = true;
     setAllItems([]);
     setPage(0);
-  }, [sortBy, dateFrom, dateTo, tool, verifiedOnly]);
+  }, [queryKey]);
 
   useEffect(() => {
     if (isDateFiltered && dateFilteredResult?.items) {
@@ -541,7 +542,9 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
             </div>
           )}
         </div>
-      ) : isLoading ? (
+      ) : isLoading || isDateLoading ? (
+        // The date-range query aggregates daily rows and takes seconds on a
+        // 30-day window; without its flag here that wait read as an empty board.
         <SkeletonRows />
       ) : (
         <div className="text-center py-16">

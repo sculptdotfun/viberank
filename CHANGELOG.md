@@ -1,5 +1,11 @@
 # Changelog
 
+## Site — the leaderboard no longer blanks on a half-set date range (September 2026)
+
+### Fixed
+- **Picking one end of a custom date range emptied the board, and so did pressing All afterwards.** The board cleared its rows on every change to the From/To inputs, but a single date isn't a range, so no new query ran to refill them and it sat on "No submissions yet" until the sort was switched. Seen on the tokens board: set From, then clear To and press All to go back, and the board stays blank. The reset now follows the query the board actually runs, so only a real filter change clears it.
+- **Loading a date range shows the skeleton instead of "No submissions yet".** The 30-day board takes a few seconds to aggregate, and during that wait it told visitors the leaderboard was empty.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
