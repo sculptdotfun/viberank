@@ -38,6 +38,9 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
       // have deliberately cleared the data.
       gate.current.abandon();
       setSupabaseData(undefined);
+      // The abandoned request's `finally` no longer clears the flag, so a
+      // switch to "skip" mid-fetch would otherwise stay "loading" for good.
+      setSupabaseLoading(false);
       return;
     }
 
@@ -81,6 +84,9 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
       // have deliberately cleared the data.
       gate.current.abandon();
       setSupabaseData(undefined);
+      // The abandoned request's `finally` no longer clears the flag, so a
+      // switch to "skip" mid-fetch would otherwise stay "loading" for good.
+      setSupabaseLoading(false);
       return;
     }
 
