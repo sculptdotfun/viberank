@@ -300,28 +300,50 @@ export function aggregateContributions(
   if (!unattributed) return summed;
   if (attributedSlices.length === 0) return sumContributions([unattributed]);
 
+  // max(unattributed, Σ attributed): the unattributed slice may be any of the
+  // id'd machines, so it can hold a day up but never add to it (#81).
+  const wholeDay = outweighs(unattributed, summed) ? sumContributions([unattributed]) : summed;
+
   // Compared model by model where both sides carry a full split, so a model
   // only the unattributed slice used — typically a retired machine's — is
   // counted instead of being hidden behind the id'd machines' day.
   const byModel = maxByModel(unattributed, attributedSlices);
-  if (byModel) return byModel;
+  return byModel ? atLeast(byModel, wholeDay) : wholeDay;
+}
 
-  // max(unattributed, Σ attributed): the unattributed slice may be any of the
-  // id'd machines, so it can hold a day up but never add to it (#81).
-  return outweighs(unattributed, summed) ? sumContributions([unattributed]) : summed;
+/**
+ * Merges are lossless: the per-model result may only raise a day above the
+ * whole-day rule, never lower it. A split accepted within tolerance can fall
+ * short of its slice's totals, so every summed field is floored at the
+ * whole-day value rather than trusting the split alone.
+ */
+function atLeast(agg: DailyAggregate, floor: DailyAggregate): DailyAggregate {
+  return {
+    ...agg,
+    inputTokens: Math.max(agg.inputTokens, floor.inputTokens),
+    outputTokens: Math.max(agg.outputTokens, floor.outputTokens),
+    cacheCreationTokens: Math.max(agg.cacheCreationTokens, floor.cacheCreationTokens),
+    cacheReadTokens: Math.max(agg.cacheReadTokens, floor.cacheReadTokens),
+    totalTokens: Math.max(agg.totalTokens, floor.totalTokens),
+    totalCost: Math.max(agg.totalCost, floor.totalCost),
+    modelsUsed: Array.from(new Set([...agg.modelsUsed, ...floor.modelsUsed])),
+    agents: Array.from(new Set([...agg.agents, ...floor.agents])),
+  };
 }
 
 /**
  * The same model across ccusage versions, which have renamed it (date
- * suffixes, provider paths, dotted versions). The tool prefix is kept:
- * `[openclaw] claude-opus-4-6` and `claude-opus-4-6` are different usage.
+ * suffixes, provider paths, dotted versions, and the `[tool]` prefix newer
+ * versions add). The prefix is dropped on purpose: the unattributed slice may
+ * be a copy of an id'd day reported by another ccusage version, so
+ * `[openclaw] google/gemini-3-pro` on one side and `google/gemini-3-pro` on
+ * the other take the max rather than add. Rows within one side still sum,
+ * since `addModel` folds them under the shared key.
  */
 function modelKey(name: string): string {
-  const prefix = name.match(/^\[[^\]]+\]/)?.[0].toLowerCase() ?? "";
   let model = name.replace(/^\[[^\]]+\]\s*/, "");
   model = model.split("/").pop() ?? model;
-  model = model.replace(/-\d{8}$/, "").replace(/\./g, "-").toLowerCase();
-  return `${prefix}${model}`;
+  return model.replace(/-\d{8}$/, "").replace(/\./g, "-").toLowerCase();
 }
 
 const breakdownTokens = (m: NormalizedModelBreakdown) =>

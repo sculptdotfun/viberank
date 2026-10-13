@@ -12,6 +12,8 @@ import { recomputeUnattributedDays } from "@/lib/data/supabase/client";
  * default) reports what would change; `{ "apply": true, "limit": 50 }`
  * writes the largest changes first. It is idempotent, so repeat until the
  * report is empty rather than risk the function time limit in one call.
+ * Days are only raised, never lowered. Back up the reported submissions'
+ * rows before `apply`, as with any prod repair.
  *
  * Service role: it reads machine_contributions, which anon can't (017).
  */

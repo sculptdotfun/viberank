@@ -401,14 +401,44 @@ export interface RecomputedSubmission {
 }
 
 /**
+ * Whether a recomputed day may replace the stored one: no lower on any field
+ * and higher on cost or tokens. A stored day above its recomputation is a
+ * manual repair or an older, larger observation, and merges are lossless, so
+ * the recompute only ever raises days.
+ */
+export function raisesStoredDay(
+  aggregate: DailyAggregate,
+  row: Pick<
+    DbDailyBreakdown,
+    "input_tokens" | "output_tokens" | "cache_creation_tokens" | "cache_read_tokens" | "total_tokens" | "total_cost"
+  >
+): boolean {
+  // numeric columns round-trip through float; don't let that read as a change
+  const EPS = 1e-6;
+  const pairs: [number, number][] = [
+    [aggregate.inputTokens, Number(row.input_tokens) || 0],
+    [aggregate.outputTokens, Number(row.output_tokens) || 0],
+    [aggregate.cacheCreationTokens, Number(row.cache_creation_tokens) || 0],
+    [aggregate.cacheReadTokens, Number(row.cache_read_tokens) || 0],
+    [aggregate.totalTokens, Number(row.total_tokens) || 0],
+    [aggregate.totalCost, Number(row.total_cost) || 0],
+  ];
+  if (pairs.some(([next, stored]) => next < stored - EPS)) return false;
+  const higherCost = aggregate.totalCost > (Number(row.total_cost) || 0) + 0.005;
+  const higherTokens = aggregate.totalTokens > (Number(row.total_tokens) || 0);
+  return higherCost || higherTokens;
+}
+
+/**
  * Re-derive stored days that hold an unattributed slice next to id'd ones.
  * Aggregates are written when a day is submitted, so a change to how
  * `aggregateContributions` combines slices only reaches the days a user
  * happens to re-submit. This brings the rest in line. Dry run unless `apply`.
  *
  * Only such mixed days can change: a default-only day (including every
- * legacy row with no per-machine map) aggregates to itself either way.
- * Idempotent, so `limit` lets a caller with a time budget apply the largest
+ * legacy row with no per-machine map) aggregates to itself either way. A day
+ * is written only when `raisesStoredDay` holds; it is never lowered.
+ * Back up the affected rows before `apply`. Idempotent, so `limit` lets a caller with a time budget apply the largest
  * changes first and call again until nothing is left.
  */
 export async function recomputeUnattributedDays(
@@ -431,8 +461,7 @@ export async function recomputeUnattributedDays(
     const contributions = row.machine_contributions;
     if (!contributions || Object.keys(contributions).length < 2) continue;
     const aggregate = aggregateContributions(contributions);
-    const sameCost = Math.abs(aggregate.totalCost - Number(row.total_cost)) < 0.005;
-    if (sameCost && aggregate.totalTokens === Number(row.total_tokens)) continue;
+    if (!raisesStoredDay(aggregate, row)) continue;
     const list = changed.get(row.submission_id) ?? [];
     list.push({ row, aggregate });
     changed.set(row.submission_id, list);

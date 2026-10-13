@@ -137,4 +137,28 @@ const seed = (): Record<string, Row[]> => ({
   check("limit applies the largest change first and repeated calls converge");
 }
 
+{
+  // Stored days above their recomputation (a manual repair, an older larger
+  // observation) are never lowered, and a day that would rise in cost but
+  // drop on any token field is left alone too.
+  const db = seed();
+  db.submissions.push({ id: "s-repaired", username: "repaired", total_cost: 500 });
+  db.daily_breakdowns.push(
+    // Recomputes to $80, but an admin repaired it to $500.
+    day("d6", "s-repaired", "2026-05-01", { default: slice("claude-opus-4-8", 60), m4: slice("gpt-6-astra", 20, ["codex"]) }, 500),
+    // Recomputes to $80 / 8,000 input, stored $70 with 9,000 cache-read tokens.
+    { ...day("d7", "s-repaired", "2026-05-02", { default: slice("claude-opus-4-8", 60), m5: slice("gpt-6-astra", 20, ["codex"]) }, 70), cache_read_tokens: 9_000, total_tokens: 16_000 }
+  );
+  const log: string[] = [];
+  const report = await recomputeUnattributedDays(fakeClient(db, log) as never, { apply: true });
+  assert.ok(!report.some((r) => r.submissionId === "s-repaired"), "neither day is reported");
+  const d6 = db.daily_breakdowns.find((d) => d.id === "d6")!;
+  const d7 = db.daily_breakdowns.find((d) => d.id === "d7")!;
+  assert.equal(d6.total_cost, 500, "a repaired day keeps its higher value");
+  assert.equal(d7.total_cost, 70, "a day losing tokens on any field isn't rewritten");
+  assert.equal(d7.cache_read_tokens, 9_000);
+  assert.equal(db.submissions.find((s) => s.id === "s-repaired")!.total_cost, 500, "its parent isn't re-summed");
+  check("recompute never lowers a stored day on any field");
+}
+
 console.log(`\n${passed} passed, 0 failed`);

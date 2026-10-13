@@ -455,12 +455,36 @@ console.log("\n[10b] Unattributed usage is compared model by model");
   ]);
   ok("shared models take the larger side, others add ($50 + $5)", overlap.aggregate.totalCost === 55, `got ${overlap.aggregate.totalCost}`);
 
-  // The tool prefix is usage, not a rename: openclaw's opus is separate.
+  // The tool prefix is treated as a rename across the two sides: a ccusage
+  // upgrade can start prefixing the same usage with `[tool]`, so an
+  // unattributed copy reported by the other version must not be added. This
+  // under-counts a genuinely separate tool's use of the model on that day,
+  // which is the conservative side of #81.
   const tools = combineContributionMaps([
     { default: slice([model("[openclaw] anthropic/claude-opus-4.8", 12)]) },
     { machineA: slice([model("claude-opus-4-8", 30)]) },
   ]);
-  ok("a different tool's use of the same model is added ($42)", tools.aggregate.totalCost === 42, `got ${tools.aggregate.totalCost}`);
+  ok("a tool-prefixed name matches its unprefixed form ($30, not $42)", tools.aggregate.totalCost === 30, `got ${tools.aggregate.totalCost}`);
+  const gemini = combineContributionMaps([
+    { default: slice([model("[openclaw] google/gemini-3-pro", 25)]) },
+    { machineA: slice([model("google/gemini-3-pro", 25)]) },
+  ]);
+  ok("a prefixed copy of the same day is not doubled ($25)", gemini.aggregate.totalCost === 25, `got ${gemini.aggregate.totalCost}`);
+
+  // Lossless: a split accepted within 1% must not pull the day below the
+  // whole-day rule. Unattributed $100 / 1,000,000 tokens with a $99.20 /
+  // 992,000 split beside an id'd $40 day of the same model: main gives $100.
+  const short = combineContributionMaps([
+    {
+      default: {
+        ...slice([{ modelName: "claude-opus-4-8", inputTokens: 992_000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, cost: 99.2 }]),
+        inputTokens: 1_000_000, totalTokens: 1_000_000, totalCost: 100,
+      },
+    },
+    { machineA: slice([{ modelName: "claude-opus-4-8", inputTokens: 400_000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, cost: 40 }]) },
+  ]);
+  ok("a short split never lowers the day ($100)", short.aggregate.totalCost === 100, `got ${short.aggregate.totalCost}`);
+  ok("nor its tokens (1,000,000)", short.aggregate.totalTokens === 1_000_000 && short.aggregate.inputTokens === 1_000_000, `got ${short.aggregate.totalTokens}/${short.aggregate.inputTokens}`);
 
   // Without a complete split on both sides, the whole-day rule applies.
   const noSplit = combineContributionMaps([
