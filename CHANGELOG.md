@@ -1,5 +1,16 @@
 # Changelog
 
+## Site — comparison pages lead with measured cost (October 2026)
+
+### Added
+- **`/compare/claude-vs-cursor` and `/compare/claude-vs-antigravity`.** Both tools have developers on the board, though too few for a full grid, so only the Claude Code pairing is generated. Kiro has no submissions yet, so it gets no page.
+- **Every comparison now shows what we measured.** For each tool it lists the developer count, median monthly API-equivalent spend, the median for developers who use only that tool, median tokens per day, and the share who also use the other tool. These come from the same one-row-per-developer, 30-day-normalised cohort as `/data`. Medians are hidden below 10 developers. The narrow rows are fetched once an hour and shared by every matchup, so building the pages doesn't page through the table once per page.
+- **A "which should you use?" section and two new FAQ entries ("Is Codex better than Claude Code?", "Is Cursor cheaper than Claude Code?").** Their answers come from those numbers and each tool's plan prices. No benchmarks we didn't run.
+
+### Changed
+- **Titles, H1s and descriptions follow the order people search in, with Claude Code second:** "Codex vs Claude Code (2026): Measured Cost From N Devs", trimmed to about 60 characters. Canonical slugs are unchanged (`claude-vs-codex` stays canonical; `codex-vs-claude` still 308s to it). The intro and FAQ also use the reversed phrasing.
+- The `/compare` index lists Claude Code pairings first. The Codex/Gemini and Cursor/Copilot posts link to their comparison pages, and llms.txt describes each page by what it measures.
+
 ## Site — pricing pages for Claude Code and Codex (October 2026)
 
 ### Added

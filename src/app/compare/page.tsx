@@ -4,12 +4,18 @@ import { ArrowLeft } from "lucide-react";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import { toolLabel } from "@/lib/utils";
-import { COMPARE_FACTS, COMPARE_MATCHUPS, matchupTitle } from "@/lib/compare";
+import { COMPARE_FACTS, COMPARE_MATCHUPS, matchupTitle, queryOrder } from "@/lib/compare";
+
+// Claude Code pairings first: that's where the search volume is.
+const ORDERED = [
+  ...COMPARE_MATCHUPS.filter((m) => m.a === "claude"),
+  ...COMPARE_MATCHUPS.filter((m) => m.a !== "claude"),
+];
 
 const SITE = "https://www.viberank.app";
 const TITLE = "Compare AI Coding Tools on Real Usage: Claude, Codex & More";
 const DESC =
-  "Head-to-head comparisons of AI coding agents — Claude Code, OpenAI Codex, Gemini CLI, Copilot, OpenCode — on pricing, models, and real adoption from live ccusage data.";
+  "Codex, Cursor, Gemini CLI, Copilot, OpenCode and Antigravity vs Claude Code: measured monthly spend, overlap and pricing from developers' live ccusage data.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -54,7 +60,7 @@ export default function CompareIndexPage() {
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-12">
-          {COMPARE_MATCHUPS.map((m) => (
+          {ORDERED.map((m) => (
             <Link
               key={m.slug}
               href={`/compare/${m.slug}`}
@@ -64,8 +70,8 @@ export default function CompareIndexPage() {
                 {matchupTitle(m)}
               </h2>
               <p className="text-muted text-sm leading-relaxed line-clamp-3">
-                {COMPARE_FACTS[m.a].provider} vs {COMPARE_FACTS[m.b].provider} — pricing, models, and who developers
-                actually use more.
+                {COMPARE_FACTS[queryOrder(m)[0]].provider} vs {COMPARE_FACTS[queryOrder(m)[1]].provider} — measured
+                monthly spend, overlap, pricing, and who developers actually use more.
               </p>
             </Link>
           ))}

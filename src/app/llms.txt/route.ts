@@ -15,7 +15,7 @@ export async function GET() {
   ).join("\n");
 
   const compares = COMPARE_MATCHUPS.map(
-    (m) => `- [${matchupTitle(m)}](${SITE}/compare/${m.slug}): pricing, models, and live adoption compared`
+    (m) => `- [${matchupTitle(m)}](${SITE}/compare/${m.slug}): measured monthly spend per developer, overlap, tokens per day and pricing`
   ).join("\n");
 
   const posts = BLOG_POSTS.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}): ${p.excerpt}`).join("\n");

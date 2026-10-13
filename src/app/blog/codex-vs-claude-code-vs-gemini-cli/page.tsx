@@ -121,6 +121,12 @@ export default function Post() {
           <Link href="/blog/how-much-does-claude-code-cost">how much Claude Code actually costs</Link> and{" "}
           <Link href="/blog/reduce-ai-coding-costs">how to cut your AI coding bill</Link>.
         </p>
+        <p>
+          For live head-to-head numbers (median monthly spend, overlap and tokens per day, refreshed hourly), see{" "}
+          <Link href="/compare/claude-vs-codex">Codex vs Claude Code</Link>,{" "}
+          <Link href="/compare/claude-vs-gemini">Gemini CLI vs Claude Code</Link> and{" "}
+          <Link href="/compare/codex-vs-gemini">Codex vs Gemini CLI</Link>.
+        </p>
 
         <h2>See your own numbers</h2>
         <p>
