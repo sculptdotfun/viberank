@@ -492,7 +492,7 @@ export async function GET(request: Request) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>{siteStats.spend}</div>
-              <div style={{ fontSize: 20, color: '#a1a1aa' }}>Total Spent</div>
+              <div style={{ fontSize: 20, color: '#a1a1aa' }}>API-equivalent</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ fontSize: 40, fontWeight: 'bold', color: '#f97316' }}>{siteStats.tokens}</div>

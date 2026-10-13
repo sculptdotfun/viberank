@@ -286,8 +286,11 @@ export default async function ProfilePage({ params }: ProfileParams) {
 
           {/* Key stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><DollarSign className="w-3.5 h-3.5" />Total spent</p>
+            <div
+              className="bg-surface-1 border border-border rounded-lg p-4"
+              title="API-equivalent: what these tokens would cost at list API prices, as estimated by ccusage. Not what was paid."
+            >
+              <p className="flex items-center gap-1.5 micro-label mb-1"><DollarSign className="w-3.5 h-3.5" />API-equivalent</p>
               <p className="text-xl font-bold font-mono text-accent">${formatNumber(totalCost)}</p>
               <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
             </div>
@@ -450,7 +453,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-medium flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-accent" />
-                  Monthly spend
+                  Monthly API-equivalent
                 </h2>
                 <span className="micro-label">last {monthEntries.length} months</span>
               </div>
