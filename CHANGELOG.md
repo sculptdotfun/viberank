@@ -6,6 +6,13 @@
 - **Picking one end of a custom date range emptied the board, and so did pressing All afterwards.** The board cleared its rows on every change to the From/To inputs, but a single date isn't a range, so no new query ran to refill them and it sat on "No submissions yet" until the sort was switched. Seen on the tokens board: set From, then clear To and press All to go back, and the board stays blank. The reset now follows the query the board actually runs, so only a real filter change clears it.
 - **Loading a date range shows the skeleton instead of "No submissions yet".** The 30-day board takes a few seconds to aggregate, and during that wait it told visitors the leaderboard was empty.
 
+## Site — profiles whose handle exists in two casings open again (September 2026)
+
+### Fixed
+- **Every casing of a handle with more than one profile row returned 404.** `profiles.username` is unique case-sensitively and the submit path looked profiles up by exact match, so an `X-GitHub-User` header typed as `some-dev` next to an existing `Some-Dev` inserted a second row. `getProfile` then read both with `ilike` + `.single()`, which errors on two rows, so the page, the modal and the README badge all reported "not found" for either casing while the leaderboard kept listing the user. The sitemap shows 22 such handles today.
+- `getProfile` now resolves any casing to one canonical row (most submissions, then oldest), and the submit path matches profiles case-insensitively, so a new casing updates the existing profile instead of creating another.
+- Usernames in these lookups are escaped for `ilike`, so `%`, `_` and `*` in a URL match literally instead of matching other profiles.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
