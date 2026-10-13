@@ -90,7 +90,7 @@ npx viberank-mcp
 Submissions are checked at the API level. Anything that fails these rules is rejected:
 
 - **Token math** — `total >= input + output + cache_creation + cache_read`. The total may legitimately *exceed* the four components because reasoning/thinking tokens (Gemini, Codex, Claude extended thinking) are counted in `totalTokens` but not broken out by `ccusage`. We only reject a total that is *less* than its known parts.
-- **Cost floor, per model** — every model's tokens have to be paid for at that model's own floor (`1e-9`/token for DeepSeek, MiMo, MiniMax and big-pickle, whose cache reads cost ~2% of a miss; `1e-7` for everything else), plus a `0.1`/token ceiling. This is the primary guard against inflated token counts now that the token-sum check is one-sided
+- **Cost floor, per model** — every model's tokens have to be paid for at that model's own floor (`1e-9`/token for DeepSeek, MiMo, MiniMax and big-pickle, whose cache reads cost ~2% of a miss, and for Muse Spark; `1e-7` for everything else), plus a `0.1`/token ceiling. This is the primary guard against inflated token counts now that the token-sum check is one-sided
 - **No negative values** anywhere in totals or daily breakdowns
 - **Valid date format** — `YYYY-MM-DD`
 - **Not too far in the future** — dates after tomorrow-UTC are rejected (covers users at any global timezone offset)
@@ -121,7 +121,7 @@ Uploads with no machine ID (web uploads, cURL, very old CLIs) are kept as an una
 Two consequences worth knowing:
 
 - **A machine's totals never silently decrease.** If a re-submission reports *less* than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install, a partial export — the higher prior figure is retained instead. Deleting local transcripts doesn't erase your rank.
-- **Genuine deletion is still recorded.** The CLI reports per-month file and byte counts of your transcript corpus, and the server classifies a shrink as *deleted* vs *rewritten* rather than guessing ([#112](https://github.com/sculptdotfun/viberank/issues/112)). Counts only — no transcript content ever leaves your machine.
+- **Genuine deletion is still recorded.** The CLI reports per-month file and byte counts of your transcript corpus, and the server classifies a shrink as *deleted* vs *rewritten* rather than guessing ([#112](https://github.com/sculptdotfun/viberank/issues/112)). Counts only — no transcript content ever leaves your machine. Counts are compared only against earlier counts of the same folder (a hash of its path is sent, never the path), so a second submitter on the same machine that counts a different folder can't pass for a deletion.
 
 ## Development
 
@@ -170,7 +170,9 @@ Apply the schema:
 #   009_open_to_work_email.sql
 #   010_api_tokens.sql          # hashed CLI tokens
 #   011_efficiency.sql          # cost-per-token, generated column
+#   020_efficiency_score.sql    # volume-weighted efficiency ranking
 #   012_corpus_observations.sql # per-month corpus counts for drift (#112)
+#   019_corpus_scope.sql        # compare corpus counts per counted folder
 #   013_month_stats.sql         # per-month aggregates for /stats/monthly
 #   014_reload_schema_cache.sql # refresh PostgREST's cached schema
 ```

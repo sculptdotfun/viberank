@@ -3,11 +3,12 @@ import { track } from "@vercel/analytics/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
-import { normalizeCcData } from "@/lib/ccusage";
+import { normalizeCcData, isClientMachineId } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { VERIFIED_PROFILE_ERROR } from "@/lib/data/supabase/client";
 import { getCliNotice } from "@/lib/sponsor";
 import { bearerFrom } from "@/lib/tokens";
+import { readCorpusScope } from "@/lib/drift";
 import { getTier } from "@/lib/tiers";
 import { badgeMarkdown, profileUrl } from "@/lib/site";
 
@@ -189,6 +190,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sentMachineId = request.headers.get("X-Machine-Id");
+    if (sentMachineId && !isClientMachineId(sentMachineId)) {
+      return NextResponse.json(
+        { error: "Invalid X-Machine-Id. Use letters, digits, '.', '_' or '-' (up to 128)." },
+        { status: 400 }
+      );
+    }
+
     // Normalize across ccusage report shapes (period→date, dedupe the
     // aggregate "all" rows, resolve per-day tools, recompute totals). This is
     // the single chokepoint every submission path funnels through.
@@ -241,6 +250,7 @@ export async function POST(request: NextRequest) {
       // comes from a client and decides whether a stored total may be lowered,
       // so a malformed block must be ignored, not half-read.
       const corpus = readCorpus(rawPayload);
+      const corpusScope = readCorpusScope(rawPayload);
 
       // Awaited directly, not raced against a timer. A rejected race did not
       // cancel the underlying writes, so a slow merge reported failure while
@@ -257,6 +267,7 @@ export async function POST(request: NextRequest) {
         verified: verified,
         machineId,
         corpus,
+        corpusScope,
         ccData: ccData,
       });
 

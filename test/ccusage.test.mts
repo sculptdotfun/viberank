@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 // Dynamic import: Node's native .ts loader reparses as ESM at runtime, so a
 // static `import {…} from "….ts"` fails name resolution; dynamic import works.
-const { normalizeCcData, validateCcData, mergeMachineContribution, combineContributionMaps } = await import("../src/lib/ccusage.ts");
+const { normalizeCcData, validateCcData, mergeMachineContribution, combineContributionMaps, isClientMachineId } = await import("../src/lib/ccusage.ts");
 
 let passed = 0;
 let failed = 0;
@@ -205,6 +205,8 @@ console.log("\n[4] Anti-cheat still holds");
               totalCost: 44_218,
               modelsUsed: ["claude-opus-4-8"],
               agents: ["claude"],
+              // A day this large must account for its cost per model (#182).
+              modelBreakdowns: [{ modelName: "claude-opus-4-8", inputTokens: 25_000_000_000, outputTokens: 113_577_997, cacheCreationTokens: 0, cacheReadTokens: 66_351_156_098, cost: 44_218 }],
             },
           ],
         },
@@ -516,6 +518,132 @@ console.log("\n[11] Cost floor is priced per model (#150, #154)");
   // Default-floor-only reports behave exactly as before: 1e-7 per token.
   ok("Claude report just above 1e-7 passes", passes(report([mb("claude-opus-4-8", 1_000_000_000, 0, 101)])));
   ok("Claude report just below 1e-7 fails", !passes(report([mb("claude-opus-4-8", 1_000_000_000, 0, 99)])));
+}
+
+console.log("\n[12] Muse Spark (pi over OpenCode Go) clears the per-model floor");
+{
+  // A real multi-agent report from one machine over 51 days: pi on Muse Spark
+  // is 91% of the tokens but 12% of the cost, so the whole report sits at
+  // 3.6e-8 and a single default floor rejected it. Shaped like
+  // `ccusage daily --json --by-agent`: an `agent: "all"` row, a per-model
+  // split and a per-agent split that reconciles with the row.
+  type Part = { agent: string; model: string; tokens: number; cost: number };
+  const slice = (p: Part) => {
+    const input = Math.round(p.tokens * 0.03); // agentic loops: ~97% cache reads
+    return { input, cacheRead: p.tokens - input };
+  };
+  const byAgentReport = (parts: Part[], opts: { split?: boolean } = {}) => {
+    const split = opts.split ?? true;
+    const tokens = parts.reduce((a, p) => a + p.tokens, 0);
+    const cost = parts.reduce((a, p) => a + p.cost, 0);
+    const input = parts.reduce((a, p) => a + slice(p).input, 0);
+    const cacheRead = tokens - input;
+    const row: Record<string, unknown> = {
+      period: "2026-09-16", agent: "all",
+      inputTokens: input, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead,
+      totalTokens: tokens, totalCost: cost,
+      modelsUsed: parts.map((p) => p.model),
+      metadata: { agents: Array.from(new Set(parts.map((p) => p.agent))) },
+    };
+    if (split) {
+      row.modelBreakdowns = parts.map((p) => ({
+        modelName: p.model, inputTokens: slice(p).input, outputTokens: 0,
+        cacheCreationTokens: 0, cacheReadTokens: slice(p).cacheRead, cost: p.cost,
+      }));
+      row.agents = parts.map((p) => ({
+        agent: p.agent, inputTokens: slice(p).input, outputTokens: 0, cacheCreationTokens: 0,
+        cacheReadTokens: slice(p).cacheRead, totalTokens: p.tokens, totalCost: p.cost,
+      }));
+    }
+    return {
+      totals: { inputTokens: input, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead, totalTokens: tokens, totalCost: cost },
+      daily: [row],
+    };
+  };
+  const accepted = (raw: unknown) => {
+    try { validateCcData(normalizeCcData(raw as never), FIXED_NOW); return true; } catch { return false; }
+  };
+
+  // The numbers from the rejected submission: 51,111,141,344 tokens, $1,841.82.
+  const pi: Part = { agent: "pi", model: "muse-spark-1.3-contributor", tokens: 46_433_090_832, cost: 214.01 };
+  const claude: Part = { agent: "claude", model: "claude-opus-4-8", tokens: 2_000_000_000, cost: 900 };
+  const codex: Part = { agent: "codex", model: "gpt-5.5", tokens: 2_678_050_512, cost: 727.81 };
+  const honest = byAgentReport([pi, claude, codex]);
+  const ratio = honest.totals.totalCost / honest.totals.totalTokens;
+  ok("whole report sits under the default floor (3.6e-8)", ratio > 3.5e-8 && ratio < 3.7e-8, `got ${ratio}`);
+  ok("per-agent split reconciles and is kept",
+    Object.keys(normalizeCcData(honest as never).daily[0].agentBreakdowns ?? {}).length === 3);
+  ok("honest pi + Claude + Codex report is accepted", accepted(honest));
+  ok("honest pi-only report (4.6e-9) is accepted", accepted(byAgentReport([pi])));
+  ok("provider-prefixed model name gets the same floor",
+    accepted(byAgentReport([{ ...pi, model: "meta/muse-spark-1.3-contributor" }])));
+
+  // One agent with an invented ratio, an order of magnitude under the floor.
+  ok("pi at 1e-10 per token is rejected",
+    !accepted(byAgentReport([{ ...pi, cost: pi.tokens * 1e-10 }])));
+  ok("pi with 100x inflated tokens beside honest Claude/Codex is rejected",
+    !accepted(byAgentReport([{ ...pi, tokens: pi.tokens * 100 }, claude, codex])));
+
+  // The floor still follows the model: the same pi ratio on a Claude model fails.
+  ok("the same pi ratio on a default-floor model is rejected",
+    !accepted(byAgentReport([{ ...pi, model: "claude-opus-4-8" }])));
+
+  // No per-agent or per-model split and only default-floor models: the old
+  // aggregate check applies unchanged.
+  ok("unsplit default-model report at 3.6e-8 is rejected",
+    !accepted(byAgentReport([{ ...pi, model: "claude-opus-4-8" }, claude, codex], { split: false })));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n[13] Per-day limits: a single day can't carry a year's allowance (#182)");
+{
+  type Model = { modelName: string; cost: number; cacheReadTokens: number; outputTokens?: number };
+  const day = (date: string, cost: number, cacheRead: number, output: number, models?: Model[]) => ({
+    date, inputTokens: 0, outputTokens: output, cacheCreationTokens: 0, cacheReadTokens: cacheRead,
+    totalTokens: cacheRead + output, totalCost: cost, modelsUsed: models ? models.map((m) => m.modelName) : ["claude-opus-4-8"],
+    ...(models ? { modelBreakdowns: models.map((m) => ({ inputTokens: 0, outputTokens: m.outputTokens ?? 0, cacheCreationTokens: 0, cacheReadTokens: m.cacheReadTokens, cost: m.cost, modelName: m.modelName })) } : {}),
+  });
+  const report = (days: ReturnType<typeof day>[]) => ({
+    daily: days,
+    totals: days.reduce((t, d) => ({
+      inputTokens: 0, outputTokens: t.outputTokens + d.outputTokens, cacheCreationTokens: 0,
+      cacheReadTokens: t.cacheReadTokens + d.cacheReadTokens, totalTokens: t.totalTokens + d.totalTokens, totalCost: t.totalCost + d.totalCost,
+    }), { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 0, totalCost: 0 }),
+  });
+  const check = (raw: unknown) => validateCcData(normalizeCcData(raw as never), FIXED_NOW);
+
+  // The live payload: exactly MAX_DAILY_COST × 365, priced exactly at the floor, no split.
+  throws("the synthetic $1,825,000 day is rejected",
+    () => check(report([day("2026-10-08", 1_825_000, 18_250_000_000_000, 0)])), "exceeds realistic limits");
+  throws("a $150K+ day is rejected even with a matching split",
+    () => check(report([day("2026-10-08", 160_000, 1_000_000_000_000, 1_000_000_000, [{ modelName: "claude-opus-5", cost: 160_000, cacheReadTokens: 1_000_000_000_000, outputTokens: 1_000_000_000 }])])), "exceeds realistic limits");
+  doesNotThrow("the largest honest day on record ($126K, split matches) passes",
+    () => check(report([day("2026-09-08", 126_233, 153_000_000_000, 575_000_000, [{ modelName: "claude-opus-5", cost: 116_000, cacheReadTokens: 140_000_000_000, outputTokens: 500_000_000 }, { modelName: "gpt-6-sol", cost: 10_233, cacheReadTokens: 13_000_000_000, outputTokens: 75_000_000 }])])));
+  throws("a $20K day with no per-model split is rejected",
+    () => check(report([day("2026-10-01", 20_000, 150_000_000_000, 50_000_000)])), "per-model costs");
+  throws("a $20K day whose split covers only $2K is rejected",
+    () => check(report([day("2026-10-01", 20_000, 150_000_000_000, 50_000_000, [{ modelName: "claude-opus-5", cost: 2_000, cacheReadTokens: 150_000_000_000, outputTokens: 50_000_000 }])])), "per-model costs");
+  doesNotThrow("a $20K day whose split is 5% short (rounding, reasoning) passes",
+    () => check(report([day("2026-10-01", 20_000, 150_000_000_000, 50_000_000, [{ modelName: "claude-opus-5", cost: 19_000, cacheReadTokens: 150_000_000_000, outputTokens: 50_000_000 }])])));
+  doesNotThrow("a $3K day with no split still passes (old CLIs, web uploads)",
+    () => check(report([day("2026-10-01", 3_000, 20_000_000_000, 10_000_000)])));
+
+  // --by-agent reports repeat a model once per agent; the cap used to cut real rows.
+  const repeated = Array.from({ length: 80 }, () => ({ modelName: "claude-opus-4-6", cost: 100, cacheReadTokens: 1_000_000_000 }));
+  const n = normalizeCcData(report([day("2026-09-01", 8_000, 80_000_000_000, 0, repeated)]) as never);
+  ok("repeated model rows fold into one before the 50-row cap",
+    n.daily[0].modelBreakdowns?.length === 1 && n.daily[0].modelBreakdowns[0].cost === 8_000, JSON.stringify(n.daily[0].modelBreakdowns?.[0]));
+  doesNotThrow("so an honest 80-row $8K by-agent day passes", () => check(report([day("2026-09-01", 8_000, 80_000_000_000, 0, repeated)])));
+}
+
+console.log("\n[14] Client machine IDs can't claim server slice names");
+{
+  ok("a UUID is accepted", isClientMachineId("3f2b8c1e-9a4d-4e2f-8b1c-0d9e7a6f5b4c"));
+  ok("a hostname-style id is accepted", isClientMachineId("work-mbp.local_2"));
+  ok("'default' is refused", !isClientMachineId("default") && !isClientMachineId("DEFAULT"));
+  ok("an ':estimated' suffix is refused", !isClientMachineId("abc:estimated"));
+  ok("a 'retired:' key is refused", !isClientMachineId("retired:deadbeef"));
+  ok("over 128 chars is refused", !isClientMachineId("a".repeat(129)));
 }
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);
