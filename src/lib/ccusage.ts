@@ -682,10 +682,12 @@ const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
  * assumption that a cached read costs about a tenth of fresh input. DeepSeek
  * bills cache hits at 2% of a miss and agentic loops are ~99% cache reads, so
  * an honest DeepSeek day lands near 1e-8 (#154); OpenCode's MiMo and MiniMax
- * models and the free big-pickle land near 2e-8 (#150). Matched on the model
- * name, not the tool: Claude Code and OpenCode can both route to these.
+ * models and the free big-pickle land near 2e-8 (#150). Meta's Muse Spark,
+ * served through OpenCode Go and run from pi, prices a mostly-cached day near
+ * 5e-9. Matched on the model name, not the tool: Claude Code, OpenCode and pi
+ * can all route to these.
  */
-const CHEAP_MODEL_PATTERN = /deepseek|mimo|minimax|big-pickle/i;
+const CHEAP_MODEL_PATTERN = /deepseek|mimo|minimax|big-pickle|muse-spark/i;
 const CHEAP_MODEL_MIN_COST_PER_TOKEN = 0.000000001;
 
 function minCostPerTokenForModel(modelName: string): number {
