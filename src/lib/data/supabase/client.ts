@@ -99,6 +99,10 @@ interface DbDailyBreakdown {
   // Per-machine slices of this day, keyed by machine id. NULL on legacy rows
   // that predate per-machine tracking (#43).
   machine_contributions?: Record<string, MachineContribution> | null;
+  // Distinct machines that contributed this day. Derived on the server from
+  // machine_contributions and never selected from Postgres; see
+  // countDayMachines.
+  machine_count?: number;
 }
 
 interface DbProfile {
@@ -205,6 +209,18 @@ function storedContributions(
 const DAILY_PUBLIC_COLUMNS =
   "id, submission_id, date, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, total_cost, models_used, agents, model_breakdowns";
 
+/**
+ * Reduces a day's machine_contributions to a bare count so the machine IDs
+ * (its keys) never reach a DailyBreakdown. The legacy default slot is not a
+ * real machine, but a day always had at least one.
+ */
+function countDayMachines(
+  contributions: Record<string, MachineContribution> | null
+): number | undefined {
+  if (!contributions) return undefined;
+  return Math.max(1, Object.keys(contributions).filter((id) => id !== DEFAULT_MACHINE_ID).length);
+}
+
 /** The daily_breakdowns columns for one day's aggregate. */
 function aggregateToDailyColumns(aggregate: DailyAggregate) {
   return {
@@ -232,9 +248,7 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
     modelsUsed: db.models_used || [],
     agents: db.agents || [],
     modelBreakdowns: db.model_breakdowns || undefined,
-    ...(db.machine_contributions ? {
-      machineCount: Math.max(1, Object.keys(db.machine_contributions).filter((id) => id !== DEFAULT_MACHINE_ID).length),
-    } : {}),
+    ...(db.machine_count !== undefined ? { machineCount: db.machine_count } : {}),
   };
 }
 
@@ -1505,18 +1519,14 @@ export class SupabaseProfilesService implements ProfilesService {
     const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
       submissionIds,
       (chunk, from, to) => {
-        if (this.serverRead) {
-          return this.client
-            .from("daily_breakdowns")
-            .select("*")
-            .in("submission_id", chunk)
-            .order("submission_id", { ascending: true })
-            .order("date", { ascending: true })
-            .range(from, to);
-        }
-        return this.client
-          .from("daily_breakdowns")
-          .select(DAILY_PUBLIC_COLUMNS)
+        // Only the service-role layer may read machine_contributions
+        // (migration 017 revokes it from anon). It is named explicitly, never
+        // via select("*"), and reduced to a count right after the fetch.
+        const table = this.client.from("daily_breakdowns");
+        const query = this.serverRead
+          ? table.select(`${DAILY_PUBLIC_COLUMNS}, machine_contributions`)
+          : table.select(DAILY_PUBLIC_COLUMNS);
+        return query
           .in("submission_id", chunk)
           .order("submission_id", { ascending: true })
           .order("date", { ascending: true })
@@ -1526,7 +1536,12 @@ export class SupabaseProfilesService implements ProfilesService {
     );
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    allDailyBreakdowns.forEach((db) => {
+    allDailyBreakdowns.forEach(({ machine_contributions, ...publicColumns }) => {
+      // Drop the machine IDs here so nothing downstream can serialize them.
+      const db: DbDailyBreakdown = {
+        ...publicColumns,
+        machine_count: countDayMachines(machine_contributions ?? null),
+      };
       const existing = dailyBySubmission.get(db.submission_id) || [];
       existing.push(db);
       dailyBySubmission.set(db.submission_id, existing);
