@@ -2276,7 +2276,7 @@ export class SupabaseStatsService implements StatsService {
   }
 
   async getSpendRows(): Promise<BurnRow[]> {
-    // Only the four columns the spend curve needs, paged. The whole table is
+    // Only the columns the spend curve needs, paged. The whole table is
     // ~1k rows and /calculator is ISR-cached hourly, so this is cheaper than
     // the aggregates /stats already runs — no RPC or migration required.
     const rows = await fetchAllPages<{
@@ -2284,11 +2284,12 @@ export class SupabaseStatsService implements StatsService {
       total_cost: number;
       date_range_start: string;
       date_range_end: string;
+      tools: string[] | null;
     }>(
       (from, to) =>
         this.client
           .from("submissions")
-          .select("username,total_cost,date_range_start,date_range_end")
+          .select("username,total_cost,date_range_start,date_range_end,tools")
           .or("flagged_for_review.is.null,flagged_for_review.eq.false")
           .order("id", { ascending: true })
           .range(from, to),
@@ -2300,6 +2301,7 @@ export class SupabaseStatsService implements StatsService {
       totalCost: Number(r.total_cost),
       start: r.date_range_start,
       end: r.date_range_end,
+      tools: r.tools ?? undefined,
     }));
   }
 }

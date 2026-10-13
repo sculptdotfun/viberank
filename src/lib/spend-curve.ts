@@ -11,6 +11,8 @@ export interface BurnRow {
   /** Inclusive ISO dates, as stored on a submission. */
   start: string;
   end: string;
+  /** Tools/agents on the submission (e.g. ["codex"]); absent on legacy rows. */
+  tools?: string[];
 }
 
 export interface SpendCurve {
