@@ -74,3 +74,27 @@ export function hashesMatch(a: string, b: string): boolean {
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }
+
+export type WhoamiResult =
+  | { status: 200; body: { username: string } }
+  | { status: 401; body: { error: string } };
+
+/**
+ * The account a bearer token files submissions under, resolved exactly the way
+ * /api/submit resolves it, so the CLI can name that account before uploading
+ * instead of a typed name the server will ignore (#181).
+ */
+export async function whoamiFor(
+  authorization: string | null | undefined,
+  resolve: (token: string) => Promise<{ githubUsername: string } | null>
+): Promise<WhoamiResult> {
+  const bearer = bearerFrom(authorization);
+  const owner = bearer ? await resolve(bearer) : null;
+  if (!owner) {
+    return {
+      status: 401,
+      body: { error: "Invalid or revoked API token. Run `npx viberank-cli login` to get a new one." },
+    };
+  }
+  return { status: 200, body: { username: owner.githubUsername } };
+}
