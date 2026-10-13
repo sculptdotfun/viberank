@@ -385,6 +385,9 @@ export function createDemoDataLayer(): DataLayer {
       async getFlaggedSubmissions(): Promise<Submission[]> {
         return submissions.filter((submission) => submission.flaggedForReview);
       },
+      async clearReview(): Promise<{ success: boolean }> {
+        return { success: true };
+      },
       async updateFlagStatus(): Promise<{ success: boolean }> {
         return { success: false };
       },
