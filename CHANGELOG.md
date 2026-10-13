@@ -1,5 +1,14 @@
 # Changelog
 
+## Site + API — Tako in the house slots (October 2026)
+
+### Added
+- **Tako, the maker's open-source Mac terminal for running many Claude Code and Codex agents at once, now has three placements.** It's labelled "from the maker of viberank", not as a sponsor. The placements are:
+  - A one-time home banner, dismissible, which replaces the August leagues announcement.
+  - A footer link.
+  - The line the CLI prints after a submission. A paid `SPONSOR_CLI_NOTICE` still takes that line when it's set.
+  - Clicks report `tako_clicked` with the placement.
+
 ## Site — the profile chart names the models in range (October 2026)
 
 ### Fixed

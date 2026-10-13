@@ -23,8 +23,14 @@ export function getSponsor(): Sponsor | null {
   };
 }
 
+// Tako is the maker's own open-source terminal for running many coding agents,
+// so it fills the house slots, labelled as ours rather than as a sponsor.
+export const TAKO_URL = "https://github.com/nikshepsvn/tako";
+const TAKO_CLI_NOTICE = `Running several agents at once? Tako, from the maker of viberank, keeps track of them all: ${TAKO_URL}`;
+
 // Server-only: line printed by the CLI after a successful submission,
-// e.g. "viberank is sponsored by Acme — https://acme.dev/viberank".
-export function getCliNotice(): string | null {
-  return process.env.SPONSOR_CLI_NOTICE || null;
+// e.g. "viberank is sponsored by Acme — https://acme.dev/viberank". A paid
+// sponsor's line wins; otherwise the CLI shows the house line.
+export function getCliNotice(): string {
+  return process.env.SPONSOR_CLI_NOTICE || TAKO_CLI_NOTICE;
 }
