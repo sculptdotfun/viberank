@@ -57,6 +57,8 @@ export interface Submission {
   claimedBy?: string;
   flaggedForReview?: boolean;
   flagReasons?: string[];
+  /** Automatic "under review" marks (#183). Shown as a badge; never hides or re-ranks. */
+  reviewReasons?: string[];
 }
 
 export interface Profile {
@@ -385,6 +387,8 @@ export interface SubmissionsService {
     flagged: boolean,
     reason?: string
   ): Promise<{ success: boolean }>;
+  /** Admin: clear the automatic review marks after a maintainer has looked. */
+  clearReview(id: string): Promise<{ success: boolean }>;
   claimAndMergeSubmissions(githubUsername: string): Promise<ClaimResult>;
   checkClaimableSubmissions(githubUsername: string): Promise<ClaimStatus>;
   /** 1-based leaderboard position for a given total cost (by-cost ranking). */

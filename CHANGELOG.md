@@ -1,5 +1,13 @@
 # Changelog
 
+## Site — an "under review" badge for unusual entries (October 2026)
+
+### Added
+- **Unusual entries are marked "under review", not hidden** (#183, migration 023 `review_reasons`). A submission is marked when it brings a day over $25K that is also more than 20× the profile's median day, or when one submission adds over $100K. The entry keeps counting and keeps its rank. The badge (on the board row and the profile header) tells readers a maintainer hasn't checked it yet, and its tooltip lists why.
+  - Only what a submission brings in can add a reason, so a cleared profile is only re-marked by new evidence. Marking runs after the write and can never fail a submission.
+  - `POST /api/admin/review {id}` clears the marks after a maintainer has looked.
+  - Existing history was backfilled with the same day rule: 5 entries are marked.
+
 ## Database — one profile per handle (October 2026)
 
 ### Fixed

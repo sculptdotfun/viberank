@@ -1,5 +1,6 @@
 "use client";
 
+import ReviewBadge from "@/components/ReviewBadge";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, DollarSign, Zap, Calendar, Share2, X, BadgeCheck, Loader2, Gauge } from "lucide-react";
@@ -496,6 +497,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
                                 cli
                               </span>
                             )}
+                            <ReviewBadge reasons={submission.reviewReasons} />
                           </div>
                           {/* Tokens live here on mobile, where the column is hidden */}
                           <div className="text-xs text-muted font-mono sm:hidden">

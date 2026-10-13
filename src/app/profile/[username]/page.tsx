@@ -32,6 +32,7 @@ import ActivityHeatmap from "@/components/ActivityHeatmap";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
+import ReviewBadge from "@/components/ReviewBadge";
 import OpenToWorkToggle from "@/components/OpenToWorkToggle";
 
 // ISR the full profile page too — direct loads and sheet "view full profile"
@@ -259,6 +260,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
               <div className="flex flex-wrap items-center gap-2.5 mb-2">
                 <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
                 <TierBadge totalCost={bestCost} size="md" />
+                <ReviewBadge reasons={submissions.flatMap((sub) => sub.reviewReasons ?? [])} size="md" />
                 {globalRank && (
                   <span className="font-mono text-xs font-semibold px-2 py-1 rounded bg-accent/12 text-accent leading-none">
                     #{globalRank}

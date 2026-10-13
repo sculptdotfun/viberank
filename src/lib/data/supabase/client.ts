@@ -52,6 +52,7 @@ import {
   type DailyAggregate,
   type MachineContribution,
 } from "@/lib/ccusage";
+import { reviewReasonsFor, mergeReviewReasons } from "@/lib/review";
 
 // ============================================================================
 // DATABASE TYPES (matching Supabase schema)
@@ -80,6 +81,8 @@ interface DbSubmission {
   claimed_by: string | null;
   flagged_for_review: boolean | null;
   flag_reasons: string[] | null;
+  /** Automatic "under review" marks (#183, migration 023). Never hides the row. */
+  review_reasons?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +158,7 @@ function convertDbSubmissionToSubmission(
     claimedBy: dbSubmission.claimed_by || undefined,
     flaggedForReview: dbSubmission.flagged_for_review || undefined,
     flagReasons: dbSubmission.flag_reasons || undefined,
+    reviewReasons: dbSubmission.review_reasons?.length ? dbSubmission.review_reasons : undefined,
   };
 }
 
@@ -627,6 +631,14 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       );
     }
 
+    // Mark unusual (not invalid) submissions for a maintainer's look (#183).
+    // Like the profile projection below, this must never fail an accepted write.
+    try {
+      await this.markForReview(submissionId, data, existing);
+    } catch (reviewError) {
+      console.error("Review marking failed after the submission was accepted:", reviewError);
+    }
+
     // The submission is durable by this point. The profile row is a projection
     // of it, so a failure here must be logged rather than raised: turning an
     // accepted submission into a client-visible error is what pushes users to
@@ -641,6 +653,53 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     }
 
     return submissionId;
+  }
+
+  private async markForReview(
+    submissionId: string,
+    data: SubmitData,
+    previous: DbSubmission | null
+  ): Promise<void> {
+    const days = await fetchAllPages<{ date: string; total_cost: number }>(
+      (from, to) =>
+        this.client
+          .from("daily_breakdowns")
+          .select("date, total_cost")
+          .eq("submission_id", submissionId)
+          .order("date")
+          .range(from, to),
+      "days for review"
+    );
+    const costByDate = new Map(days.map((d) => [d.date, Number(d.total_cost)]));
+    const incomingDates = new Set(data.ccData.daily.map((d) => d.date));
+    const reasons = reviewReasonsFor({
+      incomingDays: [...incomingDates].map((date) => ({ date, totalCost: costByDate.get(date) ?? 0 })),
+      allDayCosts: [...costByDate.values()],
+      previousTotal: previous ? Number(previous.total_cost) : 0,
+      newTotal: [...costByDate.values()].reduce((sum, cost) => sum + cost, 0),
+    });
+    if (reasons.length === 0) return;
+
+    const { data: row, error } = await this.client
+      .from("submissions")
+      .select("review_reasons")
+      .eq("id", submissionId)
+      .single();
+    // Before migration 023 the column doesn't exist; marking is best effort.
+    if (error) throw new Error(`Failed to read review state: ${error.message}`);
+    const merged = mergeReviewReasons(row?.review_reasons as string[] | null, reasons);
+    const { error: updateError } = await this.client
+      .from("submissions")
+      .update({ review_reasons: merged })
+      .eq("id", submissionId);
+    if (updateError) throw new Error(`Failed to mark for review: ${updateError.message}`);
+  }
+
+  /** Admin: a maintainer looked, so drop the automatic marks (#183). */
+  async clearReview(id: string): Promise<{ success: boolean }> {
+    const { error } = await this.client.from("submissions").update({ review_reasons: null }).eq("id", id);
+    if (error) throw new Error(`Failed to clear review: ${error.message}`);
+    return { success: true };
   }
 
   /**
