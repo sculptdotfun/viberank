@@ -24,6 +24,7 @@ import { computeStreaks } from "@/lib/streaks";
 import { computeWorkInsights, percentile, type ComparableMetric } from "@/lib/work-insights";
 import { getWorkInsightBaselinesCached } from "@/lib/work-insight-baselines";
 import { getServerDataLayer } from "@/lib/data";
+import { buildProfileChartDays } from "@/lib/profile-chart-data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
 import BadgeSnippet from "./BadgeSnippet";
@@ -101,33 +102,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
     { label: "Active days in span", value: workInsights.activeDayShare === null ? null : pct(workInsights.activeDayShare), detail: "First to last active day", comparison: null },
   ].filter((tile) => tile.value !== null);
 
-  // Model-stacked series for the usage chart: top 5 models by total cost keep
-  // their own color; everything else (and legacy days without splits) folds
-  // into "Other".
-  const chartModelTotals = new Map<string, number>();
-  for (const d of uniqueDaily) {
-    for (const mb of d.modelBreakdowns ?? []) {
-      const name = prettyModelName(mb.modelName);
-      chartModelTotals.set(name, (chartModelTotals.get(name) ?? 0) + mb.cost);
-    }
-  }
-  const chartModelKeys = Array.from(chartModelTotals.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([name]) => name);
-  const stackedDaily = uniqueDaily.map((d) => {
-    const byModel: Record<string, number> = {};
-    let attributed = 0;
-    for (const mb of d.modelBreakdowns ?? []) {
-      const name = prettyModelName(mb.modelName);
-      const key = chartModelKeys.includes(name) ? name : "Other";
-      byModel[key] = (byModel[key] ?? 0) + mb.cost;
-      attributed += mb.cost;
-    }
-    const rest = d.totalCost - attributed;
-    if (rest > 0.005) byModel["Other"] = (byModel["Other"] ?? 0) + rest;
-    return { date: d.date, total: d.totalCost, byModel };
-  });
+  // Per-model daily costs, uncollapsed: the chart ranks models within the
+  // selected range, so the series match the days on screen.
+  const chartDays = buildProfileChartDays(uniqueDaily);
 
   // Streaks over days that actually have usage recorded.
   const streaks = computeStreaks(uniqueDaily.map((d) => d.date));
@@ -401,7 +378,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         </div>
 
         {/* Usage chart (client island) */}
-        <UsageChart daily={stackedDaily} modelKeys={chartModelKeys} />
+        <UsageChart daily={chartDays} />
 
         {/* Activity heatmap */}
         <div className="bg-surface-1 border border-border rounded-lg p-5 mb-4">

@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — the profile chart names the models in range (October 2026)
+
+### Fixed
+- **New models no longer render as Other on the usage chart.** The chart picked its five colored series by all-time cost and the server folded every other model into Other before the chart saw it, so the 7d / 30d views could only slice days. A long history kept retired models in color while the ones in current use sat in gray (seen on one profile: 93–100% of recent days' cost as Other). The server now passes per-model daily costs, and the chart ranks the top 5 within the selected range and folds the rest plus unattributed cost into Other (#180). Colors follow rank in the view, so they stay distinct, and the legend lists only series in range.
+
 ## Site — profile work insights (September 2026)
 
 ### Added
