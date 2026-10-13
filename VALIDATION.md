@@ -41,6 +41,18 @@ The cutoff is intentionally one day past UTC midnight rather than today, because
 
 `totalCost > $5,000 × 365` (~$1,825,000) is rejected as out of reasonable bounds.
 
+### Per-day limits
+
+The total cap alone let a single day carry a whole year's allowance ([#182](https://github.com/sculptdotfun/viberank/issues/182)), so each day is also checked:
+
+- **A day over $150,000 is rejected.** The largest honest day across every archived payload is about $126K.
+- **A day over $5,000 must account for its cost per model.** It needs a `modelBreakdowns` split whose costs add up to the day's cost within 10%. ccusage always emits the split, so only hand-built payloads fail. Smaller days are exempt, because older CLIs and web uploads omit it.
+- Repeated model rows (one per agent in `--by-agent` reports) are folded together before the 50-model cap, so the cap no longer drops part of an honest split.
+
+### Machine IDs
+
+`X-Machine-Id` must be 1–128 characters of letters, digits, `.`, `_` or `-`, and can't be `default`. The server keys its own slices with names a client must not be able to claim: `default` for unattributed usage, and colon-suffixed keys.
+
 ## Soft flagging
 
 The schema supports a `flagged_for_review` boolean per submission. Flagged rows are hidden from the leaderboard by default (`includeFlagged: true` reveals them via the admin endpoint).

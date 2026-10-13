@@ -1,5 +1,12 @@
 # Changelog
 
+## Site — one day can't carry a year's allowance (October 2026)
+
+### Fixed
+- **A single synthetic day reached #1 on both boards** ([#182](https://github.com/sculptdotfun/viberank/issues/182)). `MAX_DAILY_COST` only ever capped the report's total (× 365), so one $1,825,000 day of pure cache reads, priced exactly at the per-model floor and with no model split, passed every check. Each day is now checked as well. A day over $150,000 is rejected; the largest honest day in the archive is about $126K. A day over $5,000 must carry a per-model split whose costs add up to it within 10%. Across all 4,960 archived payloads, the only day either rule rejects is the synthetic one. The day has been removed from production.
+- **The 50-model cap cut real rows from `--by-agent` reports.** Those reports repeat a model once per agent, and the cap ran before the rows were folded together, which left one profile's split short on 280 days. Repeats are now folded first.
+- **`X-Machine-Id` can't claim a server slice name.** `default`, colon-suffixed keys and anything outside `[A-Za-z0-9._-]{1,128}` get a 400. All 395 machine IDs in the archive already fit.
+
 ## Site + CLI — a different folder's smaller count is not a deletion (September 2026)
 
 ### Fixed
