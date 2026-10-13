@@ -165,23 +165,30 @@ function mergeAgentMaps(
 // Per-model day splits come straight from user-supplied JSON, so rebuild them
 // field-by-field and cap the count — never trust the shape.
 const MAX_MODELS_PER_DAY = 50;
+const MAX_MODEL_ROWS_READ = 1000;
 function sanitizeModelBreakdowns(value: unknown): NormalizedModelBreakdown[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
-  const out: NormalizedModelBreakdown[] = [];
-  for (const item of value.slice(0, MAX_MODELS_PER_DAY)) {
+  // `--by-agent` reports repeat a model once per agent, so fold repeats before
+  // capping: capping first dropped real rows and left the split short of the
+  // day's cost (one profile lost 280 days' worth of split this way).
+  const byModel = new Map<string, NormalizedModelBreakdown>();
+  for (const item of value.slice(0, MAX_MODEL_ROWS_READ)) {
     if (typeof item !== "object" || item === null) continue;
     const o = item as Record<string, unknown>;
     if (typeof o.modelName !== "string" || o.modelName.length === 0) continue;
-    out.push({
-      modelName: o.modelName.slice(0, 200),
-      inputTokens: num(o.inputTokens),
-      outputTokens: num(o.outputTokens),
-      cacheCreationTokens: num(o.cacheCreationTokens),
-      cacheReadTokens: num(o.cacheReadTokens),
-      cost: num(o.cost),
-    });
+    const modelName = o.modelName.slice(0, 200);
+    const row = byModel.get(modelName) ?? {
+      modelName, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, cost: 0,
+    };
+    row.inputTokens += num(o.inputTokens);
+    row.outputTokens += num(o.outputTokens);
+    row.cacheCreationTokens += num(o.cacheCreationTokens);
+    row.cacheReadTokens += num(o.cacheReadTokens);
+    row.cost += num(o.cost);
+    byModel.set(modelName, row);
   }
+  const out = [...byModel.values()].sort((a, b) => b.cost - a.cost).slice(0, MAX_MODELS_PER_DAY);
   return out.length > 0 ? out : undefined;
 }
 
@@ -260,6 +267,17 @@ export interface DailyAggregate {
 export const DEFAULT_MACHINE_ID = "default";
 
 /**
+ * Machine IDs a client may send. The server keys its own slices with names a
+ * client must not be able to claim (`default` for unattributed usage, and
+ * colon-suffixed keys such as `<id>:estimated` or `retired:<hex>`), so a header
+ * that could collide with them is refused. Every ID in the archive already fits.
+ */
+const CLIENT_MACHINE_ID = /^[A-Za-z0-9._-]{1,128}$/;
+export function isClientMachineId(id: string): boolean {
+  return CLIENT_MACHINE_ID.test(id) && id.toLowerCase() !== DEFAULT_MACHINE_ID;
+}
+
+/**
  * Whether observation `a` of one day should win over `b`. Cost decides; total
  * tokens break ties so unpriced models ($0) still keep the larger observation.
  * Compared whole rather than per-field, so the winner is a slice that was
@@ -277,13 +295,167 @@ export function aggregateContributions(
   contributions: Record<string, MachineContribution>
 ): DailyAggregate {
   const { [DEFAULT_MACHINE_ID]: unattributed, ...attributed } = contributions;
-  const summed = sumContributions(Object.values(attributed));
+  const attributedSlices = Object.values(attributed);
+  const summed = sumContributions(attributedSlices);
+  if (!unattributed) return summed;
+  if (attributedSlices.length === 0) return sumContributions([unattributed]);
+
   // max(unattributed, Σ attributed): the unattributed slice may be any of the
   // id'd machines, so it can hold a day up but never add to it (#81).
-  if (unattributed && (Object.keys(attributed).length === 0 || outweighs(unattributed, summed))) {
-    return sumContributions([unattributed]);
+  const wholeDay = outweighs(unattributed, summed) ? sumContributions([unattributed]) : summed;
+
+  // Compared model by model where both sides carry a full split, so a model
+  // only the unattributed slice used — typically a retired machine's — is
+  // counted instead of being hidden behind the id'd machines' day.
+  const byModel = maxByModel(unattributed, attributedSlices);
+  return byModel ? atLeast(byModel, wholeDay) : wholeDay;
+}
+
+/**
+ * Merges are lossless: the per-model result may only raise a day above the
+ * whole-day rule, never lower it. A split accepted within tolerance can fall
+ * short of its slice's totals, so every summed field is floored at the
+ * whole-day value rather than trusting the split alone.
+ */
+function atLeast(agg: DailyAggregate, floor: DailyAggregate): DailyAggregate {
+  return {
+    ...agg,
+    inputTokens: Math.max(agg.inputTokens, floor.inputTokens),
+    outputTokens: Math.max(agg.outputTokens, floor.outputTokens),
+    cacheCreationTokens: Math.max(agg.cacheCreationTokens, floor.cacheCreationTokens),
+    cacheReadTokens: Math.max(agg.cacheReadTokens, floor.cacheReadTokens),
+    totalTokens: Math.max(agg.totalTokens, floor.totalTokens),
+    totalCost: Math.max(agg.totalCost, floor.totalCost),
+    modelsUsed: Array.from(new Set([...agg.modelsUsed, ...floor.modelsUsed])),
+    agents: Array.from(new Set([...agg.agents, ...floor.agents])),
+  };
+}
+
+/**
+ * The same model across ccusage versions, which have renamed it (date
+ * suffixes, provider paths, dotted versions, and the `[tool]` prefix newer
+ * versions add). The prefix is dropped on purpose: the unattributed slice may
+ * be a copy of an id'd day reported by another ccusage version, so
+ * `[openclaw] google/gemini-3-pro` on one side and `google/gemini-3-pro` on
+ * the other take the max rather than add. Rows within one side still sum,
+ * since `addModel` folds them under the shared key.
+ */
+function modelKey(name: string): string {
+  let model = name.replace(/^\[[^\]]+\]\s*/, "");
+  model = model.split("/").pop() ?? model;
+  return model.replace(/-\d{8}$/, "").replace(/\./g, "-").toLowerCase();
+}
+
+const breakdownTokens = (m: NormalizedModelBreakdown) =>
+  m.inputTokens + m.outputTokens + m.cacheCreationTokens + m.cacheReadTokens;
+
+function addModel(
+  into: Map<string, NormalizedModelBreakdown>,
+  key: string,
+  m: NormalizedModelBreakdown
+): void {
+  const held = into.get(key);
+  into.set(
+    key,
+    held
+      ? {
+          ...held,
+          inputTokens: held.inputTokens + m.inputTokens,
+          outputTokens: held.outputTokens + m.outputTokens,
+          cacheCreationTokens: held.cacheCreationTokens + m.cacheCreationTokens,
+          cacheReadTokens: held.cacheReadTokens + m.cacheReadTokens,
+          cost: held.cost + m.cost,
+        }
+      : { ...m }
+  );
+}
+
+/** Per-model view of a slice, or null when its split doesn't account for its totals. */
+function modelsOf(slice: MachineContribution): Map<string, NormalizedModelBreakdown> | null {
+  const rows = slice.modelBreakdowns;
+  if (!rows || rows.length === 0) return null;
+
+  const byKey = new Map<string, NormalizedModelBreakdown>();
+  let cost = 0;
+  let tokens = 0;
+  for (const m of rows) {
+    cost += m.cost;
+    tokens += breakdownTokens(m);
+    addModel(byKey, modelKey(m.modelName), m);
   }
-  return summed;
+
+  // A partial split (older CLIs, models ccusage couldn't attribute) would
+  // silently drop the unsplit remainder, so only a complete one qualifies.
+  const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 0.01);
+  if (!close(cost, slice.totalCost) || !close(tokens, slice.totalTokens)) return null;
+  return byKey;
+}
+
+/**
+ * Σ over models of max(unattributed, Σ attributed) for that model. A copy of
+ * an id'd machine's day (#81) matches it model for model and adds nothing;
+ * usage the id'd machines don't have — another machine's — is kept. Where
+ * both sides used the same model the larger one still wins, so same-model
+ * days from a retired machine stay under-counted: only the owner can say
+ * those are separate machines.
+ *
+ * Returns null when either side lacks a complete per-model split.
+ */
+function maxByModel(
+  unattributed: MachineContribution,
+  attributed: MachineContribution[]
+): DailyAggregate | null {
+  const mine = modelsOf(unattributed);
+  if (!mine) return null;
+
+  const theirs = new Map<string, NormalizedModelBreakdown>();
+  for (const slice of attributed) {
+    const models = modelsOf(slice);
+    if (!models) return null;
+    for (const [key, m] of models) addModel(theirs, key, m);
+  }
+
+  const picked: NormalizedModelBreakdown[] = [];
+  let unattributedCounted = false;
+  for (const key of new Set([...mine.keys(), ...theirs.keys()])) {
+    const a = mine.get(key);
+    const b = theirs.get(key);
+    const aWins =
+      !!a &&
+      (!b ||
+        outweighs(
+          { totalCost: a.cost, totalTokens: breakdownTokens(a) },
+          { totalCost: b.cost, totalTokens: breakdownTokens(b) }
+        ));
+    picked.push(aWins ? a! : b!);
+    if (aWins) unattributedCounted = true;
+  }
+
+  const agg: DailyAggregate = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 0,
+    totalCost: 0,
+    modelsUsed: picked.map((m) => m.modelName),
+    agents: Array.from(
+      new Set([
+        ...attributed.flatMap((s) => s.agents),
+        ...(unattributedCounted ? unattributed.agents : []),
+      ])
+    ),
+    modelBreakdowns: picked,
+  };
+  for (const m of picked) {
+    agg.inputTokens += m.inputTokens;
+    agg.outputTokens += m.outputTokens;
+    agg.cacheCreationTokens += m.cacheCreationTokens;
+    agg.cacheReadTokens += m.cacheReadTokens;
+    agg.totalTokens += breakdownTokens(m);
+    agg.totalCost += m.cost;
+  }
+  return agg;
 }
 
 function sumContributions(slices: MachineContribution[]): DailyAggregate {
@@ -675,6 +847,16 @@ const MAX_DAILY_COST = 5000; // $5k/day is already extreme usage
 // cap and the cost/token ratio band remain the primary anti-inflation guards.
 const MAX_DAILY_TOKENS = 250_000_000; // 250M non-cache-read tokens/day
 const MIN_COST_PER_TOKEN = 0.0000001; // cache reads are very cheap
+// MAX_DAILY_COST above only ever bounded the report's *total* (× 365), so one
+// day could carry a year's allowance: a synthetic $1,825,000 day reached #1
+// that way (#182). The largest honest day in every archived payload is about
+// $126K, so this cap leaves real heavy users alone.
+const MAX_SINGLE_DAY_COST = 150_000;
+// A large day must say which models it came from, and its per-model costs must
+// account for it. ccusage always emits the split, so only hand-built payloads
+// fail; small days are exempt because old CLIs and web uploads omit it.
+const SPLIT_REQUIRED_ABOVE_COST = 5_000;
+const SPLIT_TOLERANCE = 0.1;
 const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
 
 /**
@@ -682,10 +864,12 @@ const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
  * assumption that a cached read costs about a tenth of fresh input. DeepSeek
  * bills cache hits at 2% of a miss and agentic loops are ~99% cache reads, so
  * an honest DeepSeek day lands near 1e-8 (#154); OpenCode's MiMo and MiniMax
- * models and the free big-pickle land near 2e-8 (#150). Matched on the model
- * name, not the tool: Claude Code and OpenCode can both route to these.
+ * models and the free big-pickle land near 2e-8 (#150). Meta's Muse Spark,
+ * served through OpenCode Go and run from pi, prices a mostly-cached day near
+ * 5e-9. Matched on the model name, not the tool: Claude Code, OpenCode and pi
+ * can all route to these.
  */
-const CHEAP_MODEL_PATTERN = /deepseek|mimo|minimax|big-pickle/i;
+const CHEAP_MODEL_PATTERN = /deepseek|mimo|minimax|big-pickle|muse-spark/i;
 const CHEAP_MODEL_MIN_COST_PER_TOKEN = 0.000000001;
 
 function minCostPerTokenForModel(modelName: string): number {
@@ -825,7 +1009,21 @@ export function validateCcData(
     if (day.totalTokens < dayComponents - TOKEN_SLOP) {
       throw new Error(`Token components don't sum correctly for ${day.date}.`);
     }
+    if (day.totalCost > MAX_SINGLE_DAY_COST) {
+      throw new Error(`Cost for ${day.date} exceeds realistic limits.`);
+    }
+    if (day.totalCost > SPLIT_REQUIRED_ABOVE_COST && !splitAccountsForDay(day)) {
+      throw new Error(
+        `The per-model costs for ${day.date} don't add up to its total. Please use official ccusage output.`
+      );
+    }
   }
+}
+
+function splitAccountsForDay(day: NormalizedDaily): boolean {
+  if (!day.modelBreakdowns?.length) return false;
+  const splitCost = day.modelBreakdowns.reduce((sum, m) => sum + m.cost, 0);
+  return Math.abs(splitCost - day.totalCost) <= day.totalCost * SPLIT_TOLERANCE;
 }
 
 export { TOKEN_SLOP };

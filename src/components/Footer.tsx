@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
+import { TAKO_URL } from "@/lib/sponsor";
 
 const RESOURCES = [
   { name: "Model economics", href: "/model" },
@@ -80,6 +81,11 @@ export default function Footer() {
               <li>
                 <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer" className="text-foreground/80 hover:text-accent transition-colors">
                   ccusage
+                </a>
+              </li>
+              <li>
+                <a href={TAKO_URL} target="_blank" rel="noopener" className="text-foreground/80 hover:text-accent transition-colors">
+                  Tako: run many agents at once
                 </a>
               </li>
               <li>

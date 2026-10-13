@@ -20,7 +20,7 @@ totalTokens >= inputTokens + outputTokens + cacheCreationTokens + cacheReadToken
 
 This is the primary anti-inflation guard now that the token-sum check is one-sided: inflating tokens pushes the cost below what those tokens must cost, inflating cost pushes it above the ceiling.
 
-- **Floor, per model:** the report's cost must cover each model's tokens at that model's floor. `1e-9` USD/token for `deepseek`, `mimo`, `minimax` and `big-pickle` models, whose cache reads cost ~2% of fresh input, and agentic loops are ~99% cache reads ([#150](https://github.com/sculptdotfun/viberank/issues/150), [#154](https://github.com/sculptdotfun/viberank/pull/154)). `1e-7` for every other model. Tokens a day reports beyond its per-model split are charged at the cheapest floor present that day. The floor follows the model name, not the tool, so a cheap model can't cover for inflated tokens from another model in the same report. With only default-floor models this reduces exactly to `totalCost / totalTokens >= 1e-7`.
+- **Floor, per model:** the report's cost must cover each model's tokens at that model's floor. `1e-9` USD/token for `deepseek`, `mimo`, `minimax` and `big-pickle` models, whose cache reads cost ~2% of fresh input, and agentic loops are ~99% cache reads ([#150](https://github.com/sculptdotfun/viberank/issues/150), [#154](https://github.com/sculptdotfun/viberank/pull/154)), and for `muse-spark` models (Meta's Muse Spark over OpenCode Go, where ccusage prices a mostly-cached pi workload near 5e-9). `1e-7` for every other model. Tokens a day reports beyond its per-model split are charged at the cheapest floor present that day. The floor follows the model name, not the tool, so a cheap model can't cover for inflated tokens from another model in the same report. With only default-floor models this reduces exactly to `totalCost / totalTokens >= 1e-7`.
 - **Ceiling:** `totalCost / totalTokens <= 0.1`.
 
 ### No negative values
@@ -40,6 +40,18 @@ The cutoff is intentionally one day past UTC midnight rather than today, because
 ### Realistic total cost
 
 `totalCost > $5,000 × 365` (~$1,825,000) is rejected as out of reasonable bounds.
+
+### Per-day limits
+
+The total cap alone let a single day carry a whole year's allowance ([#182](https://github.com/sculptdotfun/viberank/issues/182)), so each day is also checked:
+
+- **A day over $150,000 is rejected.** The largest honest day across every archived payload is about $126K.
+- **A day over $5,000 must account for its cost per model.** It needs a `modelBreakdowns` split whose costs add up to the day's cost within 10%. ccusage always emits the split, so only hand-built payloads fail. Smaller days are exempt, because older CLIs and web uploads omit it.
+- Repeated model rows (one per agent in `--by-agent` reports) are folded together before the 50-model cap, so the cap no longer drops part of an honest split.
+
+### Machine IDs
+
+`X-Machine-Id` must be 1–128 characters of letters, digits, `.`, `_` or `-`, and can't be `default`. The server keys its own slices with names a client must not be able to claim: `default` for unattributed usage, and colon-suffixed keys.
 
 ## Soft flagging
 

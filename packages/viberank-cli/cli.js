@@ -10,9 +10,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import prompts from 'prompts';
 import fetch from 'node-fetch';
-import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, CONFIG_DIR } from './lib/config.js';
+import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, saveTokenOwner, savedTokenOwner, CONFIG_DIR } from './lib/config.js';
+import { remoteOwnerKind, resolveTokenOwner, whoami } from './lib/identity.js';
 import * as autosubmit from './lib/autosubmit.js';
-import { collectCorpus } from './lib/corpus.js';
+import { collectCorpus, corpusScope } from './lib/corpus.js';
 import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
 import { runNpx } from './lib/npx.js';
 
@@ -129,23 +130,32 @@ async function acquireToken() {
   }
 
   // Prove it works before saving, so a typo fails here rather than silently
-  // at 9am tomorrow inside a scheduler.
+  // at 9am tomorrow inside a scheduler. whoami also says whose token it is,
+  // which is the account every submission with it is filed under (#181).
   const spinner = ora('Verifying…').start();
-  const res = await fetch(`${SITE}/api/submit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
-    body: '{}'
-  });
+  const trimmed = token.trim();
+  const who = await whoami(SITE, trimmed, { fetch });
 
-  if (res.status === 401) {
+  let rejected = who.status === 'rejected';
+  if (who.status === 'unsupported' || who.status === 'unreachable') {
+    // A server without whoami: an empty submit authenticates the token and is
+    // then rejected on its own merits, which is all this needs.
+    const res = await fetch(`${SITE}/api/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${trimmed}` },
+      body: '{}'
+    });
+    rejected = res.status === 401;
+  }
+
+  if (rejected) {
     spinner.fail('That token was rejected — it may be revoked or mistyped.');
     return false;
   }
-  // Any other status means the token authenticated and the empty body was
-  // then rejected on its own merits, which is what we want.
-  spinner.succeed('Token verified');
+  spinner.succeed(who.username ? `Token verified — signed in as @${who.username}` : 'Token verified');
 
-  writeConfig({ token: token.trim() });
+  writeConfig({ token: trimmed });
+  if (who.username) saveTokenOwner(trimmed, who.username);
   console.log(chalk.green(`\n✓ Saved to ${CONFIG_DIR}/config.json (owner-only)\n`));
   return true;
 }
@@ -243,10 +253,19 @@ async function quietSubmit() {
   const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
   try {
     const corpus = collectCorpus();
-    if (corpus) ccData.drift = { corpus };
+    if (corpus) ccData.drift = { corpus, scope: corpusScope() };
   } catch { /* best effort */ }
 
-  const githubUser = readConfig().username || 'autosubmit';
+  // The server files a token submission under the token's owner whatever the
+  // header says, so log that owner; a revoked token is reported here instead
+  // of as a generic 401 after the upload.
+  const owner = await resolveTokenOwner(SITE, getToken(), savedTokenOwner(getToken()), { fetch });
+  if (owner.rejected) {
+    console.error(`${stamp()} API token rejected (revoked?) — run \`npx viberank-cli login\` again`);
+    process.exit(1);
+  }
+  if (owner.fresh) saveTokenOwner(getToken(), owner.username);
+  const githubUser = owner.username || readConfig().username || 'autosubmit';
   let lastError = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -264,7 +283,8 @@ async function quietSubmit() {
       const result = await response.json().catch(() => ({}));
       if (response.ok && result.success) {
         writeConfig({ lastAutosubmit: new Date().toISOString() });
-        console.log(`${stamp()} submitted ${ccData.daily?.length ?? '?'} days — ${result.profileUrl ?? ''}`);
+        const as = owner.username ? ` as @${owner.username}` : '';
+        console.log(`${stamp()} submitted ${ccData.daily?.length ?? '?'} days${as} — ${result.profileUrl ?? ''}`);
         try { fs.unlinkSync(ccJsonPath); } catch { /* fine */ }
         return;
       }
@@ -281,34 +301,51 @@ async function quietSubmit() {
   process.exit(1);
 }
 
-async function main() {
-  if (QUIET) return quietSubmit();
-
-  console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
-
-  // Try to get GitHub username from remote URL first, then fall back to git config.
-  // `source` matters: a GitHub remote is evidence, `git config user.name` is a
-  // guess, and only evidence is allowed to become the prompt's default (#141).
+/**
+ * Ask which GitHub account to submit as. Used only without a known token
+ * owner: with one, the server decides and there is nothing to ask.
+ */
+async function askUsername() {
+  // `source` matters: a GitHub remote owned by a user is evidence,
+  // `git config user.name` is a guess, and only evidence is allowed to become
+  // the prompt's default (#141).
   let githubUser;
   let source = null;
-  
-  // First, try to extract from GitHub remote URL
+
+  // A handle this machine already submitted under beats every guess: it is
+  // the one answer we know is right, and pre-filling it means a stray reply to
+  // the prompt ("NO") can't quietly start a second profile (#151).
+  const remembered = looksLikeGithubHandle(readConfig().username ?? '') ? readConfig().username : null;
+
+  // First, try to extract from GitHub remote URL, e.g.
+  // https://github.com/username/repo(.git) or git@github.com:username/repo.git
   try {
     const remoteUrl = execSync('git config --get remote.origin.url', { encoding: 'utf8' }).trim();
-    // Match GitHub URLs like:
-    // https://github.com/username/repo.git
-    // git@github.com:username/repo.git
-    // https://github.com/username/repo
     const githubMatch = remoteUrl.match(/github\.com[:/]([^/]+)\//);
     if (githubMatch) {
       githubUser = githubMatch[1];
       source = 'remote';
-      console.log(chalk.gray(`Detected GitHub username from repository: ${githubUser}`));
     }
   } catch (error) {
     // Repository might not have a GitHub remote
   }
-  
+
+  // A remote's owner is often an organization, which nobody can sign in as;
+  // pre-filling it is how an organization became a profile (#181). Ask GitHub
+  // which kind of account it is, and pre-fill only a confirmed user. Skipped
+  // when a remembered handle wins anyway.
+  if (source === 'remote' && !remembered && looksLikeGithubHandle(githubUser)) {
+    const kind = await remoteOwnerKind(githubUser, { fetch });
+    if (kind === 'user') {
+      console.log(chalk.gray(`Detected GitHub username from repository: ${githubUser}`));
+    } else {
+      if (kind === 'organization') {
+        console.log(chalk.gray(`This repository belongs to the GitHub organization "${githubUser}", not a user.`));
+      }
+      source = 'remote-unconfirmed';
+    }
+  }
+
   // If we couldn't get it from remote, try git config user.name as fallback
   if (!githubUser) {
     try {
@@ -321,36 +358,34 @@ async function main() {
 
   // Always confirm with the user.
   //
-  // Only a GitHub remote pre-fills the answer. `git config user.name` is
-  // usually a display name, and pre-filling it turned a reflexive Enter into a
-  // submission under a handle that wasn't the user's — that is how a public
-  // profile called "Matt" appeared, holding 86B tokens belonging to mattw90
-  // (#141). Validation cannot catch it: "Matt" is a perfectly well-formed
-  // GitHub handle. So the guess is shown in the question and the field starts
-  // empty, which costs one line of typing to the people it would have misfiled.
-  //
-  // A handle this machine already submitted under beats both guesses: it is
-  // the one answer we know is right, and pre-filling it means a stray reply to
-  // the prompt ("NO") can't quietly start a second profile (#151).
-  const remembered = looksLikeGithubHandle(readConfig().username ?? '') ? readConfig().username : null;
-  const guessed = !remembered && source === 'gitconfig' && githubUser;
+  // Only a remote owned by a confirmed GitHub user pre-fills the answer.
+  // `git config user.name` is usually a display name, and pre-filling it
+  // turned a reflexive Enter into a submission under a handle that wasn't the
+  // user's — that is how a public profile called "Matt" appeared, holding 86B
+  // tokens belonging to mattw90 (#141). Validation cannot catch it: "Matt" is
+  // a perfectly well-formed GitHub handle. An organization, or an owner GitHub
+  // couldn't confirm, is shown the same way: in the question, not the field.
+  const hint = remembered ? null
+    : source === 'gitconfig' ? `git config says "${githubUser}"`
+    : source === 'remote-unconfirmed' ? `the repository owner is "${githubUser}"`
+    : null;
   const response = await prompts({
     type: 'text',
     name: 'username',
-    message: guessed
-      ? `GitHub username (git config says "${githubUser}" — type it if that's right)`
+    message: hint
+      ? `GitHub username (${hint} — type it if that's you)`
       : 'GitHub username:',
     initial: remembered ?? (source === 'remote' && looksLikeGithubHandle(githubUser) ? githubUser : ''),
     validate: (value) =>
       looksLikeGithubHandle(value.trim()) ||
       'That is not a valid GitHub username (1-39 letters, digits, single hyphens)'
   });
-  
+
   if (!response.username) {
     console.log(chalk.red('Username is required. Exiting.'));
     process.exit(1);
   }
-  
+
   githubUser = response.username.trim();
 
   if (remembered && githubUser.toLowerCase() !== remembered.toLowerCase()) {
@@ -362,6 +397,42 @@ async function main() {
     });
     if (!switchResponse.switch) githubUser = remembered;
   }
+  return githubUser;
+}
+
+/**
+ * With a saved token the server files the submission under the token's owner
+ * and ignores any typed name, so find that owner first (#181). Returns the
+ * owner, or null when it can't be known (old server, offline, nothing saved).
+ */
+async function signedInOwner(token) {
+  const spinner = ora('Checking your saved token…').start();
+  const owner = await resolveTokenOwner(SITE, token, savedTokenOwner(token), { fetch });
+  if (owner.rejected) {
+    spinner.fail('Your saved API token was rejected — it may have been revoked.');
+    console.log(`Run ${chalk.bold('npx viberank-cli login')} to save a new one, or ${chalk.bold('npx viberank-cli logout')} to submit without one.\n`);
+    process.exit(1);
+  }
+  if (!owner.username) {
+    spinner.stop();
+    return null;
+  }
+  if (owner.fresh) {
+    try { saveTokenOwner(token, owner.username); } catch { /* best effort */ }
+  }
+  spinner.succeed(`Signed in as @${owner.username}`);
+  return owner.username;
+}
+
+async function main() {
+  if (QUIET) return quietSubmit();
+
+  console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
+
+  const token = getToken();
+  const signedInAs = token ? await signedInOwner(token) : null;
+  let githubUser = signedInAs ?? (await askUsername());
+
   // Remember it: a scheduled --quiet run has no TTY to ask on.
   try { writeConfig({ username: githubUser }); } catch { /* best effort */ }
 
@@ -425,7 +496,14 @@ async function main() {
   const confirmResponse = await prompts({
     type: 'confirm',
     name: 'submit',
-    message: `Submit to Viberank as @${githubUser} (${SITE}/profile/${githubUser})?`,
+    // Name only the account the server will actually file this under. With a
+    // token whose owner is unknown (an older server), the typed name is not
+    // it, so don't claim one (#181).
+    message: signedInAs
+      ? `Submit to Viberank as @${githubUser} (signed in) — ${SITE}/profile/${githubUser}?`
+      : token
+        ? 'Submit to Viberank with your saved token? It is filed under the account that owns the token.'
+        : `Submit to Viberank as @${githubUser} (${SITE}/profile/${githubUser})?`,
     initial: true
   });
 
@@ -456,7 +534,7 @@ async function main() {
       // fails must never block a submission.
       try {
         const corpus = collectCorpus();
-        if (corpus) ccData.drift = { corpus };
+        if (corpus) ccData.drift = { corpus, scope: corpusScope() };
       } catch {
         // No corpus block; the server falls back to holding the high-water mark.
       }

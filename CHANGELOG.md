@@ -3,8 +3,87 @@
 ## Site — models and tools wear their vendor's colors (September 2026)
 
 ### Changed
-- **Charts color a model by its vendor, not by its rank.** Rank-coloring painted whatever came second in blue, so a profile whose top two models were both Claude showed one in OpenAI's color. Claude models now take Anthropic oranges and golds, OpenAI blues, DeepSeek a distinct indigo, Google greens, Meta purples, Mistral rose, Qwen cyan, GLM lime; xAI and Moonshot are drawn as off-white and slate, since their brand black would vanish on the dark surface. Same-vendor models take that family's shades in chart order. Applies to the profile usage chart, the model and tool lists, and the /stats model and tool lists. Unknown vendors and harnesses that run any model (OpenCode, OpenClaw, pi, Hermes, …) get hues chosen to be far from every vendor's. Checked with the dataviz validator against the chart surface.
+- **Charts color a model by its vendor, not by its rank.** Rank-coloring painted whatever came second in blue, so a profile whose top two models were both Claude showed one in OpenAI's color. Claude models now take Anthropic oranges and golds, OpenAI blues, DeepSeek a distinct indigo, Google greens, Meta purples, Mistral rose, Qwen cyan, GLM lime; xAI and Moonshot are drawn as off-white and slate, since their brand black would vanish on the dark surface. Same-vendor models take that family's shades in order of all-time cost. Applies to the profile usage chart (a model keeps its color in every range, matching the model list; Other stays gray), the model and tool lists, and the /stats model and tool lists. Unknown vendors and harnesses that run any model (OpenCode, OpenClaw, pi, Hermes, …) get hues chosen to be far from every vendor's. A vendor with more models than shades cycles its own family, so a fifth Claude model stays orange-gold, and no real model or tool is ever drawn in Other's gray. Checked with the dataviz validator against the chart surface.
 - Tool labels for Antigravity, Grok Build and ZCode, which ccusage 20 reads.
+
+## Site + API — Tako in the house slots (October 2026)
+
+### Added
+- **Tako, the maker's open-source Mac terminal for running many Claude Code and Codex agents at once, now has three placements.** It's labelled "from the maker of viberank", not as a sponsor. The placements are:
+  - A one-time home banner, dismissible, which replaces the August leagues announcement.
+  - A footer link.
+  - The line the CLI prints after a submission. A paid `SPONSOR_CLI_NOTICE` still takes that line when it's set.
+  - Clicks report `tako_clicked` with the placement.
+
+## Site — usage from a machine that no longer submits stays counted (September 2026)
+
+### Fixed
+- **Unattributed usage is compared model by model, not as a whole day.** A day holding both a no-machine-id slice (web uploads, pre-1.2 CLIs) and id'd machine slices showed only the larger of the two (#81), so a replaced or wiped machine's history hid every other machine's usage that day. Where both sides carry a complete per-model split, each model now takes the larger side and models only one side used are added. A copy of an id'd machine's day still matches it model for model and adds nothing, including across ccusage model renames (date suffixes, provider paths, dotted versions, and a `[tool]` prefix a newer ccusage adds, so `[openclaw] google/gemini-3-pro` beside `google/gemini-3-pro` takes the larger, not the sum). The result never falls below the whole-day rule on cost or any token field, so a split that is a little short of its slice can't lower a day. Days without a complete split keep the whole-day rule.
+- Same-model days from a retired machine can't be told apart from a copy automatically and remain counted once.
+
+### Operations
+- `POST /api/admin/recompute-unattributed` re-derives stored days that hold an unattributed slice beside id'd ones, since aggregates are written at submit time. Admin only. `{}` reports what would change; `{ "apply": true, "limit": 50 }` writes the largest changes first and re-sums each affected submission. It only raises days: a day is written when the new value is no lower on every field and higher on cost or tokens, so manual repairs are never undone. Idempotent: repeat until `pending` is 0. Back up the affected `daily_breakdowns` and `submissions` rows (from the dry-run report) before `apply`, as with any prod repair.
+
+## Site — the profile chart names the models in range (October 2026)
+
+### Fixed
+- **New models no longer render as Other on the usage chart.** The chart picked its five colored series by all-time cost and the server folded every other model into Other before the chart saw it, so the 7d / 30d views could only slice days. A long history kept retired models in color while the ones in current use sat in gray (seen on one profile: 93–100% of recent days' cost as Other). The server now passes per-model daily costs, and the chart ranks the top 5 within the selected range and folds the rest plus unattributed cost into Other (#180). Colors follow rank in the view, so they stay distinct, and the legend lists only series in range.
+
+## Site — profile work insights (September 2026)
+
+### Added
+- Profiles with at least three active days now show cache use, blended token cost, output share, daily tool and model mix, machine concurrency when available, and activity steadiness. Four token metrics include comparisons with developers who have at least $100 in unflagged submissions; the shared baseline is cached for two minutes. Machine IDs stay server-only.
+
+## Site — dollar figures say what they are (October 2026)
+
+### Fixed
+- **Profile dollars no longer read as money paid.** Every dollar figure is ccusage's API-equivalent estimate — what the tokens would cost at list API prices — and most developers pay a flat subscription well below it. The profile's headline tile now reads "API-equivalent" instead of "Total spent" (with a tooltip saying so), "Monthly spend" is "Monthly API-equivalent", the profile sheet shows "Value · API-equivalent", and the profile's title, meta description and structured data say "API-equivalent". The share card, its share text, the homepage OG image ("Total Spent"), the tier badge tooltip ("$X+ spent") and the /stats meta descriptions follow suit. Idea from #177.
+
+## CLI v1.12.0 — the prompt names the account you'll land on (October 2026)
+
+### Fixed
+- **An organization's name is no longer pre-filled as your username.** Running the CLI inside an org-owned repository pre-filled the remote's owner, and one Enter created a profile under an organization nobody can sign in as (#181). The CLI now asks GitHub's public `GET /users/{owner}` (unauthenticated, 2s timeout, only the owner name is sent) and pre-fills only a confirmed user. An organization, or an owner GitHub couldn't confirm (offline, rate limited), is shown as a hint in the question, like the `git config` guess.
+- **With a saved token, the confirmation shows the token's owner.** The server files token-signed submissions under the token's owner and ignores `X-GitHub-User`, but the CLI still asked for a username and confirmed `Submit to Viberank as @<typed name>`, so the two could disagree (#181). `login` now records the owner, a submit refreshes it, skips the username prompt and confirms `Submit to Viberank as @owner (signed in)`. A revoked token is reported before ccusage runs. Scheduled runs log the owner they submitted as.
+- Against a server without the new endpoint, the CLI keeps the username prompt but confirms `Submit to Viberank with your saved token?` rather than naming an account it can't vouch for.
+
+### Added
+- `GET /api/token/whoami` returns `{ username }` for a valid `Authorization: Bearer vbr_…` token and 401 otherwise. It uses the same resolver as `/api/submit`.
+
+## Site — one day can't carry a year's allowance (October 2026)
+
+### Fixed
+- **A single synthetic day reached #1 on both boards** ([#182](https://github.com/sculptdotfun/viberank/issues/182)). `MAX_DAILY_COST` only ever capped the report's total (× 365), so one $1,825,000 day of pure cache reads, priced exactly at the per-model floor and with no model split, passed every check. Each day is now checked as well. A day over $150,000 is rejected; the largest honest day in the archive is about $126K. A day over $5,000 must carry a per-model split whose costs add up to it within 10%. Across all 4,960 archived payloads, the only day either rule rejects is the synthetic one. The day has been removed from production.
+- **The 50-model cap cut real rows from `--by-agent` reports.** Those reports repeat a model once per agent, and the cap ran before the rows were folded together, which left one profile's split short on 280 days. Repeats are now folded first.
+- **`X-Machine-Id` can't claim a server slice name.** `default`, colon-suffixed keys and anything outside `[A-Za-z0-9._-]{1,128}` get a 400. All 395 machine IDs in the archive already fit.
+
+## Site + CLI — a different folder's smaller count is not a deletion (September 2026)
+
+### Fixed
+- **Totals no longer drop when two submitters on one machine count different folders.** Drift detection (#112) compares a machine's per-month transcript count with its last one and honours lower totals when the count shrinks. A machine with a script that counts a folder merged from several hosts and the CLI counting `~/.claude/projects` sends both under one machine id; the CLI's smaller count read as deleted history and lowered the account every night until the script ran again (seen in production: −$17.6K and −32.6B tokens overnight). The CLI now sends a 16-hex hash of the counted folder with its corpus, and the server compares corpora only within the same scope. A new scope has no prior, so it yields no deletion verdict and the high-water mark holds. Clients without a scope keep comparing exactly as before.
+- Migration `019_corpus_scope.sql` adds the `scope` column and re-keys `corpus_observations` on it. Until it is applied, the server falls back to the unscoped comparison.
+
+## Site — the efficiency board weighs volume (September 2026)
+
+### Fixed
+- **A short, cheap history no longer tops the efficiency board.** Ranking on raw tokens per dollar rewarded having spent little: 1B tokens for $120 scored 8.3M/$ and ranked #1 over developers with hundreds of billions of tokens at 3–4M/$. The board now ranks on a volume-weighted score — each ratio shrunk toward the site median (1.2M tokens/$) by a prior worth $1,000 of spend — so short histories report roughly the median and long ones their own ratio. The displayed number is still the raw tokens per dollar, and the $100 floor stays. Constants live in `src/lib/efficiency.ts`; migration `020_efficiency_score.sql` stores the score as a generated column, and the board falls back to the raw ratio until it is applied.
+
+## Site — Muse Spark clears the cost floor (September 2026)
+
+### Fixed
+- **Muse Spark models get the cheap-model floor.** pi running Meta's Muse Spark over OpenCode Go is priced by ccusage at ~4.6e-9 per token, so a real multi-agent report where pi is 91% of the tokens landed at 3.6e-8 and was rejected as "Cost per token ratio is unrealistic". `muse-spark` now joins `deepseek`, `mimo`, `minimax` and `big-pickle` at `1e-9`; every other model keeps `1e-7`, and the floor still follows the model name, not the tool.
+
+## Site — the leaderboard no longer blanks on a half-set date range (September 2026)
+
+### Fixed
+- **Picking one end of a custom date range emptied the board, and so did pressing All afterwards.** The board cleared its rows on every change to the From/To inputs, but a single date isn't a range, so no new query ran to refill them and it sat on "No submissions yet" until the sort was switched. Seen on the tokens board: set From, then clear To and press All to go back, and the board stays blank. The reset now follows the query the board actually runs, so only a real filter change clears it.
+- **Loading a date range shows the skeleton instead of "No submissions yet".** The 30-day board takes a few seconds to aggregate, and during that wait it told visitors the leaderboard was empty.
+
+## Site — profiles whose handle exists in two casings open again (September 2026)
+
+### Fixed
+- **Every casing of a handle with more than one profile row returned 404.** `profiles.username` is unique case-sensitively and the submit path looked profiles up by exact match, so an `X-GitHub-User` header typed as `some-dev` next to an existing `Some-Dev` inserted a second row. `getProfile` then read both with `ilike` + `.single()`, which errors on two rows, so the page, the modal and the README badge all reported "not found" for either casing while the leaderboard kept listing the user. The sitemap shows 22 such handles today.
+- `getProfile` now resolves any casing to one canonical row (most submissions, then oldest), and the submit path matches profiles case-insensitively, so a new casing updates the existing profile instead of creating another.
+- Usernames in these lookups are escaped for `ilike`, so `%`, `_` and `*` in a URL match literally instead of matching other profiles.
 
 ## MCP v1.1.0 — signed submissions (September 2026)
 
