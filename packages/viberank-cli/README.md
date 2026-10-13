@@ -72,7 +72,7 @@ Only the SHA-256 of a token is ever stored server-side; the plaintext is shown o
 
 Supported — a laptop and a desktop sum into one profile rather than overwriting each other. Each machine writes an anonymous random UUID to `~/.viberank/machine-id` on first run and the server keeps usage as a per-machine slice. No hardware or identifying information is involved.
 
-Your totals also never silently drop: if a re-submission reports less than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install — the higher prior figure is retained. The CLI does report per-month file and byte **counts** of your transcript corpus so genuine deletion can be told apart from a partial export. Counts only; no transcript content leaves your machine.
+Your totals also never silently drop: if a re-submission reports less than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install — the higher prior figure is retained. The CLI does report per-month file and byte **counts** of your transcript corpus so genuine deletion can be told apart from a partial export, plus a short hash of the folder it counted so they are only ever compared with earlier counts of that same folder. Counts and the hash only; no transcript content or path leaves your machine.
 
 ## Manual usage
 
