@@ -457,5 +457,79 @@ console.log("\n[11] Cost floor is priced per model (#150, #154)");
   ok("Claude report just below 1e-7 fails", !passes(report([mb("claude-opus-4-8", 1_000_000_000, 0, 99)])));
 }
 
+console.log("\n[12] Muse Spark (pi over OpenCode Go) clears the per-model floor");
+{
+  // A real multi-agent report from one machine over 51 days: pi on Muse Spark
+  // is 91% of the tokens but 12% of the cost, so the whole report sits at
+  // 3.6e-8 and a single default floor rejected it. Shaped like
+  // `ccusage daily --json --by-agent`: an `agent: "all"` row, a per-model
+  // split and a per-agent split that reconciles with the row.
+  type Part = { agent: string; model: string; tokens: number; cost: number };
+  const slice = (p: Part) => {
+    const input = Math.round(p.tokens * 0.03); // agentic loops: ~97% cache reads
+    return { input, cacheRead: p.tokens - input };
+  };
+  const byAgentReport = (parts: Part[], opts: { split?: boolean } = {}) => {
+    const split = opts.split ?? true;
+    const tokens = parts.reduce((a, p) => a + p.tokens, 0);
+    const cost = parts.reduce((a, p) => a + p.cost, 0);
+    const input = parts.reduce((a, p) => a + slice(p).input, 0);
+    const cacheRead = tokens - input;
+    const row: Record<string, unknown> = {
+      period: "2026-09-16", agent: "all",
+      inputTokens: input, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead,
+      totalTokens: tokens, totalCost: cost,
+      modelsUsed: parts.map((p) => p.model),
+      metadata: { agents: Array.from(new Set(parts.map((p) => p.agent))) },
+    };
+    if (split) {
+      row.modelBreakdowns = parts.map((p) => ({
+        modelName: p.model, inputTokens: slice(p).input, outputTokens: 0,
+        cacheCreationTokens: 0, cacheReadTokens: slice(p).cacheRead, cost: p.cost,
+      }));
+      row.agents = parts.map((p) => ({
+        agent: p.agent, inputTokens: slice(p).input, outputTokens: 0, cacheCreationTokens: 0,
+        cacheReadTokens: slice(p).cacheRead, totalTokens: p.tokens, totalCost: p.cost,
+      }));
+    }
+    return {
+      totals: { inputTokens: input, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: cacheRead, totalTokens: tokens, totalCost: cost },
+      daily: [row],
+    };
+  };
+  const accepted = (raw: unknown) => {
+    try { validateCcData(normalizeCcData(raw as never), FIXED_NOW); return true; } catch { return false; }
+  };
+
+  // The numbers from the rejected submission: 51,111,141,344 tokens, $1,841.82.
+  const pi: Part = { agent: "pi", model: "muse-spark-1.3-contributor", tokens: 46_433_090_832, cost: 214.01 };
+  const claude: Part = { agent: "claude", model: "claude-opus-4-8", tokens: 2_000_000_000, cost: 900 };
+  const codex: Part = { agent: "codex", model: "gpt-5.5", tokens: 2_678_050_512, cost: 727.81 };
+  const honest = byAgentReport([pi, claude, codex]);
+  const ratio = honest.totals.totalCost / honest.totals.totalTokens;
+  ok("whole report sits under the default floor (3.6e-8)", ratio > 3.5e-8 && ratio < 3.7e-8, `got ${ratio}`);
+  ok("per-agent split reconciles and is kept",
+    Object.keys(normalizeCcData(honest as never).daily[0].agentBreakdowns ?? {}).length === 3);
+  ok("honest pi + Claude + Codex report is accepted", accepted(honest));
+  ok("honest pi-only report (4.6e-9) is accepted", accepted(byAgentReport([pi])));
+  ok("provider-prefixed model name gets the same floor",
+    accepted(byAgentReport([{ ...pi, model: "meta/muse-spark-1.3-contributor" }])));
+
+  // One agent with an invented ratio, an order of magnitude under the floor.
+  ok("pi at 1e-10 per token is rejected",
+    !accepted(byAgentReport([{ ...pi, cost: pi.tokens * 1e-10 }])));
+  ok("pi with 100x inflated tokens beside honest Claude/Codex is rejected",
+    !accepted(byAgentReport([{ ...pi, tokens: pi.tokens * 100 }, claude, codex])));
+
+  // The floor still follows the model: the same pi ratio on a Claude model fails.
+  ok("the same pi ratio on a default-floor model is rejected",
+    !accepted(byAgentReport([{ ...pi, model: "claude-opus-4-8" }])));
+
+  // No per-agent or per-model split and only default-floor models: the old
+  // aggregate check applies unchanged.
+  ok("unsplit default-model report at 3.6e-8 is rejected",
+    !accepted(byAgentReport([{ ...pi, model: "claude-opus-4-8" }, claude, codex], { split: false })));
+}
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
