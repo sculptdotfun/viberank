@@ -47,6 +47,11 @@ export const tokenPageViewed = (from: string) => emit("token_page_viewed", { fro
 /** A token was minted — the closest proxy for autosubmit actually being set up. */
 export const tokenMinted = () => emit("token_minted");
 
+/* ---------- Tako (house promo) ---------- */
+
+/** A Tako link was followed; `placement` says which surface earned it. */
+export const takoClicked = (placement: string) => emit("tako_clicked", { placement });
+
 /* ---------- league funnel ---------- */
 
 export const leagueBannerClicked = () => emit("league_banner_clicked");

@@ -30,7 +30,7 @@ export default function TierBadge({ totalCost, size = "sm", bare = false, classN
       <span
         className={cn("inline-flex items-center gap-1 font-mono uppercase tracking-[0.12em]", SIZE_CLASSES[size].split(" ")[0], className)}
         style={{ color: tier.color, ...glow }}
-        title={`${tier.name} tier — $${tier.min.toLocaleString()}+ spent`}
+        title={`${tier.name} tier — $${tier.min.toLocaleString()}+ API-equivalent`}
       >
         <span aria-hidden>{tier.glyph}</span>
         {tier.name}
@@ -46,7 +46,7 @@ export default function TierBadge({ totalCost, size = "sm", bare = false, classN
         className
       )}
       style={{ color: tier.color, background: tier.soft, ...glow }}
-      title={`${tier.name} tier — $${tier.min.toLocaleString()}+ spent`}
+      title={`${tier.name} tier — $${tier.min.toLocaleString()}+ API-equivalent`}
     >
       <span aria-hidden>{tier.glyph}</span>
       {tier.name}

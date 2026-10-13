@@ -41,11 +41,13 @@ import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
 import { SupabaseRateLimiter } from "./rate-limiter";
 import type { BurnRow } from "@/lib/spend-curve";
+import { buildWorkInsightBaselines, type WorkInsightBaselines } from "@/lib/work-insights";
 import {
   validateCcData,
   inferToolFromModel,
   mergeMachineContribution,
   combineContributionMaps,
+  aggregateContributions,
   DEFAULT_MACHINE_ID,
   type DailyAggregate,
   type MachineContribution,
@@ -97,7 +99,11 @@ interface DbDailyBreakdown {
   model_breakdowns: ModelBreakdown[] | null;
   // Per-machine slices of this day, keyed by machine id. NULL on legacy rows
   // that predate per-machine tracking (#43).
-  machine_contributions: Record<string, MachineContribution> | null;
+  machine_contributions?: Record<string, MachineContribution> | null;
+  // Distinct machines that contributed this day. Derived on the server from
+  // machine_contributions and never selected from Postgres; see
+  // countDayMachines.
+  machine_count?: number;
 }
 
 interface DbProfile {
@@ -204,6 +210,18 @@ function storedContributions(
 const DAILY_PUBLIC_COLUMNS =
   "id, submission_id, date, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, total_cost, models_used, agents, model_breakdowns";
 
+/**
+ * Reduces a day's machine_contributions to a bare count so the machine IDs
+ * (its keys) never reach a DailyBreakdown. The legacy default slot is not a
+ * real machine, but a day always had at least one.
+ */
+function countDayMachines(
+  contributions: Record<string, MachineContribution> | null
+): number | undefined {
+  if (!contributions) return undefined;
+  return Math.max(1, Object.keys(contributions).filter((id) => id !== DEFAULT_MACHINE_ID).length);
+}
+
 /** The daily_breakdowns columns for one day's aggregate. */
 function aggregateToDailyColumns(aggregate: DailyAggregate) {
   return {
@@ -231,6 +249,7 @@ function convertDbDailyBreakdown(db: DbDailyBreakdown): DailyBreakdown {
     modelsUsed: db.models_used || [],
     agents: db.agents || [],
     modelBreakdowns: db.model_breakdowns || undefined,
+    ...(db.machine_count !== undefined ? { machineCount: db.machine_count } : {}),
   };
 }
 
@@ -266,6 +285,36 @@ export const VERIFIED_PROFILE_ERROR = "is verified";
 function verifiedProfileMessage(username: string): string {
   return `@${username} ${VERIFIED_PROFILE_ERROR}, so submissions to it need to be signed. Run \`npx viberank-cli login\`, then submit again.`;
 }
+/**
+ * An ilike pattern that matches `value` literally, case aside. `%` and `_`
+ * are LIKE wildcards and PostgREST also reads `*` as `%`, so without this
+ * `/profile/%` would match every profile.
+ */
+export function likeLiteral(value: string): string {
+  return value.replace(/[\\%_*]/g, "\\$&");
+}
+
+/**
+ * The one profile a case-insensitive username resolves to.
+ *
+ * `profiles.username` is unique case-sensitively, and an X-GitHub-User header
+ * arrives in whatever casing the submitter typed, so the same handle can own
+ * several rows (`Name` and `name`). Reading those with `.single()` errors on
+ * every one of them, so each casing 404'd. Pick deterministically, not by the
+ * URL's casing, so every casing lands on the same profile: the row with the
+ * most submissions, then the oldest.
+ */
+export function pickCanonicalProfile<
+  T extends Pick<DbProfile, "total_submissions" | "created_at">,
+>(rows: T[] | null | undefined): T | null {
+  if (!rows || rows.length === 0) return null;
+  return [...rows].sort(
+    (a, b) =>
+      (b.total_submissions ?? 0) - (a.total_submissions ?? 0) ||
+      Date.parse(a.created_at) - Date.parse(b.created_at)
+  )[0];
+}
+
 const MAX_ROWS = 200_000;
 
 export async function fetchAllPages<T>(
@@ -335,6 +384,160 @@ async function fetchAllByIds<T>(
     all.push(...rows);
   }
   return all;
+}
+
+// ============================================================================
+// RECOMPUTE: days with an unattributed slice beside id'd ones
+// ============================================================================
+
+export interface RecomputedSubmission {
+  submissionId: string;
+  username: string;
+  days: number;
+  costBefore: number;
+  costAfter: number;
+  /** Written in this call; false for a dry run or past `limit`. */
+  applied: boolean;
+}
+
+/**
+ * Whether a recomputed day may replace the stored one: no lower on any field
+ * and higher on cost or tokens. A stored day above its recomputation is a
+ * manual repair or an older, larger observation, and merges are lossless, so
+ * the recompute only ever raises days.
+ */
+export function raisesStoredDay(
+  aggregate: DailyAggregate,
+  row: Pick<
+    DbDailyBreakdown,
+    "input_tokens" | "output_tokens" | "cache_creation_tokens" | "cache_read_tokens" | "total_tokens" | "total_cost"
+  >
+): boolean {
+  // numeric columns round-trip through float; don't let that read as a change
+  const EPS = 1e-6;
+  const pairs: [number, number][] = [
+    [aggregate.inputTokens, Number(row.input_tokens) || 0],
+    [aggregate.outputTokens, Number(row.output_tokens) || 0],
+    [aggregate.cacheCreationTokens, Number(row.cache_creation_tokens) || 0],
+    [aggregate.cacheReadTokens, Number(row.cache_read_tokens) || 0],
+    [aggregate.totalTokens, Number(row.total_tokens) || 0],
+    [aggregate.totalCost, Number(row.total_cost) || 0],
+  ];
+  if (pairs.some(([next, stored]) => next < stored - EPS)) return false;
+  const higherCost = aggregate.totalCost > (Number(row.total_cost) || 0) + 0.005;
+  const higherTokens = aggregate.totalTokens > (Number(row.total_tokens) || 0);
+  return higherCost || higherTokens;
+}
+
+/**
+ * Re-derive stored days that hold an unattributed slice next to id'd ones.
+ * Aggregates are written when a day is submitted, so a change to how
+ * `aggregateContributions` combines slices only reaches the days a user
+ * happens to re-submit. This brings the rest in line. Dry run unless `apply`.
+ *
+ * Only such mixed days can change: a default-only day (including every
+ * legacy row with no per-machine map) aggregates to itself either way. A day
+ * is written only when `raisesStoredDay` holds; it is never lowered.
+ * Back up the affected rows before `apply`. Idempotent, so `limit` lets a caller with a time budget apply the largest
+ * changes first and call again until nothing is left.
+ */
+export async function recomputeUnattributedDays(
+  client: SupabaseClient,
+  { apply, limit = Infinity }: { apply: boolean; limit?: number }
+): Promise<RecomputedSubmission[]> {
+  const rows = await fetchAllPages<DbDailyBreakdown>(
+    (from, to) =>
+      client
+        .from("daily_breakdowns")
+        .select("*")
+        .not(`machine_contributions->${DEFAULT_MACHINE_ID}`, "is", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    "daily breakdowns with an unattributed slice"
+  );
+
+  const changed = new Map<string, { row: DbDailyBreakdown; aggregate: DailyAggregate }[]>();
+  for (const row of rows) {
+    const contributions = row.machine_contributions;
+    if (!contributions || Object.keys(contributions).length < 2) continue;
+    const aggregate = aggregateContributions(contributions);
+    if (!raisesStoredDay(aggregate, row)) continue;
+    const list = changed.get(row.submission_id) ?? [];
+    list.push({ row, aggregate });
+    changed.set(row.submission_id, list);
+  }
+  if (changed.size === 0) return [];
+
+  const submissions = await fetchAllByIds<Pick<DbSubmission, "id" | "username" | "total_cost">>(
+    [...changed.keys()],
+    (chunk, from, to) =>
+      client
+        .from("submissions")
+        .select("id, username, total_cost")
+        .in("id", chunk)
+        .order("id", { ascending: true })
+        .range(from, to),
+    "submissions to recompute"
+  );
+
+  const report: RecomputedSubmission[] = submissions.map((submission) => {
+    const days = changed.get(submission.id) ?? [];
+    const delta = days.reduce(
+      (acc, { row, aggregate }) => acc + aggregate.totalCost - Number(row.total_cost),
+      0
+    );
+    return {
+      submissionId: submission.id,
+      username: submission.username,
+      days: days.length,
+      costBefore: Number(submission.total_cost),
+      costAfter: Number(submission.total_cost) + delta,
+      applied: false,
+    };
+  });
+  report.sort((a, b) => b.costAfter - b.costBefore - (a.costAfter - a.costBefore));
+
+  if (!apply) return report;
+
+  for (const entry of report.slice(0, limit)) {
+    for (const { row, aggregate } of changed.get(entry.submissionId) ?? []) {
+      const { error } = await client
+        .from("daily_breakdowns")
+        .update(aggregateToDailyColumns(aggregate))
+        .eq("id", row.id);
+      if (error) throw new Error(`Failed to update day ${row.id}: ${error.message}`);
+    }
+
+    // Totals from the rows themselves, as every merge path does, so the
+    // parent can't drift from its days.
+    const all = await fetchAllPages<DbDailyBreakdown>(
+      (from, to) =>
+        client
+          .from("daily_breakdowns")
+          .select("*")
+          .eq("submission_id", entry.submissionId)
+          .order("date", { ascending: true })
+          .range(from, to),
+      "daily breakdowns for recomputed totals"
+    );
+    const sum = (pick: (d: DbDailyBreakdown) => number) =>
+      all.reduce((acc, d) => acc + Number(pick(d) || 0), 0);
+    const { error } = await client
+      .from("submissions")
+      .update({
+        total_cost: sum((d) => d.total_cost),
+        total_tokens: sum((d) => d.total_tokens),
+        input_tokens: sum((d) => d.input_tokens),
+        output_tokens: sum((d) => d.output_tokens),
+        cache_creation_tokens: sum((d) => d.cache_creation_tokens),
+        cache_read_tokens: sum((d) => d.cache_read_tokens),
+      })
+      .eq("id", entry.submissionId);
+    if (error) throw new Error(`Failed to update submission ${entry.submissionId}: ${error.message}`);
+    entry.applied = true;
+  }
+
+  return report;
 }
 
 // ============================================================================
@@ -495,12 +698,30 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     const incoming = data.corpus;
     if (!incoming || Object.keys(incoming).length === 0) return new Set();
 
+    // Only a corpus counted in the same directory is comparable. One machine
+    // can have two submitters that count different folders (a script over a
+    // folder merged from several hosts, and this CLI over ~/.claude/projects);
+    // across scopes a smaller count is not a deletion.
+    const scope = data.corpusScope ?? "";
+
     try {
-      const { data: rows, error } = await this.client
+      let scoped = true;
+      let { data: rows, error } = await this.client
         .from("corpus_observations")
         .select("month, files, bytes")
         .ilike("username", data.username)
-        .eq("machine_id", machineId);
+        .eq("machine_id", machineId)
+        .eq("scope", scope);
+
+      // Before migration 019 there is no scope column: compare as before.
+      if (error && MISSING_COLUMN_CODES.has(error.code)) {
+        scoped = false;
+        ({ data: rows, error } = await this.client
+          .from("corpus_observations")
+          .select("month, files, bytes")
+          .ilike("username", data.username)
+          .eq("machine_id", machineId));
+      }
 
       if (error) {
         if (MISSING_TABLE_CODES.has(error.code)) return new Set();
@@ -522,18 +743,19 @@ export class SupabaseSubmissionsService implements SubmissionsService {
         Object.entries(incoming).map(([month, size]) => ({
           username: data.username,
           machine_id: machineId,
+          ...(scoped ? { scope } : {}),
           month,
           files: Math.max(0, Math.trunc(Number(size.files) || 0)),
           bytes: Math.max(0, Math.trunc(Number(size.bytes) || 0)),
           observed_at: new Date().toISOString(),
         })),
-        { onConflict: "username,machine_id,month" }
+        { onConflict: scoped ? "username,machine_id,scope,month" : "username,machine_id,month" }
       );
       if (upsertError) console.error("Corpus observation upsert failed:", upsertError.message);
 
       if (deleted.size > 0) {
         console.warn(
-          `Corpus shrank for ${data.username} (machine ${machineId}) in ${[...deleted].join(", ")} — honouring the lower totals rather than holding the high-water mark (#112).`
+          `Corpus shrank for ${data.username} (machine ${machineId}, scope ${scope || "none"}) in ${[...deleted].join(", ")} — honouring the lower totals rather than holding the high-water mark (#112).`
         );
       }
 
@@ -782,23 +1004,28 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     submissionId: string,
     isNewSubmission: boolean
   ): Promise<void> {
-    const { data: existingProfile, error: profileQueryError } = await this.client
+    // Case-insensitive, like findTargetSubmission: the submission already
+    // merged into the row for any casing of this handle, so an exact match
+    // here would insert a second profile for `name` beside `Name` — which
+    // made every casing of that profile 404.
+    const { data: candidates, error: profileQueryError } = await this.client
       .from("profiles")
       .select("*")
-      .eq("username", data.username)
-      .single();
+      .ilike("username", likeLiteral(data.username))
+      .limit(10);
 
-    // PGRST116 is PostgREST's "no rows" for .single() — expected for a first
-    // submission, so it falls through to the insert below. Anything else is a
-    // real failure and must not be mistaken for "this profile doesn't exist".
-    if (profileQueryError && profileQueryError.code !== "PGRST116") {
+    if (profileQueryError) {
       throw new Error(`Failed to query profile: ${profileQueryError.message}`);
     }
+
+    const existingProfile = pickCanonicalProfile(candidates as DbProfile[] | null);
 
     if (existingProfile) {
       const updates: Record<string, unknown> = {
         best_submission_id: submissionId,
-        github_username: data.githubUsername,
+        // Keep the handle's stored casing: a header typed as `name` must not
+        // relabel `Name`, and github_username is unique case-sensitively.
+        github_username: existingProfile.github_username || data.githubUsername,
         github_name: data.githubName,
         avatar: data.githubAvatar,
       };
@@ -862,23 +1089,19 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     return true;
   }
 
-  async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
-    const sortBy = params.sortBy || "cost";
-    const page = params.page || 0;
-    const pageSize = Math.min(params.pageSize || 25, 50);
-    const offset = page * pageSize;
-    const includeFlagged = params.includeFlagged || false;
-
+  /** One leaderboard page, ordered by `orderColumn`, with every filter applied. */
+  private buildLeaderboardQuery(
+    params: LeaderboardParams,
+    sortBy: NonNullable<LeaderboardParams["sortBy"]>,
+    orderColumn: string,
+    offset: number,
+    pageSize: number,
+    includeFlagged: boolean
+  ) {
     let query = this.client
       .from("submissions")
       .select("*", { count: "exact" })
-      // Efficiency is ranked on the stored tokens_per_dollar column (011) with
-      // a spend floor. Without the floor the board is topped by rounding noise:
-      // a $0.01 submission scored 7M tokens/$ against a median of 1.2M.
-      .order(
-        sortBy === "cost" ? "total_cost" : sortBy === "efficiency" ? "tokens_per_dollar" : "total_tokens",
-        { ascending: false, nullsFirst: false }
-      )
+      .order(orderColumn, { ascending: false, nullsFirst: false })
       .range(offset, offset + pageSize - 1);
 
     if (!includeFlagged) {
@@ -896,12 +1119,33 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 
     // The spend floor is part of what the efficiency board *means*: below it
     // the ratio is rounding noise rather than a signal about how someone
-    // works. Applied as a filter so the count and hasMore agree with the rows.
+    // works (a $0.01 submission scored 7M tokens/$ against a median of 1.2M).
+    // Applied as a filter so the count and hasMore agree with the rows.
     if (sortBy === "efficiency") {
       query = query.gte("total_cost", EFFICIENCY_MIN_COST);
     }
 
-    const { data: submissions, count, error } = await query;
+    return query;
+  }
+
+  async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
+    const sortBy = params.sortBy || "cost";
+    const page = params.page || 0;
+    const pageSize = Math.min(params.pageSize || 25, 50);
+    const offset = page * pageSize;
+    const includeFlagged = params.includeFlagged || false;
+
+    // Efficiency is ranked on the volume-weighted efficiency_score (020, see
+    // src/lib/efficiency.ts) with a spend floor, so a short cheap history
+    // can't outrank a long one; before 020 is applied, on the raw ratio (011).
+    const run = (orderColumn: string) => this.buildLeaderboardQuery(params, sortBy, orderColumn, offset, pageSize, includeFlagged);
+    let result = await run(
+      sortBy === "cost" ? "total_cost" : sortBy === "efficiency" ? "efficiency_score" : "total_tokens"
+    );
+    if (sortBy === "efficiency" && result.error && MISSING_COLUMN_CODES.has(result.error.code ?? "")) {
+      result = await run("tokens_per_dollar");
+    }
+    const { data: submissions, count, error } = result;
 
     if (error) {
       throw new Error("Failed to fetch leaderboard: " + error.message);
@@ -1391,7 +1635,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
 export class SupabaseProfilesService implements ProfilesService {
   private client: SupabaseClient;
 
-  constructor(client: SupabaseClient) {
+  constructor(client: SupabaseClient, private serverRead = false) {
     this.client = client;
   }
 
@@ -1399,13 +1643,20 @@ export class SupabaseProfilesService implements ProfilesService {
     username: string,
     submissionLimit: number = 10
   ): Promise<ProfileWithSubmissions | null> {
-    // Use ilike for case-insensitive username matching
-    const { data: profile } = await this.client
+    // Case-insensitive, and never .single(): a handle can own one row per
+    // casing, and .single() errors on all of them (see pickCanonicalProfile).
+    const { data: candidates, error } = await this.client
       .from("profiles")
       .select("*")
-      .ilike("username", username)
-      .single();
+      .ilike("username", likeLiteral(username))
+      .limit(10);
 
+    if (error) {
+      console.error(`Failed to load profile ${username}:`, error.message);
+      return null;
+    }
+
+    const profile = pickCanonicalProfile(candidates as DbProfile[] | null);
     if (!profile) return null;
 
     const limit = Math.min(submissionLimit, 25);
@@ -1413,7 +1664,7 @@ export class SupabaseProfilesService implements ProfilesService {
     const { data: submissions } = await this.client
       .from("submissions")
       .select("*")
-      .ilike("username", profile.username)
+      .ilike("username", likeLiteral(profile.username))
       .order("submitted_at", { ascending: false })
       .limit(limit);
 
@@ -1422,19 +1673,30 @@ export class SupabaseProfilesService implements ProfilesService {
     const submissionIds = (submissions || []).map((s) => s.id);
     const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
       submissionIds,
-      (chunk, from, to) =>
-        this.client
-          .from("daily_breakdowns")
-          .select(DAILY_PUBLIC_COLUMNS)
+      (chunk, from, to) => {
+        // Only the service-role layer may read machine_contributions
+        // (migration 017 revokes it from anon). It is named explicitly, never
+        // via select("*"), and reduced to a count right after the fetch.
+        const table = this.client.from("daily_breakdowns");
+        const query = this.serverRead
+          ? table.select(`${DAILY_PUBLIC_COLUMNS}, machine_contributions`)
+          : table.select(DAILY_PUBLIC_COLUMNS);
+        return query
           .in("submission_id", chunk)
           .order("submission_id", { ascending: true })
           .order("date", { ascending: true })
-          .range(from, to),
+          .range(from, to);
+      },
       "daily breakdowns for profile"
     );
 
     const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    allDailyBreakdowns.forEach((db) => {
+    allDailyBreakdowns.forEach(({ machine_contributions, ...publicColumns }) => {
+      // Drop the machine IDs here so nothing downstream can serialize them.
+      const db: DbDailyBreakdown = {
+        ...publicColumns,
+        machine_count: countDayMachines(machine_contributions ?? null),
+      };
       const existing = dailyBySubmission.get(db.submission_id) || [];
       existing.push(db);
       dailyBySubmission.set(db.submission_id, existing);
@@ -1899,6 +2161,35 @@ export class SupabaseStatsService implements StatsService {
     return data as SiteStats;
   }
 
+  async getWorkInsightBaselines(): Promise<WorkInsightBaselines> {
+    const rows = await fetchAllPages<{
+      username: string;
+      input_tokens: number;
+      output_tokens: number;
+      cache_creation_tokens: number;
+      cache_read_tokens: number;
+      total_tokens: number;
+      total_cost: number;
+    }>(
+      (from, to) => this.client
+        .from("submissions")
+        .select("username,input_tokens,output_tokens,cache_creation_tokens,cache_read_tokens,total_tokens,total_cost")
+        .or("flagged_for_review.is.null,flagged_for_review.eq.false")
+        .order("id", { ascending: true })
+        .range(from, to),
+      "work insight baselines"
+    );
+    return buildWorkInsightBaselines(rows.map((row) => ({
+      username: row.username,
+      inputTokens: Number(row.input_tokens),
+      outputTokens: Number(row.output_tokens),
+      cacheCreationTokens: Number(row.cache_creation_tokens),
+      cacheReadTokens: Number(row.cache_read_tokens),
+      totalTokens: Number(row.total_tokens),
+      totalCost: Number(row.total_cost),
+    })), EFFICIENCY_MIN_COST);
+  }
+
   async getMonthStats(month: string): Promise<MonthStats | null> {
     // Exact per-month aggregates (migration 013). The function validates the
     // month format server-side; invalid input returns an empty-month object.
@@ -1974,6 +2265,8 @@ export class SupabaseStatsService implements StatsService {
  * the migration.
  */
 const MISSING_TABLE_CODES = new Set(["PGRST205", "42P01"]);
+/** Undefined column (Postgres) / not in PostgREST's schema cache. */
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
 
 export class SupabaseTokensService implements TokensService {
   constructor(private client: SupabaseClient) {}
@@ -2268,10 +2561,10 @@ class SupabaseDataLayer implements DataLayer {
   stats: StatsService;
   leagues: LeaguesService;
 
-  constructor(client: SupabaseClient) {
+  constructor(client: SupabaseClient, serverRead = false) {
     this.tokens = new SupabaseTokensService(client);
     this.submissions = new SupabaseSubmissionsService(client);
-    this.profiles = new SupabaseProfilesService(client);
+    this.profiles = new SupabaseProfilesService(client, serverRead);
     this.stats = new SupabaseStatsService(client);
     this.leagues = new SupabaseLeaguesService(client);
   }
@@ -2305,5 +2598,5 @@ export function createSupabaseServerDataLayer(): DataLayer {
   }
 
   const client = createClient(supabaseUrl, supabaseServiceKey);
-  return new SupabaseDataLayer(client);
+  return new SupabaseDataLayer(client, true);
 }

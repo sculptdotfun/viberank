@@ -14,6 +14,8 @@ import { useSession, signIn } from "next-auth/react";
 import { useCheckClaimableSubmissions, useClaimAndMergeSubmissions } from "@/lib/data/hooks/useSubmissions";
 import { formatNumber } from "@/lib/utils";
 import { TIERS } from "@/lib/tiers";
+import { TAKO_URL } from "@/lib/sponsor";
+import { takoClicked } from "@/lib/analytics";
 import { HOME_FAQS } from "@/lib/home-faqs";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 
@@ -102,9 +104,9 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
 
       <NavBar />
 
-      <AnnouncementBanner id="leagues-2026-08" href="/leagues">
-        <span className="font-medium text-accent">New:</span> Friend Leagues — a private leaderboard for your team
-        or group chat, one invite code to start. <span className="underline underline-offset-2">Start yours →</span>
+      <AnnouncementBanner id="tako-2026-10" href={TAKO_URL} icon={<Terminal className="w-4 h-4 text-accent flex-shrink-0" />} onOpen={() => takoClicked("home_banner")}>
+        <span className="font-medium text-accent">From the maker of viberank:</span> Tako, an open-source Mac terminal
+        for running many Claude Code and Codex agents at once. <span className="underline underline-offset-2">See it on GitHub →</span>
       </AnnouncementBanner>
 
       {/* Claim/Merge Banner */}

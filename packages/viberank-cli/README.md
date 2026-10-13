@@ -72,7 +72,7 @@ Only the SHA-256 of a token is ever stored server-side; the plaintext is shown o
 
 Supported — a laptop and a desktop sum into one profile rather than overwriting each other. Each machine writes an anonymous random UUID to `~/.viberank/machine-id` on first run and the server keeps usage as a per-machine slice. No hardware or identifying information is involved.
 
-Your totals also never silently drop: if a re-submission reports less than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install — the higher prior figure is retained. The CLI does report per-month file and byte **counts** of your transcript corpus so genuine deletion can be told apart from a partial export. Counts only; no transcript content leaves your machine.
+Your totals also never silently drop: if a re-submission reports less than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install — the higher prior figure is retained. The CLI does report per-month file and byte **counts** of your transcript corpus so genuine deletion can be told apart from a partial export, plus a short hash of the folder it counted so they are only ever compared with earlier counts of that same folder. Counts and the hash only; no transcript content or path leaves your machine.
 
 ## Manual usage
 
@@ -105,7 +105,9 @@ Submissions made with a token (`viberank login`) are **verified** and get a blue
 
 Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set that, so those rows appear with a `cli` badge (unverified). Once a username is verified, unverified submissions to it are refused: run `npx viberank-cli login` and submit again.
 
-The username prompt pre-fills the handle this machine last submitted as, and asks before switching to a different one, so a stray answer can't start a second profile.
+With a saved token there is no username prompt: the server files the submission under the token's owner, so the CLI looks that owner up and confirms `Submit to Viberank as @you (signed in)`.
+
+Without one, the username prompt pre-fills the handle this machine last submitted as, and asks before switching to a different one, so a stray answer can't start a second profile. On a first run it pre-fills the repository remote's owner only when GitHub confirms that owner is a user, not an organization.
 
 ## Troubleshooting
 
