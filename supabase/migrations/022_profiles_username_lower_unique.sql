@@ -1,0 +1,12 @@
+-- 022: one profile per handle, whatever its casing (#168).
+--
+-- profiles.username was unique case-sensitively, so a submission whose
+-- X-GitHub-User differed only in case inserted a second profile row, and every
+-- casing of that handle then 404'd. #168 made reads and the submit path match
+-- case-insensitively; this makes a second casing impossible at the database.
+--
+-- Applied to production on 2026-10-13 after folding 24 existing duplicate groups
+-- (49 rows) into the row matching each handle's GitHub casing (backup in the
+-- gitignored research/repair/). On a database that still holds duplicates this
+-- fails until they are folded, which is the point.
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_key ON profiles (lower(username));
