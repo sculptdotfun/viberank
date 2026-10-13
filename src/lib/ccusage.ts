@@ -165,23 +165,30 @@ function mergeAgentMaps(
 // Per-model day splits come straight from user-supplied JSON, so rebuild them
 // field-by-field and cap the count — never trust the shape.
 const MAX_MODELS_PER_DAY = 50;
+const MAX_MODEL_ROWS_READ = 1000;
 function sanitizeModelBreakdowns(value: unknown): NormalizedModelBreakdown[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
-  const out: NormalizedModelBreakdown[] = [];
-  for (const item of value.slice(0, MAX_MODELS_PER_DAY)) {
+  // `--by-agent` reports repeat a model once per agent, so fold repeats before
+  // capping: capping first dropped real rows and left the split short of the
+  // day's cost (one profile lost 280 days' worth of split this way).
+  const byModel = new Map<string, NormalizedModelBreakdown>();
+  for (const item of value.slice(0, MAX_MODEL_ROWS_READ)) {
     if (typeof item !== "object" || item === null) continue;
     const o = item as Record<string, unknown>;
     if (typeof o.modelName !== "string" || o.modelName.length === 0) continue;
-    out.push({
-      modelName: o.modelName.slice(0, 200),
-      inputTokens: num(o.inputTokens),
-      outputTokens: num(o.outputTokens),
-      cacheCreationTokens: num(o.cacheCreationTokens),
-      cacheReadTokens: num(o.cacheReadTokens),
-      cost: num(o.cost),
-    });
+    const modelName = o.modelName.slice(0, 200);
+    const row = byModel.get(modelName) ?? {
+      modelName, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, cost: 0,
+    };
+    row.inputTokens += num(o.inputTokens);
+    row.outputTokens += num(o.outputTokens);
+    row.cacheCreationTokens += num(o.cacheCreationTokens);
+    row.cacheReadTokens += num(o.cacheReadTokens);
+    row.cost += num(o.cost);
+    byModel.set(modelName, row);
   }
+  const out = [...byModel.values()].sort((a, b) => b.cost - a.cost).slice(0, MAX_MODELS_PER_DAY);
   return out.length > 0 ? out : undefined;
 }
 
@@ -258,6 +265,17 @@ export interface DailyAggregate {
 
 /** Sentinel machine id for submissions that carry no `X-Machine-Id` header. */
 export const DEFAULT_MACHINE_ID = "default";
+
+/**
+ * Machine IDs a client may send. The server keys its own slices with names a
+ * client must not be able to claim (`default` for unattributed usage, and
+ * colon-suffixed keys such as `<id>:estimated` or `retired:<hex>`), so a header
+ * that could collide with them is refused. Every ID in the archive already fits.
+ */
+const CLIENT_MACHINE_ID = /^[A-Za-z0-9._-]{1,128}$/;
+export function isClientMachineId(id: string): boolean {
+  return CLIENT_MACHINE_ID.test(id) && id.toLowerCase() !== DEFAULT_MACHINE_ID;
+}
 
 /**
  * Whether observation `a` of one day should win over `b`. Cost decides; total
@@ -675,6 +693,16 @@ const MAX_DAILY_COST = 5000; // $5k/day is already extreme usage
 // cap and the cost/token ratio band remain the primary anti-inflation guards.
 const MAX_DAILY_TOKENS = 250_000_000; // 250M non-cache-read tokens/day
 const MIN_COST_PER_TOKEN = 0.0000001; // cache reads are very cheap
+// MAX_DAILY_COST above only ever bounded the report's *total* (× 365), so one
+// day could carry a year's allowance: a synthetic $1,825,000 day reached #1
+// that way (#182). The largest honest day in every archived payload is about
+// $126K, so this cap leaves real heavy users alone.
+const MAX_SINGLE_DAY_COST = 150_000;
+// A large day must say which models it came from, and its per-model costs must
+// account for it. ccusage always emits the split, so only hand-built payloads
+// fail; small days are exempt because old CLIs and web uploads omit it.
+const SPLIT_REQUIRED_ABOVE_COST = 5_000;
+const SPLIT_TOLERANCE = 0.1;
 const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
 
 /**
@@ -827,7 +855,21 @@ export function validateCcData(
     if (day.totalTokens < dayComponents - TOKEN_SLOP) {
       throw new Error(`Token components don't sum correctly for ${day.date}.`);
     }
+    if (day.totalCost > MAX_SINGLE_DAY_COST) {
+      throw new Error(`Cost for ${day.date} exceeds realistic limits.`);
+    }
+    if (day.totalCost > SPLIT_REQUIRED_ABOVE_COST && !splitAccountsForDay(day)) {
+      throw new Error(
+        `The per-model costs for ${day.date} don't add up to its total. Please use official ccusage output.`
+      );
+    }
   }
+}
+
+function splitAccountsForDay(day: NormalizedDaily): boolean {
+  if (!day.modelBreakdowns?.length) return false;
+  const splitCost = day.modelBreakdowns.reduce((sum, m) => sum + m.cost, 0);
+  return Math.abs(splitCost - day.totalCost) <= day.totalCost * SPLIT_TOLERANCE;
 }
 
 export { TOKEN_SLOP };

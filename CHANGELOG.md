@@ -5,6 +5,28 @@
 ### Added
 - Profiles with at least three active days now show cache use, blended token cost, output share, daily tool and model mix, machine concurrency when available, and activity steadiness. Four token metrics include comparisons with developers who have at least $100 in unflagged submissions; the shared baseline is cached for two minutes. Machine IDs stay server-only.
 
+## Site — dollar figures say what they are (October 2026)
+
+### Fixed
+- **Profile dollars no longer read as money paid.** Every dollar figure is ccusage's API-equivalent estimate — what the tokens would cost at list API prices — and most developers pay a flat subscription well below it. The profile's headline tile now reads "API-equivalent" instead of "Total spent" (with a tooltip saying so), "Monthly spend" is "Monthly API-equivalent", the profile sheet shows "Value · API-equivalent", and the profile's title, meta description and structured data say "API-equivalent". The share card, its share text, the homepage OG image ("Total Spent"), the tier badge tooltip ("$X+ spent") and the /stats meta descriptions follow suit. Idea from #177.
+
+## CLI v1.12.0 — the prompt names the account you'll land on (October 2026)
+
+### Fixed
+- **An organization's name is no longer pre-filled as your username.** Running the CLI inside an org-owned repository pre-filled the remote's owner, and one Enter created a profile under an organization nobody can sign in as (#181). The CLI now asks GitHub's public `GET /users/{owner}` (unauthenticated, 2s timeout, only the owner name is sent) and pre-fills only a confirmed user. An organization, or an owner GitHub couldn't confirm (offline, rate limited), is shown as a hint in the question, like the `git config` guess.
+- **With a saved token, the confirmation shows the token's owner.** The server files token-signed submissions under the token's owner and ignores `X-GitHub-User`, but the CLI still asked for a username and confirmed `Submit to Viberank as @<typed name>`, so the two could disagree (#181). `login` now records the owner, a submit refreshes it, skips the username prompt and confirms `Submit to Viberank as @owner (signed in)`. A revoked token is reported before ccusage runs. Scheduled runs log the owner they submitted as.
+- Against a server without the new endpoint, the CLI keeps the username prompt but confirms `Submit to Viberank with your saved token?` rather than naming an account it can't vouch for.
+
+### Added
+- `GET /api/token/whoami` returns `{ username }` for a valid `Authorization: Bearer vbr_…` token and 401 otherwise. It uses the same resolver as `/api/submit`.
+
+## Site — one day can't carry a year's allowance (October 2026)
+
+### Fixed
+- **A single synthetic day reached #1 on both boards** ([#182](https://github.com/sculptdotfun/viberank/issues/182)). `MAX_DAILY_COST` only ever capped the report's total (× 365), so one $1,825,000 day of pure cache reads, priced exactly at the per-model floor and with no model split, passed every check. Each day is now checked as well. A day over $150,000 is rejected; the largest honest day in the archive is about $126K. A day over $5,000 must carry a per-model split whose costs add up to it within 10%. Across all 4,960 archived payloads, the only day either rule rejects is the synthetic one. The day has been removed from production.
+- **The 50-model cap cut real rows from `--by-agent` reports.** Those reports repeat a model once per agent, and the cap ran before the rows were folded together, which left one profile's split short on 280 days. Repeats are now folded first.
+- **`X-Machine-Id` can't claim a server slice name.** `default`, colon-suffixed keys and anything outside `[A-Za-z0-9._-]{1,128}` get a 400. All 395 machine IDs in the archive already fit.
+
 ## Site + CLI — a different folder's smaller count is not a deletion (September 2026)
 
 ### Fixed
