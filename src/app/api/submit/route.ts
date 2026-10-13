@@ -3,7 +3,7 @@ import { track } from "@vercel/analytics/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
-import { normalizeCcData } from "@/lib/ccusage";
+import { normalizeCcData, isClientMachineId } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { VERIFIED_PROFILE_ERROR } from "@/lib/data/supabase/client";
 import { getCliNotice } from "@/lib/sponsor";
@@ -186,6 +186,14 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(ccData.daily) || ccData.daily.length === 0) {
       return NextResponse.json(
         { error: "Invalid cc.json format. 'daily' must be a non-empty array." },
+        { status: 400 }
+      );
+    }
+
+    const sentMachineId = request.headers.get("X-Machine-Id");
+    if (sentMachineId && !isClientMachineId(sentMachineId)) {
+      return NextResponse.json(
+        { error: "Invalid X-Machine-Id. Use letters, digits, '.', '_' or '-' (up to 128)." },
         { status: 400 }
       );
     }

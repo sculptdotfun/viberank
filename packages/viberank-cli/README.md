@@ -105,7 +105,9 @@ Submissions made with a token (`viberank login`) are **verified** and get a blue
 
 Without one, the CLI falls back to an `X-GitHub-User` header — anyone can set that, so those rows appear with a `cli` badge (unverified). Once a username is verified, unverified submissions to it are refused: run `npx viberank-cli login` and submit again.
 
-The username prompt pre-fills the handle this machine last submitted as, and asks before switching to a different one, so a stray answer can't start a second profile.
+With a saved token there is no username prompt: the server files the submission under the token's owner, so the CLI looks that owner up and confirms `Submit to Viberank as @you (signed in)`.
+
+Without one, the username prompt pre-fills the handle this machine last submitted as, and asks before switching to a different one, so a stray answer can't start a second profile. On a first run it pre-fills the repository remote's owner only when GitHub confirms that owner is a user, not an organization.
 
 ## Troubleshooting
 
