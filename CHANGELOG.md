@@ -11,6 +11,17 @@
 - **Titles, H1s and descriptions follow the order people search in, with Claude Code second:** "Codex vs Claude Code (2026): Measured Cost From N Devs", trimmed to about 60 characters. Canonical slugs are unchanged (`claude-vs-codex` stays canonical; `codex-vs-claude` still 308s to it). The intro and FAQ also use the reversed phrasing.
 - The `/compare` index lists Claude Code pairings first. The Codex/Gemini and Cursor/Copilot posts link to their comparison pages, and llms.txt describes each page by what it measures.
 
+## Site — pricing pages for Claude Code and Codex (October 2026)
+
+### Added
+- **New post: `/blog/codex-pricing`.** It lists which ChatGPT plans include Codex and their prices, API rates for the Codex models, and measured monthly spend per Codex developer. It shows two cohorts: Codex-only developers, and anyone who uses Codex alongside other agents. A cohort under 20 developers isn't shown. Linked from `/tool/codex`, the Codex usage post and the Claude Code cost post.
+- `spendRowsForTool` in `cost-benchmark`, and `getSpendRows` now returns each submission's `tools`, so spend can be cut by tool without a new query.
+
+### Changed
+- **The Claude Code cost post leads with pricing**: "Claude Code Pricing (2026): Plans vs What Devs Really Spend". It adds a cited plans table (Pro, Max 5x, Max 20x, Team, API) above the measured percentile table. The URL is unchanged.
+- **The Codex usage post opens with the official usage dashboard** (`chatgpt.com/codex/settings/usage`) and `/status`. It adds a cited Codex usage limits table.
+- Plan and API prices were checked against Anthropic's and OpenAI's own pages on 2026-10-13.
+
 ## Site — an "under review" badge for unusual entries (October 2026)
 
 ### Added

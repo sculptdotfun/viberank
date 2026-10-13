@@ -2,19 +2,33 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Terminal, Gauge, Trophy, DollarSign } from "lucide-react";
 import type { Metadata } from "next";
 
+// "codex usage" (12K/mo) is answered first by OpenAI's own dashboard, so the
+// page opens with where it is, then what we add on top. Figures below were
+// verified against OpenAI's pages on 2026-10-13.
+const TITLE = "Codex Usage: Dashboard, /status, Limits & Real Costs (2026)";
+const DASHBOARD_URL = "https://chatgpt.com/codex/settings/usage";
+const LIMITS_SOURCE = "https://learn.chatgpt.com/docs/pricing";
+
+const PLUS_LIMITS = [
+  { model: "GPT-6 Astra", messages: "5–45" },
+  { model: "GPT-6.1 Sol", messages: "15–160" },
+  { model: "GPT-6 Sol", messages: "15–150" },
+  { model: "GPT-6 Luna", messages: "350–3,000" },
+] as const;
+
 export const metadata: Metadata = {
-  title: "How to Check Codex Usage: /usage, /status & Real Costs",
+  title: TITLE,
   description:
-    "Codex CLI v0.140.0 added /usage — lifetime tokens, peak day, streak and a daily heatmap, in the TUI. /status covers your 5-hour and weekly limits, and npx ccusage@latest daily turns local logs into real API-equivalent costs.",
+    "Check Codex usage in the official dashboard at chatgpt.com/codex/settings/usage or with /status in the CLI. Plus Codex usage limits per plan, /usage for tokens, and ccusage for real API-equivalent costs.",
   alternates: { canonical: "https://www.viberank.app/blog/how-to-check-codex-usage" },
   openGraph: {
-    title: "How to Check Codex Usage: /usage, /status & Real Costs",
+    title: TITLE,
     description:
-      "/usage for tokens, /status for limits, ccusage for real costs — then rank yourself on the public Codex leaderboard.",
+      "Dashboard and /status for limits, /usage for tokens, /status for limits, ccusage for real costs — then rank yourself on the public Codex leaderboard.",
     url: "https://www.viberank.app/blog/how-to-check-codex-usage",
     type: "article",
     publishedTime: "2026-07-24T00:00:00.000Z",
-    modifiedTime: "2026-08-21T00:00:00.000Z",
+    modifiedTime: "2026-10-13T00:00:00.000Z",
     authors: ["Viberank Team"],
     images: [
       {
@@ -27,24 +41,32 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "How to Check Codex Usage: /usage, /status & Real Costs",
-    description: "/usage, /status and ccusage explained — then rank yourself on the public Codex leaderboard.",
+    title: TITLE,
+    description: "The Codex usage dashboard, /status and ccusage explained — then rank yourself on the public Codex leaderboard.",
     images: ["/api/og?title=Codex%20Token%20Usage&description=Track%20it%2C%20cost%20it%2C%20rank%20it"],
   },
 };
 
 const FAQS = [
   {
+    q: "Where is the Codex usage dashboard?",
+    a: "At chatgpt.com/codex/settings/usage. It shows your current Codex limits and when they reset. Inside an active Codex CLI session, /status shows your remaining limits too.",
+  },
+  {
+    q: "What are the Codex usage limits?",
+    a: "On Plus and Standard Business seats, OpenAI estimates local messages per five-hour window by model: GPT-6 Astra 5–45, GPT-6.1 Sol 15–160, GPT-6 Sol 15–150, GPT-6 Luna 350–3,000. Weekly limits may also apply. Pro plans currently have no five-hour limit.",
+  },
+  {
     q: "How do I check my OpenAI Codex token usage?",
     a: "Three ways. Type /usage inside a Codex CLI session (v0.140.0 and later) for lifetime tokens, peak day, streak and a daily activity heatmap. Type /status for how much of your 5-hour and weekly rate limits you've used. Or run npx ccusage@latest daily to parse Codex's local session logs (JSONL under ~/.codex) into per-day token counts and API-equivalent dollar costs across every agent you use.",
   },
   {
     q: "How do I check how many tokens I have left in Codex?",
-    a: "Both views exist now. /usage reports your actual token totals — lifetime, peak day, streak — while /status reports how much of the 5-hour session window and weekly cap you have consumed, as percentages. Reset timestamps and banked usage credits still live on your ChatGPT account's web usage page rather than in the CLI.",
+    a: "Both views exist now. /usage reports your actual token totals — lifetime, peak day, streak — while /status reports how much of the 5-hour session window and weekly cap you have consumed, as percentages. Reset times and credits are in the Codex usage dashboard at chatgpt.com/codex/settings/usage.",
   },
   {
     q: "Where do I check my Codex credits?",
-    a: "On your ChatGPT/OpenAI account's usage page in the browser. In the CLI, /status shows rate-limit percentages and /usage shows token activity; credit balances and window reset times remain web-only.",
+    a: "In the Codex usage dashboard at chatgpt.com/codex/settings/usage. In the CLI, /status shows rate-limit percentages and /usage shows token activity; credit balances and window reset times remain web-only.",
   },
   {
     q: "Does Codex usage tracked this way match my OpenAI bill?",
@@ -65,12 +87,12 @@ export default function CodexTokenUsage() {
     {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
-      headline: "How to Check Codex Usage: /usage, /status & Real Costs",
+      headline: TITLE,
       description:
-        "Check your OpenAI Codex CLI token usage with /usage, your limits with /status, and your real costs with ccusage.",
+        "Check Codex usage in the official dashboard or with /status, see Codex usage limits per plan, and get real costs with ccusage.",
       image: "https://www.viberank.app/api/og?title=Codex%20Token%20Usage",
       datePublished: "2026-07-24T00:00:00.000Z",
-      dateModified: "2026-08-21T00:00:00.000Z",
+      dateModified: "2026-10-13T00:00:00.000Z",
       author: { "@type": "Organization", name: "Viberank", url: "https://www.viberank.app" },
       publisher: {
         "@type": "Organization",
@@ -105,13 +127,13 @@ export default function CodexTokenUsage() {
 
         <header className="mb-12">
           <h1 className="text-5xl font-bold text-foreground mb-4 leading-tight">
-            How to Check Your Codex Usage: Limits, Tokens & Costs
+            Codex Usage: Dashboard, /status, Limits &amp; Real Costs
           </h1>
 
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
             <span className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              July 24, 2026
+              Updated October 13, 2026
             </span>
             <span className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
@@ -121,13 +143,16 @@ export default function CodexTokenUsage() {
 
           <div className="p-6 bg-card border border-border rounded-lg">
             <p className="text-lg text-foreground m-0">
-              The short answer, as of Codex CLI v0.140.0: type <code>/usage</code> inside a session for your
-              token activity — lifetime total, peak day, streak, and a daily heatmap — or <code>/status</code> for
-              how much of your 5-hour and weekly rate limits you&apos;ve burned. For costs in dollars, and for
-              history that survives across machines, run{" "}
+              Your Codex usage lives in the official{" "}
+              <a href={DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                Codex usage dashboard
+              </a>{" "}
+              at <code>chatgpt.com/codex/settings/usage</code>: current limits and when they reset. In the CLI,
+              type <code>/status</code> for your remaining 5-hour and weekly limits, or <code>/usage</code>{" "}
+              (v0.140.0+) for token activity. For costs in dollars, run{" "}
               <span className="font-semibold text-accent">npx ccusage@latest daily</span>. This guide covers all
-              three — plus what the numbers mean and how to stack yours against the 190+ developers on the{" "}
-              <Link href="/tool/codex">public Codex leaderboard</Link>.
+              of it, the <a href="#codex-usage-limits">Codex usage limits</a> per plan, and how to stack yours
+              against the developers on the <Link href="/tool/codex">public Codex leaderboard</Link>.
             </p>
           </div>
         </header>
@@ -174,9 +199,48 @@ export default function CodexTokenUsage() {
             Inside any Codex CLI session, type <code>/status</code>. It shows your current position against both
             rate-limit windows — the rolling 5-hour session and the weekly cap — as live percentages. (You need to
             send at least one message in the session first, or there&apos;s no rate-limit state to report.) What it
-            doesn&apos;t show: reset timestamps or banked credits — those live on your ChatGPT account&apos;s web
-            usage page. And it says nothing about dollars, which is what ccusage is for. For token counts, use{" "}
+            doesn&apos;t show: reset timestamps or banked credits — those live in the{" "}
+            <a href={DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+              web usage dashboard
+            </a>. And it says nothing about dollars, which is what ccusage is for. For token counts, use{" "}
             <code>/usage</code> above.
+          </p>
+        </section>
+
+        <section className="mb-12" id="codex-usage-limits">
+          <h2 className="text-3xl font-bold text-foreground mb-6 flex items-center gap-3">
+            <Gauge className="w-8 h-8 text-accent" />
+            Codex usage limits
+          </h2>
+          <p className="text-foreground text-lg leading-relaxed mb-6">
+            OpenAI publishes limits as estimated local messages per five-hour window, which vary with task size.
+            For Plus and Standard Business seats:
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Local messages per 5 hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PLUS_LIMITS.map((row) => (
+                <tr key={row.model}>
+                  <td>{row.model}</td>
+                  <td>{row.messages}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-foreground text-lg leading-relaxed mb-6">
+            Local messages and cloud chats share the allowance, and weekly limits may also apply. Pro plans
+            currently have no five-hour limit. When you run out, you can buy credits or wait for the reset shown
+            in the dashboard. Source:{" "}
+            <a href={LIMITS_SOURCE} target="_blank" rel="noopener noreferrer">
+              OpenAI Codex pricing
+            </a>
+            , checked October 2026. What each plan costs, and what Codex developers actually burn, is in{" "}
+            <Link href="/blog/codex-pricing">Codex pricing: plans vs measured spend</Link>.
           </p>
         </section>
 
