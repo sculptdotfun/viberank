@@ -24,7 +24,7 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
   const shareUrl = profileUrl(username);
   const tier = getTier(totalCost);
   const toolsLine = tools && tools.length > 0 ? `\n🧰 ${tools.map(toolLabel).join(" · ")}` : "";
-  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n${tier.glyph} ${tier.name.toUpperCase()} tier\n💰 $${formatCurrency(totalCost)} spent\n📊 ${formatNumber(totalTokens)} tokens${toolsLine}\n\nJoin the AI coding leaderboard:`;
+  const shareText = `I'm ranked #${rank} on viberank 🏆\n\n${tier.glyph} ${tier.name.toUpperCase()} tier\n💰 $${formatCurrency(totalCost)} API-equivalent\n📊 ${formatNumber(totalTokens)} tokens${toolsLine}\n\nJoin the AI coding leaderboard:`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -73,7 +73,7 @@ export default function ShareCard({ rank, username, totalCost, totalTokens, date
 
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="rounded-lg bg-surface-2 p-3">
-            <p className="text-[11px] text-muted mb-0.5">Total spent</p>
+            <p className="text-[11px] text-muted mb-0.5">API-equivalent</p>
             <p className="text-lg font-mono font-bold text-accent">${formatNumber(totalCost)}</p>
           </div>
           <div className="rounded-lg bg-surface-2 p-3">

@@ -1,5 +1,10 @@
 # Changelog
 
+## Site — dollar figures say what they are (October 2026)
+
+### Fixed
+- **Profile dollars no longer read as money paid.** Every dollar figure is ccusage's API-equivalent estimate — what the tokens would cost at list API prices — and most developers pay a flat subscription well below it. The profile's headline tile now reads "API-equivalent" instead of "Total spent" (with a tooltip saying so), "Monthly spend" is "Monthly API-equivalent", the profile sheet shows "Value · API-equivalent", and the profile's title, meta description and structured data say "API-equivalent". The share card, its share text, the homepage OG image ("Total Spent"), the tier badge tooltip ("$X+ spent") and the /stats meta descriptions follow suit. Idea from #177.
+
 ## Site + CLI — a different folder's smaller count is not a deletion (September 2026)
 
 ### Fixed

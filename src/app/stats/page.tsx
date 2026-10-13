@@ -15,12 +15,12 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "AI Coding Usage Stats: Spend, Tokens & Top Models",
   description:
-    "Site-wide AI coding usage: total spend, tokens burned, cache hit share, and the most used models across Claude Code, Codex, Gemini CLI and more.",
+    "Site-wide AI coding usage: total API-equivalent spend, tokens burned, cache hit share, and the most used models across Claude Code, Codex, Gemini CLI and more.",
   alternates: { canonical: "https://www.viberank.app/stats" },
   openGraph: {
     title: "AI Coding Usage Stats: Spend, Tokens & Top Models",
     description:
-      "Total spend, tokens burned, and the most used models across every coding agent tracked on Viberank.",
+      "Total API-equivalent spend, tokens burned, and the most used models across every coding agent tracked on Viberank.",
     url: "https://www.viberank.app/stats",
     siteName: "Viberank",
     // Without an explicit image here the page-level openGraph object replaces
