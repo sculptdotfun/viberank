@@ -295,13 +295,167 @@ export function aggregateContributions(
   contributions: Record<string, MachineContribution>
 ): DailyAggregate {
   const { [DEFAULT_MACHINE_ID]: unattributed, ...attributed } = contributions;
-  const summed = sumContributions(Object.values(attributed));
+  const attributedSlices = Object.values(attributed);
+  const summed = sumContributions(attributedSlices);
+  if (!unattributed) return summed;
+  if (attributedSlices.length === 0) return sumContributions([unattributed]);
+
   // max(unattributed, Σ attributed): the unattributed slice may be any of the
   // id'd machines, so it can hold a day up but never add to it (#81).
-  if (unattributed && (Object.keys(attributed).length === 0 || outweighs(unattributed, summed))) {
-    return sumContributions([unattributed]);
+  const wholeDay = outweighs(unattributed, summed) ? sumContributions([unattributed]) : summed;
+
+  // Compared model by model where both sides carry a full split, so a model
+  // only the unattributed slice used — typically a retired machine's — is
+  // counted instead of being hidden behind the id'd machines' day.
+  const byModel = maxByModel(unattributed, attributedSlices);
+  return byModel ? atLeast(byModel, wholeDay) : wholeDay;
+}
+
+/**
+ * Merges are lossless: the per-model result may only raise a day above the
+ * whole-day rule, never lower it. A split accepted within tolerance can fall
+ * short of its slice's totals, so every summed field is floored at the
+ * whole-day value rather than trusting the split alone.
+ */
+function atLeast(agg: DailyAggregate, floor: DailyAggregate): DailyAggregate {
+  return {
+    ...agg,
+    inputTokens: Math.max(agg.inputTokens, floor.inputTokens),
+    outputTokens: Math.max(agg.outputTokens, floor.outputTokens),
+    cacheCreationTokens: Math.max(agg.cacheCreationTokens, floor.cacheCreationTokens),
+    cacheReadTokens: Math.max(agg.cacheReadTokens, floor.cacheReadTokens),
+    totalTokens: Math.max(agg.totalTokens, floor.totalTokens),
+    totalCost: Math.max(agg.totalCost, floor.totalCost),
+    modelsUsed: Array.from(new Set([...agg.modelsUsed, ...floor.modelsUsed])),
+    agents: Array.from(new Set([...agg.agents, ...floor.agents])),
+  };
+}
+
+/**
+ * The same model across ccusage versions, which have renamed it (date
+ * suffixes, provider paths, dotted versions, and the `[tool]` prefix newer
+ * versions add). The prefix is dropped on purpose: the unattributed slice may
+ * be a copy of an id'd day reported by another ccusage version, so
+ * `[openclaw] google/gemini-3-pro` on one side and `google/gemini-3-pro` on
+ * the other take the max rather than add. Rows within one side still sum,
+ * since `addModel` folds them under the shared key.
+ */
+function modelKey(name: string): string {
+  let model = name.replace(/^\[[^\]]+\]\s*/, "");
+  model = model.split("/").pop() ?? model;
+  return model.replace(/-\d{8}$/, "").replace(/\./g, "-").toLowerCase();
+}
+
+const breakdownTokens = (m: NormalizedModelBreakdown) =>
+  m.inputTokens + m.outputTokens + m.cacheCreationTokens + m.cacheReadTokens;
+
+function addModel(
+  into: Map<string, NormalizedModelBreakdown>,
+  key: string,
+  m: NormalizedModelBreakdown
+): void {
+  const held = into.get(key);
+  into.set(
+    key,
+    held
+      ? {
+          ...held,
+          inputTokens: held.inputTokens + m.inputTokens,
+          outputTokens: held.outputTokens + m.outputTokens,
+          cacheCreationTokens: held.cacheCreationTokens + m.cacheCreationTokens,
+          cacheReadTokens: held.cacheReadTokens + m.cacheReadTokens,
+          cost: held.cost + m.cost,
+        }
+      : { ...m }
+  );
+}
+
+/** Per-model view of a slice, or null when its split doesn't account for its totals. */
+function modelsOf(slice: MachineContribution): Map<string, NormalizedModelBreakdown> | null {
+  const rows = slice.modelBreakdowns;
+  if (!rows || rows.length === 0) return null;
+
+  const byKey = new Map<string, NormalizedModelBreakdown>();
+  let cost = 0;
+  let tokens = 0;
+  for (const m of rows) {
+    cost += m.cost;
+    tokens += breakdownTokens(m);
+    addModel(byKey, modelKey(m.modelName), m);
   }
-  return summed;
+
+  // A partial split (older CLIs, models ccusage couldn't attribute) would
+  // silently drop the unsplit remainder, so only a complete one qualifies.
+  const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 0.01);
+  if (!close(cost, slice.totalCost) || !close(tokens, slice.totalTokens)) return null;
+  return byKey;
+}
+
+/**
+ * Σ over models of max(unattributed, Σ attributed) for that model. A copy of
+ * an id'd machine's day (#81) matches it model for model and adds nothing;
+ * usage the id'd machines don't have — another machine's — is kept. Where
+ * both sides used the same model the larger one still wins, so same-model
+ * days from a retired machine stay under-counted: only the owner can say
+ * those are separate machines.
+ *
+ * Returns null when either side lacks a complete per-model split.
+ */
+function maxByModel(
+  unattributed: MachineContribution,
+  attributed: MachineContribution[]
+): DailyAggregate | null {
+  const mine = modelsOf(unattributed);
+  if (!mine) return null;
+
+  const theirs = new Map<string, NormalizedModelBreakdown>();
+  for (const slice of attributed) {
+    const models = modelsOf(slice);
+    if (!models) return null;
+    for (const [key, m] of models) addModel(theirs, key, m);
+  }
+
+  const picked: NormalizedModelBreakdown[] = [];
+  let unattributedCounted = false;
+  for (const key of new Set([...mine.keys(), ...theirs.keys()])) {
+    const a = mine.get(key);
+    const b = theirs.get(key);
+    const aWins =
+      !!a &&
+      (!b ||
+        outweighs(
+          { totalCost: a.cost, totalTokens: breakdownTokens(a) },
+          { totalCost: b.cost, totalTokens: breakdownTokens(b) }
+        ));
+    picked.push(aWins ? a! : b!);
+    if (aWins) unattributedCounted = true;
+  }
+
+  const agg: DailyAggregate = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 0,
+    totalCost: 0,
+    modelsUsed: picked.map((m) => m.modelName),
+    agents: Array.from(
+      new Set([
+        ...attributed.flatMap((s) => s.agents),
+        ...(unattributedCounted ? unattributed.agents : []),
+      ])
+    ),
+    modelBreakdowns: picked,
+  };
+  for (const m of picked) {
+    agg.inputTokens += m.inputTokens;
+    agg.outputTokens += m.outputTokens;
+    agg.cacheCreationTokens += m.cacheCreationTokens;
+    agg.cacheReadTokens += m.cacheReadTokens;
+    agg.totalTokens += breakdownTokens(m);
+    agg.totalCost += m.cost;
+  }
+  return agg;
 }
 
 function sumContributions(slices: MachineContribution[]): DailyAggregate {
