@@ -4,11 +4,12 @@
 // (1,216 users, top ≈ $440k) the $50k Supernova held the top 6% and Inferno or
 // better the top 17% — the top of the ladder no longer meant anything.
 //
-// Recalibrated 2026-09 on the live distribution: the lower rungs keep their
-// thresholds, so getting started stays as rewarding as it was (Ember 93%,
-// Flame 68%, Blaze 34% of developers), while the top is re-spaced to be hard
-// again — Inferno ≈ top 11%, Supernova ≈ top 2.5%, and a new Hypernova for
-// the top 0.5% (6 developers at the time).
+// Recalibrated 2026-10 on the live distribution (1,274 developers, after a
+// synthetic $1.8M entry was removed): the lower rungs keep their thresholds,
+// so getting started stays as rewarding as it was (Ember 93%, Flame 69%,
+// Blaze 37% of developers), while the top is re-spaced to be hard again:
+// Inferno is the top 13%, Supernova the top 3%, and a new Hypernova the top
+// 0.7% (9 developers).
 //
 // get_site_stats() buckets /stats tier counts in SQL with the same
 // thresholds (migration 021); test/tiers.test.mts keeps the two in step.
