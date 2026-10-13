@@ -6,6 +6,12 @@
 - **Charts color a model by its vendor, not by its rank.** Rank-coloring painted whatever came second in blue, so a profile whose top two models were both Claude showed one in OpenAI's color. Claude models now take Anthropic oranges and golds, OpenAI blues, DeepSeek a distinct indigo, Google greens, Meta purples, Mistral rose, Qwen cyan, GLM lime; xAI and Moonshot are drawn as off-white and slate, since their brand black would vanish on the dark surface. Same-vendor models take that family's shades in order of all-time cost. Applies to the profile usage chart (a model keeps its color in every range, matching the model list; Other stays gray), the model and tool lists, and the /stats model and tool lists. Unknown vendors and harnesses that run any model (OpenCode, OpenClaw, pi, Hermes, …) get hues chosen to be far from every vendor's. A vendor with more models than shades cycles its own family, so a fifth Claude model stays orange-gold, and no real model or tool is ever drawn in Other's gray. Checked with the dataviz validator against the chart surface.
 - Tool labels for Antigravity, Grok Build and ZCode, which ccusage 20 reads.
 
+## Site — tier ladder recalibrated, with a new top tier (September 2026)
+
+### Changed
+- **The top of the ladder means something again.** Tiers were calibrated in June 2026 (797 developers, top ≈ $57K) so that Supernova was the top 0.5%. Lifetime totals only grow; by September (1,216 developers, top ≈ $440K) the $50K Supernova held the top 6% and Inferno or better the top 17%. The lower rungs keep their thresholds, so getting started is as rewarding as before (Ember $100+, Flame $1K+, Blaze $5K+); the top is re-spaced: **Inferno $25K+** (≈ top 11%), **Supernova $100K+** (≈ top 2.5%) and a new **Hypernova $250K+** (top 0.5%, with its own glow). The legend, FAQ, home copy and the tokenmaxxing post follow.
+- `/stats` counts tiers in SQL; migration `021_tier_ladder.sql` redefines `get_site_stats()` with the new buckets (otherwise unchanged from 008), and `test/tiers.test.mts` fails if the SQL and `src/lib/tiers.ts` ever disagree again.
+
 ## Site + API — Tako in the house slots (October 2026)
 
 ### Added

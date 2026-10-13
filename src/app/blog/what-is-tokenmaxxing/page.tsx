@@ -48,7 +48,7 @@ const FAQS = [
   },
   {
     q: "What counts as heavy AI usage in 2026?",
-    a: "On Viberank, crossing about $1,000 in API-equivalent spend puts you in the Flame tier; $15,000+ is Inferno, and $50,000+ is Supernova. The median active developer burns tens of millions of tokens per day, most of it cache reads.",
+    a: "On Viberank, crossing about $1,000 in API-equivalent spend puts you in the Flame tier; $25,000+ is Inferno, $100,000+ is Supernova, and $250,000+ is Hypernova. The median active developer burns tens of millions of tokens per day, most of it cache reads.",
   },
 ];
 
@@ -221,7 +221,7 @@ export default function WhatIsTokenmaxxing() {
             <Link href="/tool/claude">Claude Code</Link>, <Link href="/tool/codex">OpenAI Codex</Link>,{" "}
             <Link href="/tool/gemini">Gemini CLI</Link>, <Link href="/tool/copilot">Copilot</Link> and every other
             agent ccusage tracks — $6.6M in API-equivalent spend and counting. Spend earns a tier: Spark, Ember,
-            Flame ($1K+), Blaze ($5K+), Inferno ($15K+), Supernova ($50K+). Submissions are sanity-checked
+            Flame ($1K+), Blaze ($5K+), Inferno ($25K+), Supernova ($100K+), Hypernova ($250K+). Submissions are sanity-checked
             server-side (token math, cost-per-token ratio bounds, date checks), and GitHub sign-in gets you a
             verified badge.
           </p>

@@ -27,6 +27,6 @@ export const HOME_FAQS = [
   },
   {
     q: "What are viberank tiers?",
-    a: "Every developer holds a spend tier based on their best submission: Spark ($0+), Ember ($100+), Flame ($1K+), Blaze ($5K+), Inferno ($15K+) and Supernova ($50K+). Tier badges appear on the leaderboard, your profile and your share card — and your profile shows exactly how far you are from the next tier.",
+    a: "Every developer holds a spend tier based on their best submission: Spark ($0+), Ember ($100+), Flame ($1K+), Blaze ($5K+), Inferno ($25K+), Supernova ($100K+) and Hypernova ($250K+). Tier badges appear on the leaderboard, your profile and your share card — and your profile shows exactly how far you are from the next tier.",
   },
 ];
