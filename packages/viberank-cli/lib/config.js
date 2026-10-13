@@ -61,8 +61,27 @@ export function clearToken() {
   const config = readConfig();
   delete config.token;
   delete config.username;
+  delete config.tokenOwner;
   fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+}
+
+/** A short digest tying a saved owner to the token it came from, so a
+ * VIBERANK_TOKEN in the environment never borrows the config token's owner. */
+function tokenFingerprint(token) {
+  return crypto.createHash('sha256').update(token).digest('hex').slice(0, 16);
+}
+
+/** Remember which account `token` belongs to, as reported by the server. */
+export function saveTokenOwner(token, username) {
+  writeConfig({ tokenOwner: { username, token: tokenFingerprint(token) } });
+}
+
+/** The saved owner of `token`, or null if none was saved for this token. */
+export function savedTokenOwner(token) {
+  const { tokenOwner } = readConfig();
+  if (!token || !tokenOwner || typeof tokenOwner.username !== 'string') return null;
+  return tokenOwner.token === tokenFingerprint(token) ? tokenOwner.username : null;
 }
 
 /**

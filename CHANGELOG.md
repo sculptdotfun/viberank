@@ -1,5 +1,15 @@
 # Changelog
 
+## CLI v1.12.0 — the prompt names the account you'll land on (October 2026)
+
+### Fixed
+- **An organization's name is no longer pre-filled as your username.** Running the CLI inside an org-owned repository pre-filled the remote's owner, and one Enter created a profile under an organization nobody can sign in as (#181). The CLI now asks GitHub's public `GET /users/{owner}` (unauthenticated, 2s timeout, only the owner name is sent) and pre-fills only a confirmed user. An organization, or an owner GitHub couldn't confirm (offline, rate limited), is shown as a hint in the question, like the `git config` guess.
+- **With a saved token, the confirmation shows the token's owner.** The server files token-signed submissions under the token's owner and ignores `X-GitHub-User`, but the CLI still asked for a username and confirmed `Submit to Viberank as @<typed name>`, so the two could disagree (#181). `login` now records the owner, a submit refreshes it, skips the username prompt and confirms `Submit to Viberank as @owner (signed in)`. A revoked token is reported before ccusage runs. Scheduled runs log the owner they submitted as.
+- Against a server without the new endpoint, the CLI keeps the username prompt but confirms `Submit to Viberank with your saved token?` rather than naming an account it can't vouch for.
+
+### Added
+- `GET /api/token/whoami` returns `{ username }` for a valid `Authorization: Bearer vbr_…` token and 401 otherwise. It uses the same resolver as `/api/submit`.
+
 ## Site + CLI — a different folder's smaller count is not a deletion (September 2026)
 
 ### Fixed
