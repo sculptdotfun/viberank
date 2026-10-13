@@ -19,6 +19,15 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "codex-pricing",
+    title: "Codex Pricing (2026): Plans vs Measured Spend Per Developer",
+    excerpt:
+      "Which ChatGPT plans include Codex, what each costs, API rates for the Codex models — and what Codex developers actually burn per month, measured.",
+    datePublished: "2026-10-13",
+    dateModified: "2026-10-13",
+    readTime: "6 min read",
+  },
+  {
     slug: "how-viberank-checks-submissions",
     title: "How Viberank Checks Submissions (and the Fake #1 We Removed)",
     excerpt:
@@ -83,11 +92,11 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "how-to-check-codex-usage",
-    title: "How to Check Codex Usage: /usage, /status & Real Costs",
+    title: "Codex Usage: Dashboard, /status, Limits & Real Costs (2026)",
     excerpt:
-      "Two commands answer it: /status inside Codex CLI for your 5-hour and weekly limits, and ccusage for token-level history and costs — plus the public Codex leaderboard.",
+      "Your Codex usage dashboard is at chatgpt.com/codex/settings/usage; /status shows limits in the CLI. Plus the official per-plan limits, /usage for tokens, and ccusage for real costs.",
     datePublished: "2026-07-24",
-    dateModified: "2026-08-18",
+    dateModified: "2026-10-13",
     readTime: "6 min read",
   },
   {
@@ -110,9 +119,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "how-much-does-claude-code-cost",
-    title: "How Much Does Claude Code Cost? Real Data, 800+ Devs (2026)",
+    title: "Claude Code Pricing (2026): Plans vs What Devs Really Spend",
     excerpt:
-      "What does Claude Code actually cost per month? Real spend, tokens, and daily averages from 800+ developers on the leaderboard.",
+      "Pro $20, Max 5x $100, Max 20x $200 or API per token — and the measured monthly spend of developers who track their own Claude Code usage.",
     datePublished: "2026-06-09",
     dateModified: "2026-10-13",
     readTime: "6 min read",

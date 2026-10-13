@@ -18,19 +18,32 @@ import {
 // quoted, so they have to stay current without anyone remembering to edit it.
 export const revalidate = 3600;
 
-const TITLE = "How Much Does Claude Code Cost? Measured, Not Estimated";
+// Leads with "pricing" because that is what people search (27K/mo for
+// "claude code pricing" vs 4K for "claude code cost"); the measured data is
+// the hook no plan-listing page can match. Slug stays for its link equity.
+const TITLE = "Claude Code Pricing (2026): Plans vs What Devs Really Spend";
 const DESC =
-  "Every page answering this quotes Anthropic's $150–250/developer/month. We measured it instead: the full spend distribution from developers who track their own Claude Code usage.";
+  "Claude Code pricing in 2026: Pro $20, Max 5x $100, Max 20x $200, or API per token — next to measured monthly spend from developers who track their own Claude Code usage.";
 const OG =
-  "/api/og?title=How%20Much%20Does%20Claude%20Code%20Cost%3F&description=Measured%20from%20real%20usage%2C%20not%20estimated";
+  "/api/og?title=Claude%20Code%20Pricing%20(2026)&description=Plans%20vs%20measured%20spend%20per%20developer";
+
+// Verified against Anthropic's own pages on 2026-10-13. Re-check before
+// editing: plan prices change and these are quoted as fact.
+const PRICING_SOURCES = {
+  plans: "https://claude.com/pricing",
+  max: "https://support.claude.com/en/articles/11049741-what-is-the-max-plan",
+  api: "https://platform.claude.com/docs/en/about-claude/pricing",
+} as const;
 const URL = "https://www.viberank.app/blog/how-much-does-claude-code-cost";
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   keywords: [
-    "how much does claude code cost",
     "claude code pricing",
+    "claude code price",
+    "claude code cost",
+    "how much does claude code cost",
     "claude code cost per month",
     "average claude code cost",
     "claude code cost per developer",
@@ -121,6 +134,14 @@ export default async function Post() {
       mainEntity: [
         {
           "@type": "Question",
+          name: "What is Claude Code's pricing?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Claude Code is included in Claude's paid plans: Pro at $20/month ($17/month billed annually), Max 5x at $100/month and Max 20x at $200/month, or Team seats from $20/seat/month billed annually. Without a subscription it bills per token at API rates, e.g. Claude Opus 5.5 at $4 input / $20 output per million tokens.",
+          },
+        },
+        {
+          "@type": "Question",
           name: "How much does Claude Code cost per month?",
           acceptedAnswer: { "@type": "Answer", text: claim },
         },
@@ -157,7 +178,7 @@ export default async function Post() {
           Back to Blog
         </Link>
 
-        <h1>How Much Does Claude Code Cost? Measured, Not Estimated</h1>
+        <h1>Claude Code Pricing (2026): Plans vs What Devs Really Spend</h1>
 
         <div className="flex items-center gap-3 text-sm text-muted not-prose mb-8">
           <span className="flex items-center gap-1">
@@ -176,24 +197,63 @@ export default async function Post() {
           </div>
         )}
 
+        <h2>Claude Code plans and prices</h2>
         <p>
-          Almost every page answering this question quotes the same number: <strong>$150–250 per developer per
-          month</strong>, sourced from Anthropic&apos;s own enterprise guidance. It gets republished because it is
-          the only published figure available — not because anyone checked it.
+          Claude Code has no separate price: it comes with a paid Claude plan, or bills per token through the API.
+          Current list prices from Anthropic:
         </p>
-        <p>
-          Viberank can check it. Developers here submit real usage: token counts and API-equivalent costs computed
-          by <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer">ccusage</a>{" "}
-          from their own local session logs. That makes this, as far as we know, the only independent distribution
-          of what heavy AI coding actually costs.
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th>Price</th>
+              <th>Claude Code usage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Pro</td>
+              <td>$20/mo ($17/mo billed annually)</td>
+              <td>Included; session limit resets every 5 hours, plus a weekly limit</td>
+            </tr>
+            <tr>
+              <td>Max 5x</td>
+              <td>$100/mo</td>
+              <td>5&times; Pro&apos;s per-session usage</td>
+            </tr>
+            <tr>
+              <td>Max 20x</td>
+              <td>$200/mo</td>
+              <td>20&times; Pro&apos;s per-session usage</td>
+            </tr>
+            <tr>
+              <td>Team (Standard seat)</td>
+              <td>$25/seat/mo ($20 billed annually)</td>
+              <td>Included</td>
+            </tr>
+            <tr>
+              <td>API (pay as you go)</td>
+              <td>Per million tokens, input / output</td>
+              <td>Opus 5.5 $4 / $20 &middot; Sonnet 5.5 $2 / $10 &middot; Haiku 4.5 $1 / $5</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="text-sm">
+          Sources:{" "}
+          <a href={PRICING_SOURCES.plans} target="_blank" rel="noopener noreferrer">claude.com/pricing</a>,{" "}
+          <a href={PRICING_SOURCES.max} target="_blank" rel="noopener noreferrer">What is the Max plan?</a>,{" "}
+          <a href={PRICING_SOURCES.api} target="_blank" rel="noopener noreferrer">Claude API pricing</a>. Checked
+          October 2026; Max prices are for web subscriptions. Limits are per plan, not per dollar, so how far a plan
+          goes depends on how you use it. See <Link href="/blog/claude-code-usage-limits">Claude Code usage limits</Link>.
         </p>
 
-        <h2>The distribution</h2>
+        <h2>What developers really spend per month</h2>
         {hasData ? (
           <>
             <p>
-              Monthly API-equivalent spend per developer, one row per person, across{" "}
-              <strong>{benchmark.cohortSize.toLocaleString("en-US")} developers</strong>:
+              A plan price is a ceiling on what you pay, not a measure of what you use. Here is measured monthly
+              API-equivalent spend per developer, computed by ccusage from local session logs, one row per person,
+              across <strong>{benchmark.cohortSize.toLocaleString("en-US")} developers</strong>:
             </p>
             <table>
               <thead>
@@ -249,6 +309,17 @@ export default async function Post() {
             </p>
 
             <h2>Against the published range</h2>
+            <p>
+              Almost every page answering this question quotes the same number: <strong>$150–250 per developer per
+              month</strong>, sourced from Anthropic&apos;s own enterprise guidance. It gets republished because it is
+              the only published figure available — not because anyone checked it.
+            </p>
+            <p>
+              Viberank can check it. Developers here submit real usage: token counts and API-equivalent costs computed
+              by <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer">ccusage</a>{" "}
+              from their own local session logs. That makes this, as far as we know, the only independent distribution
+              of what heavy AI coding actually costs.
+            </p>
             <p>Share of developers burning more than each threshold:</p>
             <table>
               <thead>
@@ -341,6 +412,10 @@ export default async function Post() {
           Claude plan your usage justifies. If the answer stung, read{" "}
           <Link href="/blog/reduce-ai-coding-costs">how to cut your AI coding bill</Link> — model routing and
           caching alone can halve a heavy bill.
+        </p>
+        <p>
+          Comparing agents? The same measurement for OpenAI&apos;s agent is in{" "}
+          <Link href="/blog/codex-pricing">Codex pricing: plans vs measured spend</Link>.
         </p>
 
         <h2>Citing these numbers</h2>

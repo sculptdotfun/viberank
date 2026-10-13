@@ -118,3 +118,30 @@ export function headlineClaim(benchmark: CostBenchmark): string {
     `${pct(shareAbove(benchmark, ANTHROPIC_PUBLISHED_RANGE.high))} exceed $${ANTHROPIC_PUBLISHED_RANGE.high}.`
   );
 }
+
+/**
+ * Below this many developers a percentile table is anecdote, not a benchmark,
+ * so per-tool pages fall back to a broader cohort or say nothing.
+ */
+export const MIN_PUBLISHABLE_COHORT = 20;
+
+/**
+ * Narrow spend rows to one tool.
+ *
+ * A submission's cost is not split by tool, so "includes" (any submission
+ * that used the tool) mixes in spend from other agents. "only" keeps
+ * submissions where the tool is the sole agent — the one cohort whose cost is
+ * cleanly attributable to that tool. Legacy rows without `tools` match neither.
+ */
+export function spendRowsForTool(
+  rows: BurnRow[],
+  tool: string,
+  mode: "only" | "includes"
+): BurnRow[] {
+  const target = tool.toLowerCase();
+  return rows.filter((row) => {
+    const tools = (row.tools ?? []).map((t) => t.toLowerCase());
+    if (!tools.includes(target)) return false;
+    return mode === "includes" || tools.every((t) => t === target);
+  });
+}

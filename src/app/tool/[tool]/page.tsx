@@ -22,6 +22,13 @@ const TOOL_GUIDES: Record<string, { href: string; label: string }> = {
   opencode: { href: "/blog/how-to-check-opencode-usage", label: "How to check your OpenCode usage" },
 };
 
+// "<tool> pricing" is a bigger query than "<tool> check usage"; the board is
+// where people comparing plans land, so point them at the measured answer.
+const TOOL_PRICING: Record<string, { href: string; label: string }> = {
+  claude: { href: "/blog/how-much-does-claude-code-cost", label: "Claude Code pricing vs what devs really spend" },
+  codex: { href: "/blog/codex-pricing", label: "Codex pricing vs measured spend per developer" },
+};
+
 // These boards rank ahead of the how-to guides for "<tool> check usage" /
 // "how to check <tool> token usage" — a query family with hundreds of
 // impressions and effectively no clicks, because a ranking table is a bad
@@ -219,6 +226,11 @@ export default async function ToolPage({ params }: ToolParams) {
           {TOOL_GUIDES[tool] && (
             <Link href={TOOL_GUIDES[tool].href} className="inline-block mt-4 text-sm text-accent hover:underline">
               {TOOL_GUIDES[tool].label} — full guide →
+            </Link>
+          )}
+          {TOOL_PRICING[tool] && (
+            <Link href={TOOL_PRICING[tool].href} className="block mt-2 text-sm text-accent hover:underline">
+              {TOOL_PRICING[tool].label} →
             </Link>
           )}
         </section>
