@@ -9,6 +9,15 @@
   - The line the CLI prints after a submission. A paid `SPONSOR_CLI_NOTICE` still takes that line when it's set.
   - Clicks report `tako_clicked` with the placement.
 
+## Site — usage from a machine that no longer submits stays counted (September 2026)
+
+### Fixed
+- **Unattributed usage is compared model by model, not as a whole day.** A day holding both a no-machine-id slice (web uploads, pre-1.2 CLIs) and id'd machine slices showed only the larger of the two (#81), so a replaced or wiped machine's history hid every other machine's usage that day. Where both sides carry a complete per-model split, each model now takes the larger side and models only one side used are added. A copy of an id'd machine's day still matches it model for model and adds nothing, including across ccusage model renames (date suffixes, provider paths, dotted versions, and a `[tool]` prefix a newer ccusage adds, so `[openclaw] google/gemini-3-pro` beside `google/gemini-3-pro` takes the larger, not the sum). The result never falls below the whole-day rule on cost or any token field, so a split that is a little short of its slice can't lower a day. Days without a complete split keep the whole-day rule.
+- Same-model days from a retired machine can't be told apart from a copy automatically and remain counted once.
+
+### Operations
+- `POST /api/admin/recompute-unattributed` re-derives stored days that hold an unattributed slice beside id'd ones, since aggregates are written at submit time. Admin only. `{}` reports what would change; `{ "apply": true, "limit": 50 }` writes the largest changes first and re-sums each affected submission. It only raises days: a day is written when the new value is no lower on every field and higher on cost or tokens, so manual repairs are never undone. Idempotent: repeat until `pending` is 0. Back up the affected `daily_breakdowns` and `submissions` rows (from the dry-run report) before `apply`, as with any prod repair.
+
 ## Site — the profile chart names the models in range (October 2026)
 
 ### Fixed
