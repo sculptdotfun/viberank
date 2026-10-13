@@ -266,6 +266,36 @@ export const VERIFIED_PROFILE_ERROR = "is verified";
 function verifiedProfileMessage(username: string): string {
   return `@${username} ${VERIFIED_PROFILE_ERROR}, so submissions to it need to be signed. Run \`npx viberank-cli login\`, then submit again.`;
 }
+/**
+ * An ilike pattern that matches `value` literally, case aside. `%` and `_`
+ * are LIKE wildcards and PostgREST also reads `*` as `%`, so without this
+ * `/profile/%` would match every profile.
+ */
+export function likeLiteral(value: string): string {
+  return value.replace(/[\\%_*]/g, "\\$&");
+}
+
+/**
+ * The one profile a case-insensitive username resolves to.
+ *
+ * `profiles.username` is unique case-sensitively, and an X-GitHub-User header
+ * arrives in whatever casing the submitter typed, so the same handle can own
+ * several rows (`Name` and `name`). Reading those with `.single()` errors on
+ * every one of them, so each casing 404'd. Pick deterministically, not by the
+ * URL's casing, so every casing lands on the same profile: the row with the
+ * most submissions, then the oldest.
+ */
+export function pickCanonicalProfile<
+  T extends Pick<DbProfile, "total_submissions" | "created_at">,
+>(rows: T[] | null | undefined): T | null {
+  if (!rows || rows.length === 0) return null;
+  return [...rows].sort(
+    (a, b) =>
+      (b.total_submissions ?? 0) - (a.total_submissions ?? 0) ||
+      Date.parse(a.created_at) - Date.parse(b.created_at)
+  )[0];
+}
+
 const MAX_ROWS = 200_000;
 
 export async function fetchAllPages<T>(
@@ -782,23 +812,28 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     submissionId: string,
     isNewSubmission: boolean
   ): Promise<void> {
-    const { data: existingProfile, error: profileQueryError } = await this.client
+    // Case-insensitive, like findTargetSubmission: the submission already
+    // merged into the row for any casing of this handle, so an exact match
+    // here would insert a second profile for `name` beside `Name` — which
+    // made every casing of that profile 404.
+    const { data: candidates, error: profileQueryError } = await this.client
       .from("profiles")
       .select("*")
-      .eq("username", data.username)
-      .single();
+      .ilike("username", likeLiteral(data.username))
+      .limit(10);
 
-    // PGRST116 is PostgREST's "no rows" for .single() — expected for a first
-    // submission, so it falls through to the insert below. Anything else is a
-    // real failure and must not be mistaken for "this profile doesn't exist".
-    if (profileQueryError && profileQueryError.code !== "PGRST116") {
+    if (profileQueryError) {
       throw new Error(`Failed to query profile: ${profileQueryError.message}`);
     }
+
+    const existingProfile = pickCanonicalProfile(candidates as DbProfile[] | null);
 
     if (existingProfile) {
       const updates: Record<string, unknown> = {
         best_submission_id: submissionId,
-        github_username: data.githubUsername,
+        // Keep the handle's stored casing: a header typed as `name` must not
+        // relabel `Name`, and github_username is unique case-sensitively.
+        github_username: existingProfile.github_username || data.githubUsername,
         github_name: data.githubName,
         avatar: data.githubAvatar,
       };
@@ -1399,13 +1434,20 @@ export class SupabaseProfilesService implements ProfilesService {
     username: string,
     submissionLimit: number = 10
   ): Promise<ProfileWithSubmissions | null> {
-    // Use ilike for case-insensitive username matching
-    const { data: profile } = await this.client
+    // Case-insensitive, and never .single(): a handle can own one row per
+    // casing, and .single() errors on all of them (see pickCanonicalProfile).
+    const { data: candidates, error } = await this.client
       .from("profiles")
       .select("*")
-      .ilike("username", username)
-      .single();
+      .ilike("username", likeLiteral(username))
+      .limit(10);
 
+    if (error) {
+      console.error(`Failed to load profile ${username}:`, error.message);
+      return null;
+    }
+
+    const profile = pickCanonicalProfile(candidates as DbProfile[] | null);
     if (!profile) return null;
 
     const limit = Math.min(submissionLimit, 25);
@@ -1413,7 +1455,7 @@ export class SupabaseProfilesService implements ProfilesService {
     const { data: submissions } = await this.client
       .from("submissions")
       .select("*")
-      .ilike("username", profile.username)
+      .ilike("username", likeLiteral(profile.username))
       .order("submitted_at", { ascending: false })
       .limit(limit);
 

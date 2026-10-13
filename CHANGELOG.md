@@ -5,6 +5,19 @@
 ### Fixed
 - **Muse Spark models get the cheap-model floor.** pi running Meta's Muse Spark over OpenCode Go is priced by ccusage at ~4.6e-9 per token, so a real multi-agent report where pi is 91% of the tokens landed at 3.6e-8 and was rejected as "Cost per token ratio is unrealistic". `muse-spark` now joins `deepseek`, `mimo`, `minimax` and `big-pickle` at `1e-9`; every other model keeps `1e-7`, and the floor still follows the model name, not the tool.
 
+## Site — the leaderboard no longer blanks on a half-set date range (September 2026)
+
+### Fixed
+- **Picking one end of a custom date range emptied the board, and so did pressing All afterwards.** The board cleared its rows on every change to the From/To inputs, but a single date isn't a range, so no new query ran to refill them and it sat on "No submissions yet" until the sort was switched. Seen on the tokens board: set From, then clear To and press All to go back, and the board stays blank. The reset now follows the query the board actually runs, so only a real filter change clears it.
+- **Loading a date range shows the skeleton instead of "No submissions yet".** The 30-day board takes a few seconds to aggregate, and during that wait it told visitors the leaderboard was empty.
+
+## Site — profiles whose handle exists in two casings open again (September 2026)
+
+### Fixed
+- **Every casing of a handle with more than one profile row returned 404.** `profiles.username` is unique case-sensitively and the submit path looked profiles up by exact match, so an `X-GitHub-User` header typed as `some-dev` next to an existing `Some-Dev` inserted a second row. `getProfile` then read both with `ilike` + `.single()`, which errors on two rows, so the page, the modal and the README badge all reported "not found" for either casing while the leaderboard kept listing the user. The sitemap shows 22 such handles today.
+- `getProfile` now resolves any casing to one canonical row (most submissions, then oldest), and the submit path matches profiles case-insensitively, so a new casing updates the existing profile instead of creating another.
+- Usernames in these lookups are escaped for `ilike`, so `%`, `_` and `*` in a URL match literally instead of matching other profiles.
+
 ## MCP v1.1.0 — signed submissions (September 2026)
 
 ### Fixed
