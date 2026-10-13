@@ -56,8 +56,8 @@ export const VENDOR_SHADES: Record<Vendor, string[]> = {
 };
 
 /**
- * For series with no single vendor (harnesses that run any model) or a
- * vendor whose shades are used up: the hues farthest (ΔE) from every vendor
+ * For series with no single vendor (harnesses that run any model, unknown
+ * models): the hues farthest (ΔE) from every vendor
  * shade on this surface, so an unknown model never reads as a known vendor.
  */
 const UNAFFILIATED = ["#c9ed44", "#7f6eaf", "#b12b50", "#9c3294", "#dc9e79"];
@@ -107,28 +107,25 @@ export function vendorOfTool(tool: string): Vendor | null {
 
 /**
  * Colors for a ranked list of series, in the same order. Each series takes
- * the next unused shade of its vendor's family; unknown vendors and
- * exhausted families take the next unaffiliated hue, then gray. A name that
- * appears twice gets the same color both times.
+ * the next shade of its vendor's family, cycling within the family once its
+ * shades run out, so a fifth Claude model still reads as Anthropic. Unknown
+ * vendors cycle the unaffiliated hues. Nothing ever falls to OTHER_COLOR:
+ * that gray means folded spend, and a real series drawn in it reads as Other.
+ * A name that appears twice gets the same color both times.
  */
 function assignColors(names: string[], vendorOf: (name: string) => Vendor | null): string[] {
-  const used = new Map<Vendor, number>();
+  const used = new Map<Vendor | null, number>();
   const byName = new Map<string, string>();
-  let spare = 0;
-  const nextSpare = () => (spare < UNAFFILIATED.length ? UNAFFILIATED[spare++] : OTHER_COLOR);
+
+  const nextColor = (vendor: Vendor | null): string => {
+    const palette = vendor ? VENDOR_SHADES[vendor] : UNAFFILIATED;
+    const i = used.get(vendor) ?? 0;
+    used.set(vendor, i + 1);
+    return palette[i % palette.length];
+  };
 
   return names.map((name) => {
-    const known = byName.get(name);
-    if (known) return known;
-    const vendor = vendorOf(name);
-    let color: string;
-    if (vendor) {
-      const i = used.get(vendor) ?? 0;
-      used.set(vendor, i + 1);
-      color = i < VENDOR_SHADES[vendor].length ? VENDOR_SHADES[vendor][i] : nextSpare();
-    } else {
-      color = nextSpare();
-    }
+    const color = byName.get(name) ?? nextColor(vendorOf(name));
     byName.set(name, color);
     return color;
   });

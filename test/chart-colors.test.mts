@@ -56,13 +56,28 @@ const check = (label: string) => {
 }
 
 {
-  const five = modelColors(["claude-a", "claude-b", "claude-c", "claude-d", "claude-e", "claude-f"]);
-  assert.equal(new Set(five).size, 6, "an exhausted family falls back to unaffiliated hues, not repeats");
-  assert.ok(!five.slice(4).some((c) => Object.values(VENDOR_SHADES).flat().includes(c)), "never borrows another vendor's color");
-  const unknown = modelColors(Array.from({ length: 9 }, (_, i) => `mystery-${i}`));
-  assert.equal(unknown[8], OTHER_COLOR, "past the unaffiliated hues, gray");
+  // A fifth Claude model stays in the Anthropic family instead of taking an
+  // unaffiliated hue; the family cycles once its shades run out.
+  const claude = modelColors(["claude-a", "claude-b", "claude-c", "claude-d", "claude-e", "claude-f"]);
+  assert.deepEqual(claude.slice(0, 4), VENDOR_SHADES.anthropic);
+  assert.ok(claude.every((c) => VENDOR_SHADES.anthropic.includes(c)), "every Claude model wears an Anthropic shade");
+  assert.equal(claude[4], VENDOR_SHADES.anthropic[0], "the fifth cycles back to the family's first shade");
+  check("an exhausted vendor family cycles within itself");
+}
+
+{
+  // OTHER_COLOR means folded spend; a real model drawn in it reads as Other.
+  const vendorPrefixes = ["claude", "gpt", "gemini", "grok", "deepseek", "kimi", "llama", "mistral", "qwen", "glm"];
+  const known = vendorPrefixes.flatMap((prefix) => Array.from({ length: 8 }, (_, i) => `${prefix}-${i}`));
+  const unknown = Array.from({ length: 20 }, (_, i) => `mystery-${i}`);
+  const colors = modelColors([...known, ...unknown]);
+  assert.ok(!colors.includes(OTHER_COLOR), "no model is ever drawn in Other gray");
+  const harnesses = toolColors(Array.from({ length: 20 }, (_, i) => `harness-${i}`));
+  assert.ok(!harnesses.includes(OTHER_COLOR), "nor any tool");
+  const vendorShades = Object.values(VENDOR_SHADES).flat();
+  assert.ok(!colors.slice(known.length).some((c) => vendorShades.includes(c)), "unknown models never borrow a vendor's color");
   assert.deepEqual(modelColors(["gpt-5", "gpt-5"]), [VENDOR_SHADES.openai[0], VENDOR_SHADES.openai[0]]);
-  check("overflow is unaffiliated then gray; a repeated name keeps its color");
+  check("overflow never falls to Other gray; a repeated name keeps its color");
 }
 
 {
