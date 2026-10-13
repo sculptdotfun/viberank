@@ -1,5 +1,10 @@
 # Changelog
 
+## Database — one profile per handle (October 2026)
+
+### Fixed
+- **Duplicate-casing profile rows are folded, and a second casing can no longer be created** (migration 022, a unique index on `lower(username)`). 24 handles had 2–3 rows. Each group kept the row matching the handle's GitHub casing, kept any open-to-work opt-in, and left the submissions untouched (they're already read case-insensitively). Follow-up to #168.
+
 ## Site — how submissions are checked (October 2026)
 
 ### Added
