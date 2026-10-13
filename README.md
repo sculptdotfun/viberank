@@ -170,6 +170,7 @@ Apply the schema:
 #   009_open_to_work_email.sql
 #   010_api_tokens.sql          # hashed CLI tokens
 #   011_efficiency.sql          # cost-per-token, generated column
+#   020_efficiency_score.sql    # volume-weighted efficiency ranking
 #   012_corpus_observations.sql # per-month corpus counts for drift (#112)
 #   013_month_stats.sql         # per-month aggregates for /stats/monthly
 #   014_reload_schema_cache.sql # refresh PostgREST's cached schema
