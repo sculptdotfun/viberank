@@ -18,7 +18,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelName } from "@/lib/utils";
-import { seriesColor } from "@/lib/chartColors";
+import { modelColors, toolColors } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
 import { computeWorkInsights, percentile, type ComparableMetric } from "@/lib/work-insights";
@@ -216,6 +216,19 @@ export default async function ProfilePage({ params }: ProfileParams) {
   }
   const toolEntries = Array.from(toolDays.entries()).sort((a, b) => b[1] - a[1]);
 
+  // One assignment for the chart and the model list, in all-time order, so a
+  // model keeps its color in both and in every chart range (the chart ranks
+  // its series per range). Chart-only names are appended so none goes uncolored.
+  const listedModels = modelEntries.map(([name]) => name);
+  const listedSet = new Set(listedModels);
+  const chartOnlyModels = [...new Set(chartDays.flatMap((d) => Object.keys(d.byModel)))].filter((n) => !listedSet.has(n));
+  const colorOrder = [...listedModels, ...chartOnlyModels];
+  const orderedModelColors = modelColors(colorOrder);
+  const modelColor = new Map(colorOrder.map((name, i) => [name, orderedModelColors[i]]));
+  const toolNames = toolEntries.map(([tool]) => tool);
+  const orderedToolColors = toolColors(toolNames);
+  const toolColor = new Map(toolNames.map((tool, i) => [tool, orderedToolColors[i]]));
+
   return (
     <div className="min-h-screen bg-background">
       <NavBar />
@@ -378,7 +391,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         </div>
 
         {/* Usage chart (client island) */}
-        <UsageChart daily={chartDays} />
+        <UsageChart daily={chartDays} colorByModel={Object.fromEntries(modelColor)} />
 
         {/* Activity heatmap */}
         <div className="bg-surface-1 border border-border rounded-lg p-5 mb-4">
@@ -513,11 +526,11 @@ export default async function ProfilePage({ params }: ProfileParams) {
                   <span className="micro-label">{hasModelCosts ? "by cost" : "by days used"}</span>
                 </div>
                 <div className="space-y-3">
-                  {topModels.map(([name, value], i) => (
+                  {topModels.map(([name, value]) => (
                     <div key={name}>
                       <div className="flex justify-between items-center mb-1.5 gap-2">
                         <span className="flex items-center gap-1.5 text-xs font-mono truncate">
-                          <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+                          <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: modelColor.get(name) }} />
                           {name}
                         </span>
                         <span className="font-mono text-xs text-muted flex-shrink-0">
@@ -528,7 +541,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
                       <div className="w-full bg-surface-3 rounded-full h-1.5">
                         <div
                           className="h-1.5 rounded-full"
-                          style={{ width: `${Math.max((value / modelTotal) * 100, 1)}%`, background: seriesColor(i) }}
+                          style={{ width: `${Math.max((value / modelTotal) * 100, 1)}%`, background: modelColor.get(name) }}
                         />
                       </div>
                     </div>
@@ -560,11 +573,11 @@ export default async function ProfilePage({ params }: ProfileParams) {
                   <span className="micro-label">by active days</span>
                 </div>
                 <div className="space-y-3">
-                  {toolEntries.map(([tool, days], i) => (
+                  {toolEntries.map(([tool, days]) => (
                     <div key={tool}>
                       <div className="flex justify-between items-center mb-1.5">
                         <span className="flex items-center gap-1.5 text-xs font-medium">
-                          <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+                          <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: toolColor.get(tool) }} />
                           {toolLabel(tool)}
                         </span>
                         <span className="font-mono text-xs text-muted">
@@ -574,7 +587,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
                       <div className="w-full bg-surface-3 rounded-full h-1.5">
                         <div
                           className="h-1.5 rounded-full"
-                          style={{ width: `${Math.max((days / daysActive) * 100, 1)}%`, background: seriesColor(i) }}
+                          style={{ width: `${Math.max((days / daysActive) * 100, 1)}%`, background: toolColor.get(tool) }}
                         />
                       </div>
                     </div>

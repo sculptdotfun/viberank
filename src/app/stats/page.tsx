@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame } from "lucide-react";
 import { formatNumber, formatCurrency, toolLabel, prettyModelName } from "@/lib/utils";
-import { seriesColor } from "@/lib/chartColors";
+import { modelColors, toolColors } from "@/lib/chartColors";
 import { TIERS } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";
 import NavBar from "@/components/NavBar";
@@ -60,9 +60,12 @@ function StatTile({
 function BarList({
   rows,
   format,
+  colors,
 }: {
   rows: { label: string; value: number }[];
   format: (value: number) => string;
+  /** One per row: vendor colors, so a model or tool looks the same here as on profiles. */
+  colors: string[];
 }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
   return (
@@ -71,7 +74,7 @@ function BarList({
         <div key={label}>
           <div className="flex justify-between items-center mb-1.5 gap-2">
             <span className="flex items-center gap-1.5 text-xs font-mono truncate">
-              <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: seriesColor(i) }} />
+              <span className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: colors[i] }} />
               {label}
             </span>
             <span className="font-mono text-xs text-muted flex-shrink-0">{format(value)}</span>
@@ -79,7 +82,7 @@ function BarList({
           <div className="w-full bg-surface-3 rounded-full h-1.5">
             <div
               className="h-1.5 rounded-full"
-              style={{ width: `${Math.max((value / max) * 100, 1)}%`, background: seriesColor(i) }}
+              style={{ width: `${Math.max((value / max) * 100, 1)}%`, background: colors[i] }}
             />
           </div>
         </div>
@@ -340,7 +343,7 @@ export default async function StatsPage() {
                   </h2>
                   <span className="micro-label">by users</span>
                 </div>
-                <BarList rows={topModelUsers.map(([label, value]) => ({ label, value }))} format={(v) => `${formatNumber(v)} devs`} />
+                <BarList rows={topModelUsers.map(([label, value]) => ({ label, value }))} format={(v) => `${formatNumber(v)} devs`} colors={modelColors(topModelUsers.map(([label]) => label))} />
               </div>
             )}
 
@@ -353,7 +356,7 @@ export default async function StatsPage() {
                   </h2>
                   <span className="micro-label">by spend</span>
                 </div>
-                <BarList rows={topModelSpend.map(([label, value]) => ({ label, value }))} format={(v) => `$${formatNumber(v)}`} />
+                <BarList rows={topModelSpend.map(([label, value]) => ({ label, value }))} format={(v) => `$${formatNumber(v)}`} colors={modelColors(topModelSpend.map(([label]) => label))} />
               </div>
             )}
 
@@ -369,6 +372,7 @@ export default async function StatsPage() {
                 <BarList
                   rows={toolRows.map((t) => ({ label: toolLabel(t.tool), value: t.users }))}
                   format={(v) => `${formatNumber(v)} devs`}
+                  colors={toolColors(toolRows.map((t) => t.tool))}
                 />
               </div>
             )}

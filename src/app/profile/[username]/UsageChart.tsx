@@ -13,7 +13,7 @@ import {
   type TooltipProps,
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { SERIES_COLORS, OTHER_COLOR, seriesColor } from "@/lib/chartColors";
+import { SERIES_COLORS, OTHER_COLOR, modelColors } from "@/lib/chartColors";
 import {
   OTHER_KEY,
   selectRangeSeries,
@@ -26,6 +26,11 @@ const SURFACE = "#0f0f12";
 interface UsageChartProps {
   /** Every day with uncollapsed per-model costs; series are ranked per range here. */
   daily: ProfileChartDay[];
+  /**
+   * Vendor color per model name, assigned once for the whole profile so a
+   * model wears the same color in every range and in the model list.
+   */
+  colorByModel: Record<string, string>;
 }
 
 function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
@@ -64,7 +69,7 @@ function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) 
   );
 }
 
-export default function UsageChart({ daily }: UsageChartProps) {
+export default function UsageChart({ daily, colorByModel }: UsageChartProps) {
   const [range, setRange] = useState<"7d" | "30d" | "all">("30d");
 
   const sortedDaily = useMemo(() => [...daily].sort((a, b) => a.date.localeCompare(b.date)), [daily]);
@@ -78,15 +83,15 @@ export default function UsageChart({ daily }: UsageChartProps) {
   const rangeTotal = data.reduce((s, d) => s + d.total, 0);
   const hasOther = data.some((d) => (d.byModel[OTHER_KEY] ?? 0) > 0);
 
-  // Series in stack order (bottom→top). Colors follow rank within this view,
-  // so they stay distinct. With no model splits in range, the whole chart
-  // would be one gray "Other" stack — render it as a single accent-colored
-  // "Spend" series instead.
+  // Series in stack order (bottom→top). Colors follow the model's vendor, not
+  // its rank in this view, so they match the model list. With no model
+  // splits in range, the whole chart would be one gray "Other" stack —
+  // render it as a single accent-colored "Spend" series instead.
   const legacyOnly = modelKeys.length === 0;
   const series = legacyOnly
     ? [{ key: OTHER_KEY, label: "Spend", color: SERIES_COLORS[0] }]
     : [
-        ...modelKeys.map((key, i) => ({ key, label: key, color: seriesColor(i) })),
+        ...modelKeys.map((key) => ({ key, label: key, color: colorByModel[key] ?? modelColors([key])[0] })),
         ...(hasOther ? [{ key: OTHER_KEY, label: OTHER_KEY, color: OTHER_COLOR }] : []),
       ];
 
