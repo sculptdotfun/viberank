@@ -395,7 +395,8 @@ export default function CursorVsClaudeCodeVsCopilot() {
               <p className="text-foreground m-0">
                 You want the most polished AI-native IDE experience. You're comfortable switching from VS Code
                 and want powerful multi-file editing with visual diffs. You value a beautiful UI and don't need
-                extensive external integrations.
+                extensive external integrations. Live numbers are on the{" "}
+                <Link href="/compare/claude-vs-cursor">Cursor vs Claude Code comparison</Link>.
               </p>
             </div>
 
@@ -415,7 +416,7 @@ export default function CursorVsClaudeCodeVsCopilot() {
                 You want reliable autocomplete in your existing IDE without workflow changes. You're on a budget
                 and $10/month fits better than $20+. Your enterprise requires compliance features and admin controls.
                 In 2026 its agent mode is genuinely capable — see how its usage stacks up on the{" "}
-                <Link href="/compare/claude-vs-copilot">Claude Code vs Copilot comparison</Link>.
+                <Link href="/compare/claude-vs-copilot">GitHub Copilot vs Claude Code comparison</Link>.
               </p>
             </div>
           </div>

@@ -11,6 +11,9 @@ export interface BurnRow {
   /** Inclusive ISO dates, as stored on a submission. */
   start: string;
   end: string;
+  /** Tools on the submission; only the /compare cohorts read it. */
+  tools?: string[];
+  totalTokens?: number;
 }
 
 export interface SpendCurve {
@@ -24,11 +27,11 @@ export interface SpendCurve {
  * Submissions shorter than this extrapolate to a meaningless monthly figure —
  * a two-day sample says nothing about a month.
  */
-const MIN_SPAN_DAYS = 7;
+export const MIN_SPAN_DAYS = 7;
 
 const QUANTILES = [10, 25, 50, 75, 90, 95, 99];
 
-function spanDays(start: string, end: string): number {
+export function spanDays(start: string, end: string): number {
   const from = Date.parse(start);
   const to = Date.parse(end);
   if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return 0;

@@ -2276,19 +2276,22 @@ export class SupabaseStatsService implements StatsService {
   }
 
   async getSpendRows(): Promise<BurnRow[]> {
-    // Only the four columns the spend curve needs, paged. The whole table is
-    // ~1k rows and /calculator is ISR-cached hourly, so this is cheaper than
-    // the aggregates /stats already runs — no RPC or migration required.
+    // Only the narrow columns the spend curve and /compare cohorts need, paged.
+    // The whole table is ~1k rows and every caller is ISR-cached hourly, so
+    // this is cheaper than the aggregates /stats already runs — no RPC or
+    // migration required.
     const rows = await fetchAllPages<{
       username: string;
       total_cost: number;
+      total_tokens: number | null;
+      tools: string[] | null;
       date_range_start: string;
       date_range_end: string;
     }>(
       (from, to) =>
         this.client
           .from("submissions")
-          .select("username,total_cost,date_range_start,date_range_end")
+          .select("username,total_cost,total_tokens,tools,date_range_start,date_range_end")
           .or("flagged_for_review.is.null,flagged_for_review.eq.false")
           .order("id", { ascending: true })
           .range(from, to),
@@ -2298,6 +2301,8 @@ export class SupabaseStatsService implements StatsService {
     return rows.map((r) => ({
       username: r.username,
       totalCost: Number(r.total_cost),
+      totalTokens: Number(r.total_tokens ?? 0),
+      tools: r.tools ?? [],
       start: r.date_range_start,
       end: r.date_range_end,
     }));
