@@ -21,7 +21,7 @@ import { seriesColor } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
 import { getServerDataLayer } from "@/lib/data";
-import { buildProfileChartData } from "@/lib/profile-chart-data";
+import { buildProfileChartDays } from "@/lib/profile-chart-data";
 import { getProfileCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
 import BadgeSnippet from "./BadgeSnippet";
@@ -76,9 +76,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
   });
   const dedupedSeries = uniqueDaily.map((d) => ({ date: d.date, cost: d.totalCost }));
 
-  // Preserve every model series; only cost without a stored model split is
-  // assigned to "Other".
-  const { stackedDaily, modelKeys: chartModelKeys } = buildProfileChartData(uniqueDaily);
+  // Per-model daily costs, uncollapsed: the chart ranks models within the
+  // selected range, so the series match the days on screen.
+  const chartDays = buildProfileChartDays(uniqueDaily);
 
   // Streaks over days that actually have usage recorded.
   const streaks = computeStreaks(uniqueDaily.map((d) => d.date));
@@ -330,7 +330,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         </div>
 
         {/* Usage chart (client island) */}
-        <UsageChart daily={stackedDaily} modelKeys={chartModelKeys} />
+        <UsageChart daily={chartDays} />
 
         {/* Activity heatmap */}
         <div className="bg-surface-1 border border-border rounded-lg p-5 mb-4">

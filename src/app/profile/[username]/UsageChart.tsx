@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import {
   BarChart,
@@ -13,23 +13,19 @@ import {
   type TooltipProps,
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { SERIES_COLORS, OTHER_COLOR } from "@/lib/chartColors";
+import { SERIES_COLORS, OTHER_COLOR, seriesColor } from "@/lib/chartColors";
+import {
+  OTHER_KEY,
+  selectRangeSeries,
+  type ProfileChartDay,
+  type StackedDay,
+} from "@/lib/profile-chart-data";
 
 const SURFACE = "#0f0f12";
 
-export const OTHER_KEY = "Other";
-
-export interface StackedDay {
-  date: string;
-  total: number;
-  /** Cost per pretty model name; unattributed spend sits under OTHER_KEY. */
-  byModel: Record<string, number>;
-}
-
 interface UsageChartProps {
-  daily: StackedDay[];
-  /** All models with cost data, in descending total-cost order. */
-  modelKeys: string[];
+  /** Every day with uncollapsed per-model costs; series are ranked per range here. */
+  daily: ProfileChartDay[];
 }
 
 function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
@@ -68,24 +64,29 @@ function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) 
   );
 }
 
-export default function UsageChart({ daily, modelKeys }: UsageChartProps) {
+export default function UsageChart({ daily }: UsageChartProps) {
   const [range, setRange] = useState<"7d" | "30d" | "all">("30d");
 
-  const data = [...daily]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(range === "7d" ? -7 : range === "30d" ? -30 : 0);
+  const sortedDaily = useMemo(() => [...daily].sort((a, b) => a.date.localeCompare(b.date)), [daily]);
+  // Rank models within the visible days, so a model that is new this week
+  // gets its own series instead of hiding in Other behind all-time leaders.
+  const { modelKeys, stacked: data } = useMemo(
+    () => selectRangeSeries(sortedDaily.slice(range === "7d" ? -7 : range === "30d" ? -30 : 0)),
+    [sortedDaily, range]
+  );
 
   const rangeTotal = data.reduce((s, d) => s + d.total, 0);
   const hasOther = data.some((d) => (d.byModel[OTHER_KEY] ?? 0) > 0);
 
-  // Series in stack order (bottom→top). With no model splits at all, the
-  // whole chart would be one gray "Other" stack — render it as a single
-  // accent-colored "Spend" series instead.
+  // Series in stack order (bottom→top). Colors follow rank within this view,
+  // so they stay distinct. With no model splits in range, the whole chart
+  // would be one gray "Other" stack — render it as a single accent-colored
+  // "Spend" series instead.
   const legacyOnly = modelKeys.length === 0;
   const series = legacyOnly
     ? [{ key: OTHER_KEY, label: "Spend", color: SERIES_COLORS[0] }]
     : [
-        ...modelKeys.map((key, i) => ({ key, label: key, color: SERIES_COLORS[i % SERIES_COLORS.length] })),
+        ...modelKeys.map((key, i) => ({ key, label: key, color: seriesColor(i) })),
         ...(hasOther ? [{ key: OTHER_KEY, label: OTHER_KEY, color: OTHER_COLOR }] : []),
       ];
 
