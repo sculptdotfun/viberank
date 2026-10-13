@@ -45,12 +45,17 @@ export const metadata: Metadata = {
     url: URL,
     type: "article",
     publishedTime: "2026-06-09T00:00:00.000Z",
-    modifiedTime: "2026-08-21T00:00:00.000Z",
+    modifiedTime: "2026-10-13T00:00:00.000Z",
     authors: ["Viberank Team"],
     images: [{ url: OG, width: 1200, height: 630, alt: TITLE }],
   },
   twitter: { card: "summary_large_image", title: TITLE, description: DESC, images: [OG] },
 };
+
+function dataMonthStart(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
 
 async function loadBenchmark(): Promise<CostBenchmark> {
   try {
@@ -74,7 +79,9 @@ export default async function Post() {
       description: hasData ? claim : DESC,
       image: "https://www.viberank.app" + OG,
       datePublished: "2026-06-09T00:00:00.000Z",
-      dateModified: "2026-08-21T00:00:00.000Z",
+      // The figures are re-measured hourly from live data; report the month they
+      // were last refreshed in, not the day the prose was written.
+      dateModified: dataMonthStart(),
       author: { "@type": "Organization", name: "Viberank", url: "https://www.viberank.app" },
       publisher: {
         "@type": "Organization",

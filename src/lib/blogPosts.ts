@@ -19,6 +19,15 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "how-viberank-checks-submissions",
+    title: "How Viberank Checks Submissions (and the Fake #1 We Removed)",
+    excerpt:
+      "A synthetic $1.8M day briefly topped the leaderboard. What it was, why it got through, the per-day checks that stop it now, and what self-reported usage can and can't prove.",
+    datePublished: "2026-10-13",
+    dateModified: "2026-10-13",
+    readTime: "6 min read",
+  },
+  {
     slug: "ai-token-leaderboards-compared",
     title: "AI Token Leaderboards Compared: 9 Boards Ranked (2026)",
     excerpt:
@@ -105,7 +114,7 @@ export const BLOG_POSTS: BlogPost[] = [
     excerpt:
       "What does Claude Code actually cost per month? Real spend, tokens, and daily averages from 800+ developers on the leaderboard.",
     datePublished: "2026-06-09",
-    dateModified: "2026-06-09",
+    dateModified: "2026-10-13",
     readTime: "6 min read",
   },
   {

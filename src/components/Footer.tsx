@@ -7,6 +7,7 @@ const RESOURCES = [
   { name: "Open data & API", href: "/data" },
   { name: "Cost calculator", href: "/calculator" },
   { name: "Blog", href: "/blog" },
+  { name: "How we check submissions", href: "/blog/how-viberank-checks-submissions" },
   { name: "Compare AI coding tools", href: "/compare" },
   { name: "Friend leagues", href: "/leagues" },
   { name: "한국어 안내", href: "/ko" },

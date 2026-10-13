@@ -1,5 +1,13 @@
 # Changelog
 
+## Site — how submissions are checked (October 2026)
+
+### Added
+- **New post: `/blog/how-viberank-checks-submissions`.** It covers the synthetic $1.8M day that reached #1 (#182): what it was, why it passed, the per-day checks from #186, what a verified badge means, and what a leaderboard built on self-reported usage can't prove. It's linked from the footer.
+
+### Fixed
+- **The Claude Code cost post reports the month its live figures were refreshed as `dateModified`, not a frozen date from August.** The figures are re-measured hourly.
+
 ## Site — models and tools wear their vendor's colors (September 2026)
 
 ### Changed
