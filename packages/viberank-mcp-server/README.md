@@ -1,212 +1,150 @@
-# Viberank MCP Server
+# viberank MCP server
 
-Submit your AI coding usage stats (Claude Code, Codex, Gemini CLI and more) to [viberank](https://www.viberank.app) directly from your MCP-compatible AI assistant!
+Submit your AI coding usage (Claude Code, Codex, Gemini CLI, OpenCode and every other tool [ccusage](https://github.com/ryoppippi/ccusage) reads) to [viberank](https://www.viberank.app), and read the leaderboard, from any MCP client.
 
-## Features
+## Install
 
-- 🚀 **Automatic Usage Tracking** - Fetch your Claude Code usage stats via ccusage
-- 📊 **Direct Submission** - Submit to Viberank leaderboard without leaving your workflow
-- 🔄 **Smart Caching** - Caches usage data for 5 minutes to reduce overhead
-- 👤 **Profile Management** - View profiles and leaderboard data
-- 🔐 **GitHub Integration** - Reads your GitHub username from your repo's GitHub remote. Pass `username` explicitly if there isn't one — `git config user.name` is usually a display name, and submitting under it creates a profile you don't own
+### Claude Code
 
-## Installation
-
-### Option 1: NPM Global Install
 ```bash
-npm install -g viberank-mcp
+claude mcp add --scope user viberank -- npx -y viberank-mcp
 ```
 
-### Option 2: Local Development
+To have submissions verified and filed under your account automatically, add an API token. Mint one at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens) (sign in with GitHub, then **Create token**); it starts with `vbr_`:
+
 ```bash
-git clone https://github.com/sculptdotfun/viberank.git
-cd viberank/packages/viberank-mcp-server
-npm install
-npm run build
+claude mcp add --scope user viberank --env VIBERANK_TOKEN=vbr_… -- npx -y viberank-mcp
 ```
 
-## Configuration
+On native Windows (not WSL), `npx` has to go through `cmd /c`:
 
-### Claude Desktop (macOS)
+```bash
+claude mcp add --scope user viberank -- cmd /c npx -y viberank-mcp
+```
 
-Add to your Claude Desktop configuration at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+`--scope user` makes the server available in every project. Check it with `claude mcp list`.
+
+### Claude Desktop
+
+Add this to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`), then restart Claude Desktop. Leave out the `env` block if you don't have a token.
 
 ```json
 {
   "mcpServers": {
     "viberank": {
       "command": "npx",
-      "args": ["viberank-mcp"]
+      "args": ["-y", "viberank-mcp"],
+      "env": {
+        "VIBERANK_TOKEN": "vbr_…"
+      }
     }
   }
 }
 ```
 
-### Claude Desktop (Windows)
-
-Add to your Claude Desktop configuration at `%APPDATA%\Claude\claude_desktop_config.json`:
+On Windows, use `cmd /c`:
 
 ```json
 {
   "mcpServers": {
     "viberank": {
-      "command": "npx",
-      "args": ["viberank-mcp"]
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "viberank-mcp"],
+      "env": {
+        "VIBERANK_TOKEN": "vbr_…"
+      }
     }
   }
 }
 ```
 
-### Other MCP-Compatible Clients
+### Other MCP clients
 
-For other MCP clients, use the following command:
-```bash
-npx viberank-mcp
-```
+Run `npx -y viberank-mcp` as a stdio server. Node.js 18 or newer.
 
-Or if installed locally:
-```bash
-node /path/to/viberank-mcp-server/dist/index.js
-```
+## Which account a submission goes to
 
-## Available Tools
+- **With a token** (`VIBERANK_TOKEN`, or the one `npx viberank-cli login` saved in `~/.viberank/config.json`): the server files the submission under the token's owner and marks it verified. The MCP server asks viberank who that is before uploading, and the result names that account. No username is needed.
+- **Without a token**: `github_username` is required, and it should be your own GitHub handle, because it becomes a public profile. If the agent calls without one, nothing is uploaded. The MCP server suggests a handle instead (the one this machine submitted under before, or the repository's owner when GitHub confirms that's a personal account, never an organization) and the agent asks you to confirm it before calling again. Once a profile is verified, unsigned submissions to it are refused, so nobody else can write to yours.
 
-### 1. `get_usage`
-Fetches your current Claude Code usage statistics.
+## Tools
 
-**Parameters:**
-- `force_refresh` (boolean, optional): Force refresh the data, bypassing cache
+### `get_usage`
 
-**Example:**
-```
-Use the get_usage tool to check my AI coding usage stats
-```
+Runs `ccusage@20 daily --json --by-agent` locally and returns a summary: API-equivalent cost, tokens, days tracked, date range and cost per tool. Sends nothing. Cached for 5 minutes.
 
-### 2. `submit_to_viberank`
-Submits your usage statistics to the Viberank leaderboard.
+- `force_refresh` (boolean, optional): re-run ccusage instead of using the cache.
 
-**Parameters:**
-- `github_username` (string, optional): Your GitHub username
-- `auto_detect_username` (boolean, optional): Auto-detect from git config (default: true)
+### `submit_to_viberank`
 
-**Example:**
-```
-Submit my Claude usage to Viberank
-```
+Uploads your usage to the leaderboard. On success it returns the account it was filed under, your profile URL, your standing (rank, top percentage, tier, and README badge markdown), and next steps the agent can offer: adding the badge to your README, and turning on daily autosubmit with `npx viberank-cli login` and `npx viberank-cli autosubmit`.
 
-### 3. `get_profile`
-Get the Viberank profile URL for a specific user.
+- `github_username` (string): your GitHub username. Required without a token, not needed with one.
 
-**Parameters:**
-- `username` (string, required): GitHub username to look up
+### `get_leaderboard`
 
-**Example:**
-```
-Show me the Viberank profile for octocat
-```
+The current leaderboard: rank, username, cost, tokens, tools and verified status for each entry.
 
-### 4. `get_leaderboard`
-Get information about the Viberank leaderboard.
+- `limit` (integer, optional): 1 to 50, default 10.
+- `tool` (string, optional): rank only users of one tool, such as `claude`, `codex`, `gemini`, `opencode` or `copilot`.
 
-**Parameters:**
-- `limit` (number, optional): Number of top users to show (default: 10)
+### `get_profile`
 
-**Example:**
-```
-Show me the top 20 users on Viberank
-```
+One developer's profile: rank, cost, tokens, days tracked, tools and verified status. Says `found: false` when there's no profile for that username.
 
-## Usage Examples
+- `username` (string, required): the GitHub username.
 
-### Basic Workflow
+### `get_stats`
 
-1. **Check your usage:**
-   ```
-   Hey Claude, use the Viberank MCP server to check my current Claude usage
-   ```
+Site-wide numbers from [`/api/stats`](https://www.viberank.app/api/stats): developer count, total spend and tokens, monthly spend percentiles, tool and model adoption, the monthly trend and tiers, with methodology and caveats.
 
-2. **Submit to leaderboard:**
-   ```
-   Now submit my usage stats to Viberank
-   ```
+## Example prompts
 
-3. **View your profile:**
-   ```
-   Show me my Viberank profile
-   ```
+- "What's my AI coding usage?"
+- "Submit my usage to viberank."
+- "Show the top 20 on viberank for Codex."
+- "Look up octocat on viberank."
+- "How does my monthly spend compare with other developers?"
 
-### Advanced Usage
+## What is sent, and where
 
-- **Force refresh data:**
-  ```
-  Get my Claude usage with a fresh fetch (don't use cache)
-  ```
+Only `submit_to_viberank` sends your usage, and only to `https://www.viberank.app/api/submit`. Along with the ccusage report it sends:
 
-- **Submit with specific username:**
-  ```
-  Submit my stats to Viberank using the username "myGitHubUser"
-  ```
+- `Authorization: Bearer <token>` when you have a token, otherwise `X-GitHub-User: <username>`.
+- `X-Machine-Id`: the anonymous random ID in `~/.viberank/machine-id`, shared with the CLI and created on first use, so usage from your laptop and desktop adds up instead of overwriting.
+- `X-Viberank-Client: mcp/<version>`.
 
-## How It Works
-
-1. **Usage Collection**: The MCP server runs `ccusage` to collect your Claude Code usage statistics
-2. **Data Processing**: Statistics are parsed and validated
-3. **Submission**: Data is sent to the Viberank API with your GitHub username
-4. **Verification**: if you've run `npx viberank-cli login` (or set `VIBERANK_TOKEN`), the MCP server signs submissions with that token and they're verified. Otherwise they're an unverified claim to the username, which the server refuses once that username is verified
+The read tools fetch public data from viberank.app. Without a token, `submit_to_viberank` also asks the GitHub API whether a suggested handle is a personal account; only the handle is sent.
 
 ## Troubleshooting
 
-### "Failed to get usage data"
-- Make sure you've used a supported AI coding tool (Claude Code, Codex, Gemini CLI, …) at least once
-- Ensure `ccusage` is accessible (it's automatically installed via npx)
-
-### "GitHub username is required"
-- Set your git config: `git config --global user.name "YourGitHubUsername"`
-- Or provide the username explicitly in the tool call
-
-### Cache Issues
-- Use `force_refresh: true` to bypass the 5-minute cache
-- The cache helps reduce overhead when checking stats frequently
-
-## Security & Privacy
-
-- Your usage data is only sent to Viberank when you explicitly use the `submit_to_viberank` tool
-- No data is collected or transmitted without your action
-- GitHub usernames from git config are only read locally
-- The API token is read from `VIBERANK_TOKEN` or the CLI's `~/.viberank/config.json`, and the CLI's machine ID from `~/.viberank/machine-id`, so MCP and CLI submissions from one machine count once
+- **"VIBERANK_TOKEN is set but is not a viberank token"**: the variable holds something other than `vbr_` plus 43 characters, often the `vbr_…` placeholder from these docs. Paste the real token or remove the variable.
+- **"was rejected by viberank"**: the token was revoked. Mint a new one at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens).
+- **"a GitHub username is required"**: there's no token, so tell the agent your GitHub username, or add a token.
+- **"No usage found"**: ccusage found no logs on this machine. Use Claude Code, Codex or another supported tool first.
+- **"Could not run ccusage@20"**: check that `npx --version` works and that the machine is online; the first run downloads ccusage.
 
 ## Development
 
-### Building from Source
 ```bash
 npm install
-npm run build
+npm run build    # tsc into dist/
+npm test         # unit tests, no network
+npm run smoke    # starts dist/index.js over stdio and calls the read tools against viberank.app
+npm run smoke -- --usage   # also runs get_usage (ccusage, local only)
 ```
 
-### Running in Development
-```bash
-npm run dev
-```
+The smoke test never calls `submit_to_viberank`.
 
-### Testing Locally
-```bash
-# Start the server
-node dist/index.js
-
-# In another terminal, send test commands via MCP protocol
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT - See LICENSE file for details
+The package is listed in the [MCP registry](https://registry.modelcontextprotocol.io) as `io.github.sculptdotfun/viberank` (`mcpName` in `package.json`, metadata in `server.json`). Keep the `version` fields in `server.json` in step with `package.json`.
 
 ## Links
 
-- [Viberank Website](https://www.viberank.app)
-- [GitHub Repository](https://github.com/sculptdotfun/viberank)
-- [Report Issues](https://github.com/sculptdotfun/viberank/issues)
-- [MCP Protocol Docs](https://modelcontextprotocol.io)
+- [viberank](https://www.viberank.app)
+- [Source](https://github.com/sculptdotfun/viberank/tree/main/packages/viberank-mcp-server)
+- [Issues](https://github.com/sculptdotfun/viberank/issues)
+- [viberank-cli](https://www.npmjs.com/package/viberank-cli), for submitting from a terminal and daily autosubmit
+
+## License
+
+MIT

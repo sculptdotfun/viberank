@@ -2,8 +2,10 @@
   "mcpServers": {
     "viberank": {
       "command": "npx",
-      "args": ["@viberank/mcp-server"],
-      "env": {}
+      "args": ["-y", "viberank-mcp"],
+      "env": {
+        "VIBERANK_TOKEN": "vbr_your_token_from_viberank.app/settings/tokens"
+      }
     }
   }
 }
