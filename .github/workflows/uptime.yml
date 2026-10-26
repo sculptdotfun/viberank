@@ -1,0 +1,40 @@
+# Fails, and so emails whoever last edited this file, when viberank.app stops
+# answering. From about 14 to 21 Oct 2026 every page and every CLI submission
+# got 402 Payment Required (a Vercel billing block), and nobody knew until
+# users opened #193 and #194. Vercel's spend alerts cover the budget, not the
+# site being down.
+#
+# Each URL gets three tries a minute apart, so a single slow deploy rollover
+# doesn't page anyone. GitHub disables scheduled workflows after 60 days
+# without a commit to the repo; re-enable it from the Actions tab if that
+# happens.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: The site and the leaderboard API answer 200
+        run: |
+          failed=0
+          for url in "https://www.viberank.app/" "https://www.viberank.app/api/leaderboard?limit=1"; do
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo "000")
+              echo "$url -> $code (try $attempt)"
+              [ "$code" = "200" ] && break
+              [ "$attempt" -lt 3 ] && sleep 60
+            done
+            if [ "$code" != "200" ]; then
+              echo "::error::$url returned $code"
+              failed=1
+            fi
+          done
+          exit $failed
