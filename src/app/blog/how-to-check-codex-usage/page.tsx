@@ -5,9 +5,19 @@ import type { Metadata } from "next";
 // "codex usage" (12K/mo) is answered first by OpenAI's own dashboard, so the
 // page opens with where it is, then what we add on top. Figures below were
 // verified against OpenAI's pages on 2026-10-13.
-const TITLE = "Codex Usage: Dashboard, /status, Limits & Real Costs (2026)";
+//
+// Search Console, 28 days to 2026-10-26: 29.8K impressions at position 4.2 and
+// 0.7% CTR; "codex usage dashboard" sat at 3.8 with 0.3%, and "check codex
+// usage" never got a click. The title leads with the how-to the queries ask,
+// adds limits, and promises both answers; the description gives them.
+const TITLE = "How to Check Codex Usage & Limits: Dashboard + /status (2026)";
+const DESC =
+  "The Codex usage dashboard is chatgpt.com/codex/settings/usage. In the CLI, type /status for your 5-hour and weekly limits, /usage for tokens, ccusage for cost.";
+const MODIFIED = "2026-10-26T00:00:00.000Z";
 const DASHBOARD_URL = "https://chatgpt.com/codex/settings/usage";
 const LIMITS_SOURCE = "https://learn.chatgpt.com/docs/pricing";
+const OG =
+  "/api/og?title=How%20to%20Check%20Codex%20Usage%20%26%20Limits&description=The%20dashboard%2C%20%2Fstatus%2C%20%2Fusage%20and%20real%20cost";
 
 const PLUS_LIMITS = [
   { model: "GPT-6 Astra", messages: "5–45" },
@@ -18,32 +28,31 @@ const PLUS_LIMITS = [
 
 export const metadata: Metadata = {
   title: TITLE,
-  description:
-    "Check Codex usage in the official dashboard at chatgpt.com/codex/settings/usage or with /status in the CLI. Plus Codex usage limits per plan, /usage for tokens, and ccusage for real API-equivalent costs.",
+  description: DESC,
+  keywords: [
+    "codex usage",
+    "codex usage dashboard",
+    "check codex usage",
+    "how to check codex usage",
+    "codex usage limit",
+    "codex token usage",
+  ],
   alternates: { canonical: "https://www.viberank.app/blog/how-to-check-codex-usage" },
   openGraph: {
     title: TITLE,
-    description:
-      "Dashboard and /status for limits, /usage for tokens, /status for limits, ccusage for real costs — then rank yourself on the public Codex leaderboard.",
+    description: DESC,
     url: "https://www.viberank.app/blog/how-to-check-codex-usage",
     type: "article",
     publishedTime: "2026-07-24T00:00:00.000Z",
-    modifiedTime: "2026-10-13T00:00:00.000Z",
+    modifiedTime: MODIFIED,
     authors: ["Viberank Team"],
-    images: [
-      {
-        url: "/api/og?title=Codex%20Token%20Usage&description=Track%20it%2C%20cost%20it%2C%20rank%20it",
-        width: 1200,
-        height: 630,
-        alt: "Track OpenAI Codex token usage",
-      },
-    ],
+    images: [{ url: OG, width: 1200, height: 630, alt: TITLE }],
   },
   twitter: {
     card: "summary_large_image",
     title: TITLE,
-    description: "The Codex usage dashboard, /status and ccusage explained — then rank yourself on the public Codex leaderboard.",
-    images: ["/api/og?title=Codex%20Token%20Usage&description=Track%20it%2C%20cost%20it%2C%20rank%20it"],
+    description: DESC,
+    images: [OG],
   },
 };
 
@@ -88,11 +97,10 @@ export default function CodexTokenUsage() {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
       headline: TITLE,
-      description:
-        "Check Codex usage in the official dashboard or with /status, see Codex usage limits per plan, and get real costs with ccusage.",
-      image: "https://www.viberank.app/api/og?title=Codex%20Token%20Usage",
+      description: DESC,
+      image: "https://www.viberank.app" + OG,
       datePublished: "2026-07-24T00:00:00.000Z",
-      dateModified: "2026-10-13T00:00:00.000Z",
+      dateModified: MODIFIED,
       author: { "@type": "Organization", name: "Viberank", url: "https://www.viberank.app" },
       publisher: {
         "@type": "Organization",
@@ -133,7 +141,7 @@ export default function CodexTokenUsage() {
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
             <span className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Updated October 13, 2026
+              Updated October 26, 2026
             </span>
             <span className="flex items-center gap-2">
               <Clock className="w-4 h-4" />

@@ -65,11 +65,11 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "how-to-check-claude-code-usage",
-    title: "How to Check Your Claude Code Usage: /usage & ccusage",
+    title: "How to Check Claude Code Usage & Limits: /usage Command (2026)",
     excerpt:
-      "Three ways to see exactly how much Claude Code you've used — the /usage command, ccusage for token-level history, and the leaderboard that tracks it daily.",
+      "Type /usage in Claude Code for your 5-hour and weekly limits and when they reset; run npx ccusage@latest daily for tokens and real cost. Plus the leaderboard that tracks it daily.",
     datePublished: "2026-08-18",
-    dateModified: "2026-08-18",
+    dateModified: "2026-10-26",
     readTime: "7 min read",
   },
   {
@@ -92,11 +92,11 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: "how-to-check-codex-usage",
-    title: "Codex Usage: Dashboard, /status, Limits & Real Costs (2026)",
+    title: "How to Check Codex Usage & Limits: Dashboard + /status (2026)",
     excerpt:
       "Your Codex usage dashboard is at chatgpt.com/codex/settings/usage; /status shows limits in the CLI. Plus the official per-plan limits, /usage for tokens, and ccusage for real costs.",
     datePublished: "2026-07-24",
-    dateModified: "2026-10-13",
+    dateModified: "2026-10-26",
     readTime: "6 min read",
   },
   {
