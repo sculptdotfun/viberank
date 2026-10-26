@@ -5,6 +5,7 @@ import { fetchAllPages } from "@/lib/data/supabase/client";
 import { BLOG_POSTS } from "@/lib/blogPosts";
 import { COMPARE_MATCHUPS } from "@/lib/compare";
 import { buildModelEconomics, publishableModels } from "@/lib/model-economics";
+import { indexableProfiles } from "@/lib/profile-index";
 
 const SITE = "https://www.viberank.app";
 
@@ -108,32 +109,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Only profiles that have actually submitted. A signed-in account with no
     // submission renders an empty shell: 774 profile URLs were indexed for a
     // combined 47 clicks, and the empty ones are pure thin-content ballast.
-    const profiles = await fetchAllPages<{
-      username: string;
-      github_username: string | null;
-      updated_at: string | null;
-    }>(
-      (from, to) =>
-        client
-          .from("profiles")
-          .select("username, github_username, updated_at")
-          .gt("total_submissions", 0)
-          .order("updated_at", { ascending: false })
-          .order("username", { ascending: true })
-          .range(from, to),
-      "profiles for sitemap"
-    );
+    //
+    // "Actually submitted" is decided by indexableProfiles, the same rule the
+    // page's robots tag uses, from real submission rows. The stored
+    // `total_submissions` it used to filter on goes stale, so the sitemap
+    // listed pages that were marked noindex.
+    const [profiles, submissions] = await Promise.all([
+      fetchAllPages<{ username: string; github_username: string | null; updated_at: string | null }>(
+        (from, to) =>
+          client
+            .from("profiles")
+            .select("username, github_username, updated_at")
+            .order("updated_at", { ascending: false })
+            .order("username", { ascending: true })
+            .range(from, to),
+        "profiles for sitemap"
+      ),
+      fetchAllPages<{ username: string }>(
+        (from, to) =>
+          client.from("submissions").select("username").order("id", { ascending: true }).range(from, to),
+        "submissions for sitemap"
+      ),
+    ]);
 
-    const profileEntries: MetadataRoute.Sitemap = profiles.flatMap((p) => {
-      const handle = p.github_username || p.username;
-      if (!handle) return [];
-      return [{
-        url: `${SITE}/profile/${encodeURIComponent(handle)}`,
-        lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
-        changeFrequency: "weekly" as const,
-        priority: 0.5,
-      }];
-    });
+    const profileEntries: MetadataRoute.Sitemap = indexableProfiles(
+      profiles.map((p) => ({ username: p.username, githubUsername: p.github_username, updatedAt: p.updated_at })),
+      submissions.map((s) => s.username)
+    ).map(({ handle, updatedAt }) => ({
+      url: `${SITE}/profile/${encodeURIComponent(handle)}`,
+      lastModified: updatedAt ? new Date(updatedAt) : new Date(),
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    }));
 
     return [...staticEntries, ...modelEntries, ...profileEntries];
   } catch {

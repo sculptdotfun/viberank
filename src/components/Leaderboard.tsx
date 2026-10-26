@@ -14,7 +14,7 @@ import SponsorSlot from "./SponsorSlot";
 import TierBadge from "./TierBadge";
 import { TIERS } from "@/lib/tiers";
 import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, getGitHubAvatarUrl } from "@/lib/utils";
-import { useLeaderboard, useLeaderboardByDateRange } from "@/lib/data/hooks/useSubmissions";
+import { useLeaderboard, useLeaderboardByDateRange, SUBMITTED_EVENT } from "@/lib/data/hooks/useSubmissions";
 import { useGlobalStats } from "@/lib/data/hooks/useStats";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 import { boardQueryKey, hasDateRange, leaderboardQuery, type SortBy } from "@/lib/leaderboard-query";
@@ -66,6 +66,9 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   // Latches on the first real filter change and never resets — see
   // isSeededDefaultView below.
   const hasChangedFilters = useRef(false);
+  // Bumped when a submission lands in this tab, so the board refetches rather
+  // than keep showing the rows it was rendered with (see SUBMITTED_EVENT).
+  const [refreshKey, setRefreshKey] = useState(0);
   const { data: liveStats } = useGlobalStats();
   const globalStats = liveStats ?? initialStats;
 
@@ -125,6 +128,7 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
   // can't tell "not yet interacted" from "back at the default".
   const isSeededDefaultView =
     !hasChangedFilters.current &&
+    refreshKey === 0 &&
     (initialItems?.length ?? 0) > 0 &&
     page === 0 &&
     sortBy === "cost" &&
@@ -133,14 +137,27 @@ export default function Leaderboard({ initialItems, initialStats, initialHasMore
     !isDateFiltered;
 
   const { data: regularResult, isLoading } = useLeaderboard(
-    query.kind === "all-time" && !isSeededDefaultView ? query.params : "skip"
+    query.kind === "all-time" && !isSeededDefaultView ? query.params : "skip",
+    refreshKey
   );
 
   const hasMore = regularResult?.hasMore ?? (isSeededDefaultView ? initialHasMore ?? false : false);
 
   const { data: dateFilteredResult, isLoading: isDateLoading } = useLeaderboardByDateRange(
-    query.kind === "date-range" ? query.params : "skip"
+    query.kind === "date-range" ? query.params : "skip",
+    refreshKey
   );
+
+  useEffect(() => {
+    // Back to the first page: a refetch of page 3 alone would merge fresh
+    // rows into stale ones.
+    const onSubmitted = () => {
+      setPage(0);
+      setRefreshKey((key) => key + 1);
+    };
+    window.addEventListener(SUBMITTED_EVENT, onSubmitted);
+    return () => window.removeEventListener(SUBMITTED_EVENT, onSubmitted);
+  }, []);
 
   // Tools available to filter by, sourced from the global per-tool stats.
   const availableTools = globalStats?.modelUsage

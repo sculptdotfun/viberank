@@ -7,6 +7,8 @@
  * shields.io badges it will sit next to.
  */
 
+import { formatTokensCompact } from "./utils";
+
 export type BadgeMetric = "rank" | "cost" | "tokens";
 
 export const BADGE_METRICS: BadgeMetric[] = ["rank", "cost", "tokens"];
@@ -92,15 +94,8 @@ export function badgeCost(cost: number): string {
   return `$${Math.round(value)}`;
 }
 
-/** Compact tokens: 940M, 26.1B, 1.2T. */
-export function badgeTokens(tokens: number): string {
-  const value = Number.isFinite(tokens) && tokens > 0 ? tokens : 0;
-  if (value >= 1e12) return `${(value / 1e12).toFixed(1)}T`;
-  if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
-  if (value >= 1e6) return `${Math.round(value / 1e6)}M`;
-  if (value >= 1e3) return `${Math.round(value / 1e3)}K`;
-  return String(Math.round(value));
-}
+/** Compact tokens: 940M, 26.1B, 1.2T. The same formatter the share cards use. */
+export const badgeTokens = formatTokensCompact;
 
 export function badgeLabelFor(metric: BadgeMetric): string {
   return metric === "rank" ? "viberank" : metric === "cost" ? "ai spend" : "tokens";

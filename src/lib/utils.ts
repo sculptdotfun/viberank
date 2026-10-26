@@ -13,6 +13,22 @@ export function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
+/**
+ * Compact token counts for share cards and badges: 940M, 26.1B, 1.2T.
+ *
+ * The profile share card had its own formatter that stopped at billions,
+ * so heavy users' cards read "1167.3B tokens". Anything that prints a token
+ * count into an image or badge goes through this one.
+ */
+export function formatTokensCompact(tokens: number): string {
+  const value = Number.isFinite(tokens) && tokens > 0 ? tokens : 0;
+  if (value >= 1e12) return `${(value / 1e12).toFixed(1)}T`;
+  if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `${Math.round(value / 1e6)}M`;
+  if (value >= 1e3) return `${Math.round(value / 1e3)}K`;
+  return String(Math.round(value));
+}
+
 // Friendly display labels for ccusage tool/agent keys.
 const TOOL_LABELS: Record<string, string> = {
   claude: "Claude",
