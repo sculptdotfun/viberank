@@ -53,6 +53,15 @@ export function writeConfig(patch) {
 export function getToken() {
   const fromEnv = process.env.VIBERANK_TOKEN;
   if (looksLikeToken(fromEnv)) return fromEnv;
+  return getSavedToken();
+}
+
+/**
+ * The token saved on disk, ignoring the environment. A scheduled job does not
+ * inherit the shell's VIBERANK_TOKEN, so this is the one that decides whether
+ * autosubmit can work.
+ */
+export function getSavedToken() {
   const { token } = readConfig();
   return looksLikeToken(token) ? token : null;
 }

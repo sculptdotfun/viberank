@@ -1,31 +1,51 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import crypto from 'crypto';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import ora from 'ora';
 import prompts from 'prompts';
-import fetch from 'node-fetch';
-import { getToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, saveTokenOwner, savedTokenOwner, CONFIG_DIR } from './lib/config.js';
+import { getToken, getSavedToken, getMachineId, readConfig, writeConfig, clearToken, looksLikeToken, saveTokenOwner, savedTokenOwner, CONFIG_DIR } from './lib/config.js';
 import { remoteOwnerKind, resolveTokenOwner, whoami } from './lib/identity.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus, corpusScope } from './lib/corpus.js';
 import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
-import { runNpx } from './lib/npx.js';
+import { blockedMessage, helpText, parseArgs, submitMode } from './lib/args.js';
+import { CCUSAGE, generateReport, noUsageHelp, parseReport } from './lib/ccusage.js';
+import { SITE, describeWait, failureMessage, isVerifiedRefusal, networkErrorCode, postReport, submitHeaders } from './lib/submit.js';
+import { appendLog, formatLogLine, isOverdue, lastSuccess, timeAgo } from './lib/runlog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Quiet mode: no prompts, no cwd side effects, timestamped log lines. A
-// scheduled run passes --quiet explicitly; a missing TTY means there is no
-// human to answer prompts either way, so treat that as quiet too rather than
-// cancel (the pre-1.5 behavior: prompts got EOF, "cancelled", exit 0 — every
-// scheduled autosubmit run since the feature shipped was a silent no-op).
-const QUIET = process.argv.includes('--quiet') || !process.stdin.isTTY;
+// Read package.json to get version
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const CLI_VERSION = packageJson.version;
+
+const ARGS = parseArgs(process.argv.slice(2));
+
+// Scheduled mode is an explicit --quiet and nothing else. A missing TTY used
+// to count as well, which sent every run from an agent's shell or CI down the
+// scheduled path; submitMode in lib/args.js has the story.
+const QUIET = ARGS.flags.quiet;
+
+// Whether a person can answer prompts. prompts reads stdin, and without a TTY
+// there it either gets EOF and "cancels" or waits on a pipe that never
+// answers, so every prompt below sits behind this.
+const INTERACTIVE = !QUIET && process.stdin.isTTY === true;
+
+// The report goes in viberank's own folder rather than the current one,
+// which is usually somebody's repository, and is regenerated on every run so
+// a stale one is never what gets sent.
+const REPORT_FILE = path.join(CONFIG_DIR, 'cc.json');
+
+// RunAtLoad and logon triggers fire on every boot, so a scheduled run skips
+// itself within this long of a success.
+const SKIP_WITHIN_MS = 20 * 60 * 60 * 1000;
+
+const pad2 = (n) => String(n).padStart(2, '0');
 
 /** GitHub handle: 1-39 alphanumerics with single interior hyphens. The
  * fallback source for the default is `git config user.name`, which has held
@@ -36,59 +56,73 @@ function looksLikeGithubHandle(value) {
   return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(value);
 }
 
-/** Generate a fresh ccusage report to `dest` without relying on PATH or a
- * shell redirect — a launchd/schtasks job runs with a minimal PATH that has
- * no node or npx on it. lib/npx.js resolves the npx entrypoint next to the
- * running node binary; going through node rather than the `npx.cmd` shim is
- * also what keeps this from throwing EINVAL on Windows (#137). */
-function generateCcJson(dest) {
-  const run = (extra) => runNpx(['-y', 'ccusage@latest', 'daily', '--json', ...extra], {
-    encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
-  });
-
-  // `--by-agent` adds a per-agent split to each day, which lets the server apply
-  // a Claude-transcript cleanup to Claude's tokens alone instead of taking the
-  // same day's Codex usage down with it (#125). It roughly doubles the report
-  // size and it is a newer flag, so an older ccusage on a pinned or cached
-  // resolve will reject it — fall back rather than fail the whole run, since a
-  // submission without the split is still a perfectly good submission.
-  let out;
-  try {
-    out = run(['--by-agent']);
-  } catch {
-    out = run([]);
-  }
-  fs.writeFileSync(dest, out);
+/**
+ * Generate a fresh report with ccusage, save it to REPORT_FILE and check its
+ * shape. Throws with a message a person can act on.
+ */
+async function loadReport() {
+  const text = await generateReport();
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  // Saved before it is checked, so a report the CLI can't read is there to look at.
+  fs.writeFileSync(REPORT_FILE, text, { mode: 0o600 });
+  return parseReport(text);
 }
 
-// Read package.json to get version
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
-const CLI_VERSION = packageJson.version;
+/**
+ * loadReport behind a spinner that counts the seconds. ccusage routinely
+ * takes 15-25 s, and a spinner that doesn't move for that long reads as a hang.
+ */
+async function readUsage() {
+  const started = Date.now();
+  const seconds = () => Math.round((Date.now() - started) / 1000);
+  const label = `Reading your usage with ${CCUSAGE}…`;
+  const spinner = ora(label).start();
+  const tick = setInterval(() => { spinner.text = `${label} ${seconds()}s`; }, 1000);
+  try {
+    const data = await loadReport();
+    clearInterval(tick);
+    if (data.daily.length === 0) spinner.warn('ccusage found no usage');
+    else spinner.succeed(`Read ${data.daily.length} days of usage (${seconds()}s)`);
+    return data;
+  } catch (error) {
+    clearInterval(tick);
+    spinner.fail('Could not read your usage');
+    console.error(chalk.red(error.message));
+    process.exit(1);
+  }
+}
 
-
-const SITE = 'https://www.viberank.app';
+/** Per-month corpus size, so the server can tell a transcript the runtime
+ * rewrote from history the user deleted (#112). Best effort: a scan that
+ * fails must never block a submission. */
+function withCorpus(data) {
+  try {
+    const corpus = collectCorpus();
+    if (corpus) return { ...data, drift: { corpus, scope: corpusScope() } };
+  } catch {
+    // No corpus block; the server falls back to holding the high-water mark.
+  }
+  return data;
+}
 
 function help() {
-  console.log(`
-${chalk.yellow.bold('viberank')} — submit your AI coding usage
-
-  ${chalk.bold('npx viberank-cli')}                 submit now (interactive)
-  ${chalk.bold('npx viberank-cli login')}           save an API token
-  ${chalk.bold('npx viberank-cli logout')}          forget the saved token
-  ${chalk.bold('npx viberank-cli autosubmit')}      submit once a day in the background
-  ${chalk.bold('npx viberank-cli autosubmit off')}  stop submitting automatically
-  ${chalk.bold('npx viberank-cli status')}          show token and schedule state
-
-Most people run ${chalk.bold('login')} once, then ${chalk.bold('autosubmit')} once, and never think
-about it again — your rank stays current instead of freezing on the day you
-first submitted.
-`);
+  console.log(`\n${chalk.yellow.bold('viberank')} — submit your AI coding usage (v${CLI_VERSION})\n`);
+  console.log(helpText());
+  console.log();
 }
 
 async function login() {
-  if (!(await acquireToken())) process.exit(1);
+  const saved = ARGS.flags.token !== null ? await saveVerifiedToken(ARGS.flags.token.trim())
+    : INTERACTIVE ? await acquireToken()
+    : noTerminalForLogin();
+  if (!saved) process.exit(1);
   console.log(`Next: ${chalk.bold('npx viberank-cli autosubmit')} to keep a running backup.\n`);
+}
+
+function noTerminalForLogin() {
+  console.log(chalk.yellow('\nThere is no terminal here to paste a token into.'));
+  console.log(`Pass it instead: ${chalk.bold('npx viberank-cli login --token vbr_…')} (tokens are at ${SITE}/settings/tokens)\n`);
+  return false;
 }
 
 /**
@@ -128,24 +162,43 @@ async function acquireToken() {
     console.log(chalk.gray('\nNo token entered.'));
     return false;
   }
+  return saveVerifiedToken(token.trim());
+}
 
-  // Prove it works before saving, so a typo fails here rather than silently
-  // at 9am tomorrow inside a scheduler. whoami also says whose token it is,
-  // which is the account every submission with it is filed under (#181).
+/**
+ * Prove a token works, then save it. Shared by the pasted and the --token
+ * paths, so a typo fails here rather than silently at 9am tomorrow inside a
+ * scheduler. whoami also says whose token it is, which is the account every
+ * submission with it is filed under (#181).
+ */
+async function saveVerifiedToken(token) {
+  if (!looksLikeToken(token)) {
+    console.log(chalk.red('\nThat does not look like a viberank token (vbr_ followed by 43 characters).\n'));
+    return false;
+  }
+
   const spinner = ora('Verifying…').start();
-  const trimmed = token.trim();
-  const who = await whoami(SITE, trimmed, { fetch });
+  const who = await whoami(SITE, token, { fetch });
 
   let rejected = who.status === 'rejected';
   if (who.status === 'unsupported' || who.status === 'unreachable') {
     // A server without whoami: an empty submit authenticates the token and is
     // then rejected on its own merits, which is all this needs.
-    const res = await fetch(`${SITE}/api/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${trimmed}` },
-      body: '{}'
-    });
-    rejected = res.status === 401;
+    try {
+      const res = await fetch(`${SITE}/api/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Viberank-Client': `cli/${CLI_VERSION}`,
+          Authorization: `Bearer ${token}`,
+        },
+        body: '{}'
+      });
+      rejected = res.status === 401;
+    } catch (error) {
+      spinner.fail(`Could not check the token: ${failureMessage({ error })}`);
+      return false;
+    }
   }
 
   if (rejected) {
@@ -154,31 +207,133 @@ async function acquireToken() {
   }
   spinner.succeed(who.username ? `Token verified — signed in as @${who.username}` : 'Token verified');
 
-  writeConfig({ token: trimmed });
-  if (who.username) saveTokenOwner(trimmed, who.username);
+  writeConfig({ token });
+  if (who.username) saveTokenOwner(token, who.username);
   console.log(chalk.green(`\n✓ Saved to ${CONFIG_DIR}/config.json (owner-only)\n`));
   return true;
 }
 
+/** Forget the token, and the schedule with it: a scheduled run cannot submit
+ * without a token, so leaving it on would only fill the log with failures. */
 function logout() {
+  const scheduled = autosubmit.isEnabled();
   clearToken();
-  console.log(chalk.green('\n✓ Token removed. Scheduled submissions will stop working.\n'));
+  if (scheduled) autosubmit.disable();
+  console.log(chalk.green('\n✓ Token removed.'));
+  if (scheduled) {
+    console.log(chalk.gray('  Automatic submission is off too, since it cannot submit without a token.'));
+    console.log(chalk.gray('  Log in and run `npx viberank-cli autosubmit` to turn it back on.'));
+  }
+  if (process.env.VIBERANK_TOKEN) {
+    console.log(chalk.gray('  VIBERANK_TOKEN is still set in this shell, and the CLI will keep using it here.'));
+  }
+  console.log();
 }
 
-function showStatus() {
+/** The token line of `status`: whose it is, per the server, or that it was revoked. */
+async function describeToken(token) {
+  if (!token) return chalk.gray('none — run `npx viberank-cli login`');
+  const source = token === process.env.VIBERANK_TOKEN ? 'from VIBERANK_TOKEN' : 'saved';
+  const who = await whoami(SITE, token, { fetch });
+  if (who.status === 'ok') return chalk.green(`${source}, signed in as @${who.username}`);
+  if (who.status === 'rejected') {
+    return chalk.red(`${source}, but REJECTED: it was revoked or mistyped. Run \`npx viberank-cli login\` to save a new one.`);
+  }
+  return chalk.yellow(`${source}, not checked (could not reach viberank.app)`);
+}
+
+function describeSchedule(s, config) {
+  if (!s.scheduler) return chalk.gray(`not available on ${process.platform}`);
+  if (!s.enabled) return chalk.gray('off — run `npx viberank-cli autosubmit`');
+  const at = config.autosubmit ? `, daily at ${pad2(config.autosubmit.hour)}:${pad2(config.autosubmit.minute)}` : '';
+  const line = chalk.green(`on (${s.scheduler})${at}`);
+  if (!s.lastRun) return line;
+  if (!s.lastRun.ran) return `${line}${chalk.gray(', not run yet')}`;
+  const exit = `last run exited ${s.lastRun.exitCode}`;
+  return `${line}, ${s.lastRun.exitCode === 0 ? chalk.green(exit) : chalk.red(exit)}`;
+}
+
+/** Things about the schedule that mean it will not work as it stands. */
+function scheduleWarnings(s, token) {
+  if (!s.enabled) return [];
+  const notes = [];
+  if (s.outdated) {
+    notes.push('This job was set up by an older version and cannot find node. Run `npx viberank-cli autosubmit` once to repair it.');
+  } else if (s.lastRun?.exitCode === 127) {
+    notes.push('The last run could not find node or npx. Run `npx viberank-cli autosubmit` to rewrite the job.');
+  }
+  if (!getSavedToken()) {
+    notes.push(token
+      ? 'The scheduled job cannot see VIBERANK_TOKEN. Save the token with `npx viberank-cli login --token <token>`.'
+      : 'There is no saved token, so the scheduled job cannot submit. Run `npx viberank-cli login`.');
+  }
+  return notes;
+}
+
+async function showStatus() {
   const token = getToken();
+  const config = readConfig();
   const s = autosubmit.status();
 
   console.log(chalk.yellow.bold('\nviberank status\n'));
-  console.log(`  token       ${token ? chalk.green('saved') : chalk.gray('none — run `viberank login`')}`);
-  console.log(`  autosubmit  ${s.enabled ? chalk.green(`on (${s.scheduler})`) : chalk.gray('off')}`);
-  console.log(`  machine id  ${getMachineId()}`);
+  console.log(`  token        ${await describeToken(token)}`);
+  console.log(`  autosubmit   ${describeSchedule(s, config)}`);
+  for (const note of scheduleWarnings(s, token)) console.log(chalk.yellow(`  ! ${note}`));
+
+  const last = lastSuccess(config);
+  console.log(`  last submit  ${last ? `${last.toLocaleString()} (${timeAgo(last)})` : chalk.gray('none recorded on this machine')}`);
+  if (isOverdue({ enabled: s.enabled, last, enabledAt: config.autosubmit?.enabledAt })) {
+    console.log(chalk.yellow('  ! No successful submission in over 48 hours. The recent runs below should say why.'));
+  }
+  console.log(`  machine id   ${getMachineId()}`);
 
   if (s.log.length) {
-    console.log(chalk.gray('\n  recent runs:'));
+    console.log(chalk.gray(`\n  recent runs (${autosubmit.LOG_FILE}):`));
     for (const line of s.log) console.log(chalk.gray(`    ${line}`));
   }
   console.log();
+}
+
+/**
+ * A scheduled run cannot sign in through a browser and does not inherit the
+ * shell's VIBERANK_TOKEN, so autosubmit needs a token saved on disk. Get one
+ * inline when someone is here to paste it, rather than send them off to run
+ * `login` and come back.
+ */
+async function ensureSavedToken() {
+  if (getSavedToken()) return true;
+  console.log(chalk.yellow(process.env.VIBERANK_TOKEN
+    ? '\nVIBERANK_TOKEN is set in this shell, but a scheduled job will not see it, so it needs a saved token.'
+    : '\nA scheduled run cannot sign in through a browser, so it needs a token first.'));
+  if (!INTERACTIVE) {
+    console.log(`Save one with ${chalk.bold('npx viberank-cli login --token <token>')} (from ${SITE}/settings/tokens), then run this again.\n`);
+    return false;
+  }
+  return acquireToken();
+}
+
+/** Install the daily job and say how to check on it. False if the scheduler refused it. */
+function enableAutosubmit(hour) {
+  let result;
+  try {
+    result = autosubmit.enable(hour);
+  } catch (error) {
+    console.log(chalk.red(`\nCould not turn on automatic submission.\n${error.message}\n`));
+    return false;
+  }
+  console.log(chalk.green(`\n✓ Submitting daily at ${pad2(result.hour)}:${pad2(result.minute)} via ${result.scheduler}.`));
+  console.log(chalk.gray(`  ${result.path}`));
+  console.log(chalk.gray('  The minute is fixed per machine, so not everyone submits at once.'));
+  if (!result.durable) {
+    // Scheduled through `npx -y` because this copy lives in npm's throwaway
+    // cache. Say so, rather than let someone wonder why a background job
+    // reaches the network.
+    console.log(chalk.gray('  Runs via npx, so it stays on the latest version.'));
+    console.log(chalk.gray('  For an offline-capable job: npm i -g viberank-cli, then re-run this.'));
+  }
+  console.log(`  Check on it any time: ${chalk.bold('npx viberank-cli status')}`);
+  console.log(chalk.gray('  Turn it off with: npx viberank-cli autosubmit off\n'));
+  return true;
 }
 
 async function autosubmitCommand(arg) {
@@ -190,114 +345,116 @@ async function autosubmitCommand(arg) {
 
   if (!autosubmit.platform()) {
     console.log(chalk.red(`\nNo supported scheduler on ${process.platform}.`));
-    console.log('Run `npx viberank-cli submit` from your own cron instead.\n');
+    console.log('Run `npx viberank-cli submit --quiet` from your own cron instead.\n');
     process.exit(1);
   }
 
-  if (!getToken()) {
-    console.log(chalk.yellow('\nA scheduled run cannot sign in through a browser, so it needs a token first.'));
-    console.log(`Run ${chalk.bold('npx viberank-cli login')}, then try again.\n`);
-    process.exit(1);
-  }
+  if (!(await ensureSavedToken())) process.exit(1);
 
-  const { hour } = await prompts({
-    type: 'number',
-    name: 'hour',
-    message: 'Hour of day to submit (0-23):',
-    initial: 9,
-    validate: (v) => (v >= 0 && v <= 23) || '0-23'
-  });
-
-  const result = autosubmit.enable(hour ?? 9);
-  console.log(chalk.green(`\n✓ Submitting daily at ${String(result.hour).padStart(2, '0')}:00 via ${result.scheduler}.`));
-  console.log(chalk.gray(`  ${result.path}`));
-  if (!result.durable) {
-    // Scheduled through `npx -y` because this copy lives in npm's throwaway
-    // cache. Say so, rather than let someone wonder why a background job
-    // reaches the network.
-    console.log(chalk.gray('  Runs via npx, so it stays on the latest version.'));
-    console.log(chalk.gray('  For an offline-capable job: npm i -g viberank-cli, then re-run this.'));
+  let hour = 9;
+  if (INTERACTIVE) {
+    const answer = await prompts({
+      type: 'number',
+      name: 'hour',
+      message: 'Hour of day to submit (0-23):',
+      initial: 9,
+      validate: (v) => (v >= 0 && v <= 23) || '0-23'
+    });
+    if (answer.hour === undefined) {
+      console.log(chalk.gray('\nCancelled; nothing was scheduled.\n'));
+      return;
+    }
+    hour = answer.hour;
   }
-  console.log(chalk.gray('  Turn it off with: npx viberank-cli autosubmit off\n'));
+  if (!enableAutosubmit(hour)) process.exit(1);
+}
+
+/** Whether stdout is the autosubmit log itself, as it is under launchd. */
+function outputIsLogFile() {
+  try {
+    const out = fs.fstatSync(1);
+    const log = fs.statSync(autosubmit.LOG_FILE);
+    return out.ino === log.ino && out.dev === log.dev;
+  } catch {
+    return false;
+  }
+}
+
+/** One dated line in ~/.viberank/autosubmit.log, echoed to the console
+ * unless the console is that very file. */
+function logRun(entry) {
+  const line = formatLogLine(entry);
+  let logged = false;
+  try {
+    appendLog(autosubmit.LOG_FILE, line);
+    logged = true;
+  } catch {
+    // A read-only home still gets the console line.
+  }
+  if (!logged || !outputIsLogFile()) (entry.outcome === 'fail' ? console.error : console.log)(line);
 }
 
 /**
- * The scheduled path: no prompts, no cwd writes, one timestamped line per run.
+ * The scheduled path: no prompts, no cwd writes, one dated line per run.
  * Identity comes from the API token (the server resolves the token's owner and
  * ignores the header claim), so a token is required here.
  */
 async function quietSubmit() {
-  const stamp = () => `[${new Date().toISOString()}]`;
-
-  if (!getToken()) {
-    console.error(`${stamp()} no API token — run \`npx viberank-cli login\`, then re-enable autosubmit`);
+  const token = getToken();
+  if (!token) {
+    logRun({ outcome: 'fail', detail: 'no API token: run `npx viberank-cli login`, then `npx viberank-cli autosubmit` again' });
     process.exit(1);
   }
 
-  // RunAtLoad/logon triggers fire on every boot; skip if a run already
-  // succeeded in the last 20 hours so catch-up never double-submits.
-  const last = readConfig().lastAutosubmit;
-  if (last && Date.now() - Date.parse(last) < 20 * 60 * 60 * 1000) {
-    console.log(`${stamp()} already submitted at ${last}, skipping`);
+  // Any success counts, a manual one included: it sent the same data, and a
+  // second send within the hour would only meet the rate limit.
+  const last = lastSuccess(readConfig());
+  if (last && Date.now() - last.getTime() < SKIP_WITHIN_MS) {
+    logRun({ outcome: 'skip', detail: `already submitted at ${last.toISOString()}` });
     return;
   }
 
-  const ccJsonPath = path.join(CONFIG_DIR, 'cc.json');
+  let data;
   try {
-    generateCcJson(ccJsonPath);
+    data = await loadReport();
   } catch (error) {
-    console.error(`${stamp()} ccusage failed: ${error.message}`);
+    logRun({ outcome: 'fail', detail: `ccusage: ${error.message}` });
     process.exit(1);
   }
-
-  const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
-  try {
-    const corpus = collectCorpus();
-    if (corpus) ccData.drift = { corpus, scope: corpusScope() };
-  } catch { /* best effort */ }
+  if (data.daily.length === 0) {
+    logRun({ outcome: 'fail', detail: 'ccusage found no usage on this machine; run `npx viberank-cli` in a terminal to see where it looks' });
+    process.exit(1);
+  }
 
   // The server files a token submission under the token's owner whatever the
   // header says, so log that owner; a revoked token is reported here instead
   // of as a generic 401 after the upload.
-  const owner = await resolveTokenOwner(SITE, getToken(), savedTokenOwner(getToken()), { fetch });
+  const owner = await resolveTokenOwner(SITE, token, savedTokenOwner(token), { fetch });
   if (owner.rejected) {
-    console.error(`${stamp()} API token rejected (revoked?) — run \`npx viberank-cli login\` again`);
+    logRun({ outcome: 'fail', status: 401, detail: 'API token rejected (revoked?): run `npx viberank-cli login` again' });
     process.exit(1);
   }
-  if (owner.fresh) saveTokenOwner(getToken(), owner.username);
+  if (owner.fresh) saveTokenOwner(token, owner.username);
+
   const githubUser = owner.username || readConfig().username || 'autosubmit';
-  let lastError = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const response = await fetch('https://www.viberank.app/api/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-GitHub-User': githubUser,
-          'X-CLI-Version': CLI_VERSION,
-          'X-Machine-Id': getMachineId(),
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify(ccData),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (response.ok && result.success) {
-        writeConfig({ lastAutosubmit: new Date().toISOString() });
-        const as = owner.username ? ` as @${owner.username}` : '';
-        console.log(`${stamp()} submitted ${ccData.daily?.length ?? '?'} days${as} — ${result.profileUrl ?? ''}`);
-        try { fs.unlinkSync(ccJsonPath); } catch { /* fine */ }
-        return;
-      }
-      lastError = new Error(result.error || `server returned ${response.status}`);
-      if (response.status !== 503 && response.status < 500) break; // 4xx: retrying won't help
-    } catch (error) {
-      lastError = error; // network error — retry
-    }
-    if (attempt < 3) await new Promise((r) => setTimeout(r, 5000 * attempt));
+  const outcome = await postReport({
+    fetch,
+    headers: submitHeaders({ version: CLI_VERSION, machineId: getMachineId(), githubUser, token }),
+    payload: withCorpus(data),
+    scheduled: true,
+  });
+
+  if (outcome.ok) {
+    const now = new Date().toISOString();
+    writeConfig({ lastAutosubmit: now, lastSubmit: now });
+    const as = owner.username ? ` as @${owner.username}` : '';
+    const waited = outcome.waitedSeconds ? `, after waiting ${describeWait(outcome.waitedSeconds)} for the rate limit` : '';
+    logRun({ outcome: 'ok', status: outcome.status, detail: `submitted ${data.daily.length} days${as}${waited} ${outcome.body.profileUrl ?? ''}` });
+    return;
   }
 
-  try { fs.unlinkSync(ccJsonPath); } catch { /* fine */ }
-  console.error(`${stamp()} submit failed: ${lastError?.message ?? 'unknown error'}`);
+  const retry = outcome.status === 429 && outcome.retryAfter != null ? ` (try again in ${describeWait(outcome.retryAfter)})` : '';
+  logRun({ outcome: 'fail', status: outcome.status, detail: `${failureMessage(outcome)}${retry}` });
   process.exit(1);
 }
 
@@ -326,7 +483,7 @@ async function askUsername() {
       githubUser = githubMatch[1];
       source = 'remote';
     }
-  } catch (error) {
+  } catch {
     // Repository might not have a GitHub remote
   }
 
@@ -351,7 +508,7 @@ async function askUsername() {
     try {
       githubUser = execSync('git config user.name', { encoding: 'utf8' }).trim();
       source = 'gitconfig';
-    } catch (error) {
+    } catch {
       console.log(chalk.yellow('Could not detect GitHub username automatically'));
     }
   }
@@ -401,6 +558,25 @@ async function askUsername() {
 }
 
 /**
+ * The name for X-GitHub-User when no token owner is known: --user, else the
+ * prompt, else (unattended, with a token an old server could not name) the
+ * name this machine used before. Null when there is nothing to go on; with a
+ * token the server ignores the header anyway.
+ */
+async function chooseUsername() {
+  const flagged = ARGS.flags.user;
+  const remembered = readConfig().username;
+  if (flagged) {
+    if (remembered && remembered.toLowerCase() !== flagged.toLowerCase()) {
+      console.log(chalk.yellow(`This machine submitted as @${remembered} before; @${flagged} is a separate profile.`));
+    }
+    return flagged;
+  }
+  if (INTERACTIVE) return askUsername();
+  return looksLikeGithubHandle(remembered ?? '') ? remembered : null;
+}
+
+/**
  * With a saved token the server files the submission under the token's owner
  * and ignores any typed name, so find that owner first (#181). Returns the
  * owner, or null when it can't be known (old server, offline, nothing saved).
@@ -424,76 +600,8 @@ async function signedInOwner(token) {
   return owner.username;
 }
 
-async function main() {
-  if (QUIET) return quietSubmit();
-
-  console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
-
-  const token = getToken();
-  const signedInAs = token ? await signedInOwner(token) : null;
-  let githubUser = signedInAs ?? (await askUsername());
-
-  // Remember it: a scheduled --quiet run has no TTY to ask on.
-  try { writeConfig({ username: githubUser }); } catch { /* best effort */ }
-
-  // Check if cc.json already exists
-  let ccJsonPath = path.join(process.cwd(), 'cc.json');
-  let usingExistingFile = false;
-
-  if (fs.existsSync(ccJsonPath)) {
-    const response = await prompts({
-      type: 'confirm',
-      name: 'useExisting',
-      message: 'Found existing cc.json. Use this file?',
-      initial: true
-    });
-
-    if (!response.useExisting) {
-      // Generate new file
-      const spinner = ora('Generating usage data with ccusage...').start();
-      
-      try {
-        generateCcJson(ccJsonPath);
-        spinner.succeed('Generated cc.json successfully');
-      } catch (error) {
-        spinner.fail('Failed to generate cc.json');
-        console.error(chalk.red('Error:', error.message));
-        console.log(chalk.yellow('\nMake sure you have used a supported AI coding tool (Claude Code, Codex, Gemini CLI, …) at least once.'));
-        process.exit(1);
-      }
-    } else {
-      usingExistingFile = true;
-      console.log(chalk.green('✓ Using existing cc.json'));
-    }
-  } else {
-    // Generate new file
-    const spinner = ora('Generating usage data with ccusage...').start();
-    
-    try {
-      generateCcJson(ccJsonPath);
-      spinner.succeed('Generated cc.json successfully');
-    } catch (error) {
-      spinner.fail('Failed to generate cc.json');
-      console.error(chalk.red('Error:', error.message));
-      console.log(chalk.yellow('\nMake sure you have used a supported AI coding tool (Claude Code, Codex, Gemini CLI, …) at least once.'));
-      process.exit(1);
-    }
-  }
-
-  // Read and display summary
-  try {
-    const data = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
-    console.log('\nSummary:');
-    console.log(`  Total Cost: ${chalk.green('$' + Math.round(data.totals.totalCost))}`);
-    console.log(`  Total Tokens: ${chalk.green(data.totals.totalTokens.toLocaleString())}`);
-    console.log(`  Days Tracked: ${chalk.green(data.daily.length)}\n`);
-  } catch (error) {
-    console.error(chalk.red('Error reading cc.json:', error.message));
-    process.exit(1);
-  }
-
-  // Confirm submission
-  const confirmResponse = await prompts({
+async function confirmSubmit(githubUser, signedInAs, token) {
+  const { submit } = await prompts({
     type: 'confirm',
     name: 'submit',
     // Name only the account the server will actually file this under. With a
@@ -506,193 +614,147 @@ async function main() {
         : `Submit to Viberank as @${githubUser} (${SITE}/profile/${githubUser})?`,
     initial: true
   });
+  return Boolean(submit);
+}
 
-  if (!confirmResponse.submit) {
+async function postWithSpinner(payload, githubUser) {
+  const spinner = ora('Submitting to Viberank...').start();
+  const outcome = await postReport({
+    fetch,
+    headers: submitHeaders({ version: CLI_VERSION, machineId: getMachineId(), githubUser, token: getToken() }),
+    payload,
+    onRetry: ({ reason, attempt, delayMs }) => {
+      const what = reason === 'network' ? 'Connection failed' : 'Viberank is temporarily unavailable';
+      spinner.text = `${what}. Retrying in ${delayMs / 1000} seconds... (attempt ${attempt}/3)`;
+    },
+  });
+  if (outcome.ok) spinner.succeed('Successfully submitted to Viberank!');
+  else spinner.fail('Failed to submit to Viberank');
+  return outcome;
+}
+
+/** The error, plus what to do about it where there is something to do. */
+function explainFailure(outcome) {
+  if (outcome.error) {
+    if (networkErrorCode(outcome.error)) {
+      console.error(chalk.red('Error: Unable to connect to Viberank server'));
+      console.log(chalk.yellow('\nPlease check your internet connection and try again.'));
+    } else {
+      console.error(chalk.red('Error:', outcome.error.message));
+    }
+    return;
+  }
+  if (outcome.body === null) {
+    console.error(chalk.red(`Error: Invalid response from server (${outcome.status})`));
+    console.log(chalk.yellow('\nThe server may be experiencing issues. Please try again later.'));
+    return;
+  }
+
+  console.error(chalk.red('Error:', failureMessage(outcome)));
+  const { status } = outcome;
+  if (status === 400) {
+    console.log(chalk.yellow('\nTroubleshooting tips:'));
+    console.log(chalk.yellow(`- This CLI reads your usage with ${CCUSAGE}; make sure the CLI itself is current: npx viberank-cli@latest`));
+    console.log(chalk.yellow(`- The report it sent is at ${REPORT_FILE}`));
+  } else if (isVerifiedRefusal(outcome) && !INTERACTIVE) {
+    console.log(chalk.yellow(`\nSave a token with ${chalk.bold('npx viberank-cli login --token <token>')} (from ${SITE}/settings/tokens), then submit again.`));
+  } else if (status === 413) {
+    console.log(chalk.yellow('\nYour usage data is too large. Consider submitting data for a shorter time period.'));
+  } else if (status === 429) {
+    const wait = outcome.retryAfter != null ? `Try again in ${describeWait(outcome.retryAfter)}.` : 'Try again a little later.';
+    console.log(chalk.yellow(`\nviberank limits how often one account can submit. ${wait}`));
+  } else if (status === 503) {
+    console.log(chalk.yellow('\nThe database service is temporarily unavailable.'));
+    console.log(chalk.yellow('Please wait a few minutes and try again.'));
+  } else if (status >= 500) {
+    console.log(chalk.yellow('\nThe server is experiencing issues. Please try again in a few moments.'));
+    console.log(chalk.yellow('If this persists, please report it at: https://github.com/sculptdotfun/viberank/issues'));
+  }
+}
+
+/**
+ * Submit, recovering on the spot from the one refusal a person can fix there:
+ * a verified profile refusing an unsigned submission. Signing in fixes it, so
+ * do that inline and send the same payload again, rather than stop and make
+ * them read their usage all over again. Exits on failure.
+ */
+async function sendReport(payload, githubUser) {
+  let outcome = await postWithSpinner(payload, githubUser);
+  if (!outcome.ok && isVerifiedRefusal(outcome) && INTERACTIVE && !getToken()) {
+    console.log(chalk.yellow(`\n@${githubUser} is verified, so a submission to it has to be signed with a token.`));
+    console.log(chalk.yellow('Sign in once and this one goes through, without reading your usage again.'));
+    if (await acquireToken()) outcome = await postWithSpinner(payload, githubUser);
+  }
+  if (!outcome.ok) {
+    explainFailure(outcome);
+    process.exit(1);
+  }
+  return outcome.body;
+}
+
+/** Where you landed, and the badge, right here. This is the one moment
+ * someone is actually pleased with the tool, and it used to print a bare URL
+ * — which is why almost nobody has ever put the badge up. */
+function showResult(result) {
+  const st = result.standing;
+  if (st && st.totalDevelopers > 0) {
+    console.log(
+      `\n  ${chalk.yellow.bold(`#${st.rank}`)} of ${st.totalDevelopers.toLocaleString('en-US')} developers` +
+      `  ${chalk.gray('·')}  top ${chalk.bold(st.topPercent + '%')}` +
+      `  ${chalk.gray('·')}  ${chalk.bold(st.tier)} tier`
+    );
+  }
+  console.log(`\n  Profile: ${chalk.green(result.profileUrl)}`);
+  if (st && st.badgeMarkdown) {
+    console.log(`\n  ${chalk.gray('Badge for your README:')}`);
+    console.log(`  ${chalk.cyan(st.badgeMarkdown)}\n`);
+  } else {
+    console.log('');
+  }
+  if (result.hint) console.log(chalk.yellow(result.hint) + '\n');
+  if (result.notice) console.log(chalk.gray(result.notice) + '\n');
+}
+
+/** A submit with a person at the terminal, or an unattended one that has
+ * what it needs (see submitMode). Never prompts unless INTERACTIVE. */
+async function main() {
+  console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
+
+  const token = getToken();
+  const signedInAs = token ? await signedInOwner(token) : null;
+  if (signedInAs && ARGS.flags.user && ARGS.flags.user.toLowerCase() !== signedInAs.toLowerCase()) {
+    console.log(chalk.yellow(`The token decides the account, so this is filed under @${signedInAs}, not @${ARGS.flags.user}.`));
+  }
+  const githubUser = signedInAs ?? (await chooseUsername());
+
+  const data = await readUsage();
+  if (data.daily.length === 0) {
+    console.log();
+    for (const line of noUsageHelp()) console.log(chalk.yellow(line));
+    console.log();
+    process.exit(1);
+  }
+
+  console.log('\nSummary:');
+  console.log(`  Total Cost: ${chalk.green('$' + Math.round(data.totals.totalCost))}`);
+  console.log(`  Total Tokens: ${chalk.green(data.totals.totalTokens.toLocaleString())}`);
+  console.log(`  Days Tracked: ${chalk.green(data.daily.length)}\n`);
+
+  if (INTERACTIVE && !ARGS.flags.yes && !(await confirmSubmit(githubUser, signedInAs, token))) {
     console.log(chalk.yellow('Submission cancelled.'));
     process.exit(0);
   }
 
-  // Submit to Viberank with retry logic
-  const submitSpinner = ora('Submitting to Viberank...').start();
-  
-  let attempt = 0;
-  const maxAttempts = 3;
-  const retryDelay = 5000; // 5 seconds
-  // Held outside the retry loop so the autosubmit prompt can still describe the
-  // report after cc.json may have been cleaned up.
-  let submitted = null;
-  
-  while (attempt < maxAttempts) {
-    attempt++;
-    
-    try {
-      const ccData = JSON.parse(fs.readFileSync(ccJsonPath, 'utf8'));
-      submitted = ccData;
+  const result = await sendReport(withCorpus(data), githubUser ?? 'autosubmit');
+  // Remember the handle only once a submission has landed under it, so the
+  // next prompt's default is a name this machine really submitted as. A
+  // scheduled --quiet run also falls back to it, having no TTY to ask on.
+  try {
+    writeConfig({ lastSubmit: new Date().toISOString(), ...(githubUser ? { username: githubUser } : {}) });
+  } catch { /* best effort */ }
+  showResult(result);
 
-      // Per-month corpus size, so the server can tell a transcript the runtime
-      // rewrote from history the user deleted (#112). Best effort: a scan that
-      // fails must never block a submission.
-      try {
-        const corpus = collectCorpus();
-        if (corpus) ccData.drift = { corpus, scope: corpusScope() };
-      } catch {
-        // No corpus block; the server falls back to holding the high-water mark.
-      }
-      
-      const response = await fetch('https://www.viberank.app/api/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // The header is a claim anyone can make; the token is proof. Sending
-          // both keeps older servers working and lets a token-authenticated
-          // submission come back verified.
-          'X-GitHub-User': githubUser,
-          'X-CLI-Version': CLI_VERSION,
-          'X-Machine-Id': getMachineId(),
-          ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
-        },
-        body: JSON.stringify(ccData)
-      });
-
-      // Check if response is ok before parsing
-      if (!response.ok) {
-        let errorMessage = `Server returned ${response.status} ${response.statusText}`;
-        let requestId = null;
-        let shouldRetry = false;
-        
-        // Try to parse error details from response
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-          if (errorData.requestId) {
-            requestId = errorData.requestId;
-            errorMessage += ` (Request ID: ${errorData.requestId})`;
-          }
-          if (errorData.retryAdvice) {
-            shouldRetry = true;
-          }
-        } catch {
-          // If JSON parsing fails, use the status text
-        }
-        
-        // Handle 503 errors with retry
-        if (response.status === 503 && attempt < maxAttempts) {
-          submitSpinner.text = `Database temporarily unavailable. Retrying in ${retryDelay/1000} seconds... (attempt ${attempt}/${maxAttempts})`;
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-          continue; // Retry the submission
-        }
-        
-        submitSpinner.fail('Failed to submit to Viberank');
-        console.error(chalk.red('Error:', errorMessage));
-        
-        // Provide helpful troubleshooting tips based on status code
-        if (response.status === 400) {
-          console.log(chalk.yellow('\nTroubleshooting tips:'));
-          console.log(chalk.yellow('- Ensure you\'re using the latest version of ccusage'));
-          console.log(chalk.yellow('- Try regenerating your cc.json file: npx ccusage@latest daily --json > cc.json'));
-          console.log(chalk.yellow('- Check that your cc.json file is valid JSON'));
-        } else if (response.status === 413) {
-          console.log(chalk.yellow('\nYour usage data is too large. Consider submitting data for a shorter time period.'));
-        } else if (response.status === 503) {
-          console.log(chalk.yellow('\nThe database service is temporarily unavailable.'));
-          console.log(chalk.yellow('Please wait a few minutes and try again.'));
-          if (requestId) {
-            console.log(chalk.gray(`Request ID for support: ${requestId}`));
-          }
-        } else if (response.status >= 500) {
-          console.log(chalk.yellow('\nThe server is experiencing issues. Please try again in a few moments.'));
-          console.log(chalk.yellow('If this persists, please report it at: https://github.com/sculptdotfun/viberank/issues'));
-        }
-        
-        process.exit(1);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        submitSpinner.succeed('Successfully submitted to Viberank!');
-
-        // Where you landed, and the badge, right here. This is the one moment
-        // someone is actually pleased with the tool, and it used to print a
-        // bare URL — which is why almost nobody has ever put the badge up.
-        const st = result.standing;
-        if (st && st.totalDevelopers > 0) {
-          console.log(
-            `\n  ${chalk.yellow.bold(`#${st.rank}`)} of ${st.totalDevelopers.toLocaleString('en-US')} developers` +
-            `  ${chalk.gray('·')}  top ${chalk.bold(st.topPercent + '%')}` +
-            `  ${chalk.gray('·')}  ${chalk.bold(st.tier)} tier`
-          );
-        }
-        console.log(`\n  Profile: ${chalk.green(result.profileUrl)}`);
-        if (st && st.badgeMarkdown) {
-          console.log(`\n  ${chalk.gray('Badge for your README:')}`);
-          console.log(`  ${chalk.cyan(st.badgeMarkdown)}\n`);
-        } else {
-          console.log('');
-        }
-        if (result.hint) {
-          console.log(chalk.yellow(result.hint) + '\n');
-        }
-        if (result.notice) {
-          console.log(chalk.gray(result.notice) + '\n');
-        }
-        break; // Success, exit the retry loop
-      } else {
-        submitSpinner.fail('Failed to submit to Viberank');
-        console.error(chalk.red('Error:', result.error || 'Unknown error'));
-        
-        // Provide helpful context for common errors
-        if (result.error && result.error.includes('cc.json')) {
-          console.log(chalk.yellow('\nTry regenerating your cc.json file:'));
-          console.log(chalk.yellow('  npx ccusage@latest daily --json > cc.json'));
-        }
-        
-        process.exit(1);
-      }
-    } catch (error) {
-      // On network errors, retry if we haven't exhausted attempts
-      if ((error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') && attempt < maxAttempts) {
-        submitSpinner.text = `Connection failed. Retrying in ${retryDelay/1000} seconds... (attempt ${attempt}/${maxAttempts})`;
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        continue; // Retry the submission
-      }
-      
-      submitSpinner.fail('Failed to submit to Viberank');
-      
-      // Handle network errors specifically
-      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-        console.error(chalk.red('Error: Unable to connect to Viberank server'));
-        console.log(chalk.yellow('\nPlease check your internet connection and try again.'));
-      } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
-        console.error(chalk.red('Error: Invalid response from server'));
-        console.log(chalk.yellow('\nThe server may be experiencing issues. Please try again later.'));
-      } else {
-        console.error(chalk.red('Error:', error.message));
-      }
-      
-      process.exit(1);
-    }
-  }
-
-  // Cleanup
-  if (!usingExistingFile) {
-    const cleanupResponse = await prompts({
-      type: 'confirm',
-      name: 'cleanup',
-      message: 'Remove cc.json file?',
-      initial: false
-    });
-
-    if (cleanupResponse.cleanup) {
-      fs.unlinkSync(ccJsonPath);
-      console.log(chalk.green('✓ Cleaned up cc.json'));
-    }
-  }
-
-  await offerAutosubmit(submitted);
-
+  if (INTERACTIVE) await offerAutosubmit(data);
   console.log(chalk.green('\nDone! 🎉'));
 }
 
@@ -709,9 +771,17 @@ async function main() {
  * something to spring on anyone, least of all this audience.
  */
 async function offerAutosubmit(ccData) {
-  if (QUIET) return;                        // scheduled run; nobody to ask
+  if (!INTERACTIVE) return;                 // nobody to ask
   if (!autosubmit.platform()) return;       // no scheduler we can drive
-  if (autosubmit.status().enabled) return;  // already on
+  if (autosubmit.isEnabled()) {
+    // Already on, but a job from before 1.13 cannot start, and cannot fix
+    // itself either. This is the moment its owner is here to hear it.
+    if (autosubmit.status().outdated) {
+      console.log(chalk.yellow('\nYour daily autosubmit job was set up by an older version and cannot find node.'));
+      console.log(chalk.yellow(`Run ${chalk.bold('npx viberank-cli autosubmit')} once to repair it.`));
+    }
+    return;
+  }
 
   // The pitch used to be about keeping a rank fresh. That is the vanity reason
   // and it converts badly — 62 of ~1,100 people have ever sent a second report.
@@ -737,35 +807,65 @@ async function offerAutosubmit(ccData) {
   // A scheduled run can't open a browser, so it needs a token first. Offer to
   // do it here rather than printing two commands to run later: they just said
   // yes, and sending them away to read instructions is where that yes is lost.
-  if (!getToken() && !(await acquireToken())) {
+  if (!getSavedToken() && !(await acquireToken())) {
     console.log(chalk.gray(`Turn it on any time with ${chalk.bold('npx viberank-cli autosubmit')}.\n`));
     return;
   }
 
-  try {
-    const result = autosubmit.enable(9);
-    console.log(
-      chalk.green(
-        `\n✓ Submitting daily at ${String(result.hour).padStart(2, '0')}:00 via ${result.scheduler}.`
-      )
-    );
-    console.log(chalk.gray('  Stop any time with `npx viberank-cli autosubmit off`.'));
+  if (enableAutosubmit(9)) {
     // We back the history up; we can also tell them how to stop losing it in
     // the first place. Costs nothing and is the more useful half of the advice.
     console.log(chalk.gray(`  ${keepLocalHistoryHint()}`));
-  } catch (error) {
-    console.log(chalk.yellow(`\nCould not schedule automatic submission: ${error.message}`));
+  } else {
     console.log(chalk.gray('Run `npx viberank-cli autosubmit` to try again.'));
   }
 }
 
-const [command, arg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+async function submitCommand() {
+  if (QUIET) return quietSubmit();
+  if (ARGS.flags.user && !looksLikeGithubHandle(ARGS.flags.user)) {
+    console.error(chalk.red(`"${ARGS.flags.user}" is not a valid GitHub username (1-39 letters, digits, single hyphens).`));
+    process.exit(1);
+  }
+  const mode = submitMode({
+    quiet: QUIET,
+    interactive: INTERACTIVE,
+    hasToken: Boolean(getToken()),
+    user: ARGS.flags.user,
+    yes: ARGS.flags.yes,
+  });
+  if (mode === 'blocked') {
+    const [first, ...rest] = blockedMessage();
+    console.error(chalk.yellow(`\n${first}`));
+    for (const line of rest) console.error(line);
+    console.error();
+    process.exit(1);
+  }
+  return main();
+}
 
 const run = async () => {
-  switch (command) {
+  // Global fetch arrived in Node 18. Without it every network call would
+  // fail with "fetch is not defined", which says nothing about the fix.
+  if (typeof fetch !== 'function') {
+    throw new Error(`viberank-cli needs Node.js 18 or newer; this is ${process.version}.`);
+  }
+
+  // Read before anything else. These used to be filtered out with every
+  // other `--` argument, so `--help` started a submission.
+  if (ARGS.flags.version) return console.log(CLI_VERSION);
+  if (ARGS.flags.help || ARGS.command === 'help') return help();
+  if (ARGS.unknown.length || ARGS.missing.length) {
+    for (const name of ARGS.unknown) console.error(chalk.red(`Unknown option: ${name}`));
+    for (const name of ARGS.missing) console.error(chalk.red(`${name} needs a value`));
+    console.error(`Run ${chalk.bold('npx viberank-cli --help')} for every command and option.`);
+    process.exit(1);
+  }
+
+  switch (ARGS.command) {
     case undefined:
     case 'submit':
-      return main();
+      return submitCommand();
     case 'login':
       return login();
     case 'logout':
@@ -773,22 +873,19 @@ const run = async () => {
     case 'status':
       return showStatus();
     case 'autosubmit':
-      return autosubmitCommand(arg);
-    case 'help':
-    case '--help':
-    case '-h':
-      return help();
+      return autosubmitCommand(ARGS.arg);
     default:
-      console.error(chalk.red(`Unknown command: ${command}`));
+      console.error(chalk.red(`Unknown command: ${ARGS.command}`));
       help();
       process.exit(1);
   }
 };
 
 run().catch(error => {
-  // A scheduled run logs to a file nobody watches, so stamp it — an
-  // undated stack trace is close to useless when it turns up weeks later.
-  const stamp = QUIET ? `[${new Date().toISOString()}] ` : '';
-  console.error(chalk.red(`${stamp}Unexpected error: ${error.message}`));
+  // A scheduled run logs to a file nobody watches, so it goes there as a
+  // dated line like every other outcome; an undated stack trace is close to
+  // useless when it turns up weeks later.
+  if (QUIET) logRun({ outcome: 'fail', detail: `unexpected error: ${error.message}` });
+  else console.error(chalk.red(`Unexpected error: ${error.message}`));
   process.exit(1);
 });
