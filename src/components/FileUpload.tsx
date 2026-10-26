@@ -12,6 +12,7 @@ import { formatNumber, formatCurrency } from "@/lib/utils";
 import { useSubmit } from "@/lib/data/hooks/useSubmissions";
 import { autosubmitCommandCopied } from "@/lib/analytics";
 import { AUTOSUBMIT_COMMAND, CCUSAGE_EXPORT_COMMAND } from "@/lib/commands";
+import CommandText from "./CommandText";
 import type { ModelBreakdown, SubmitResponse } from "@/lib/data/types";
 
 interface CCData {
@@ -116,7 +117,7 @@ function SubmitSuccess({ result, username }: { result: SubmitResponse; username:
         aria-label={`Copy ${AUTOSUBMIT_COMMAND}`}
         className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 mt-1.5 border border-border hover:border-accent/50 transition-colors text-left"
       >
-        <code className="text-xs font-mono text-accent min-w-0">{AUTOSUBMIT_COMMAND}</code>
+        <code className="text-xs font-mono text-accent min-w-0"><CommandText command={AUTOSUBMIT_COMMAND} /></code>
         {copied ? <Check className="w-4 h-4 text-success flex-shrink-0" /> : <Copy className="w-3.5 h-3.5 text-muted flex-shrink-0" />}
       </button>
     </motion.div>
@@ -197,7 +198,7 @@ export default function FileUpload() {
 
   const howToMakeFile = (
     <p className="text-[11px] text-muted mt-2 leading-relaxed">
-      Make the file with <code className="font-mono text-foreground/80 break-words">{CCUSAGE_EXPORT_COMMAND}</code>
+      Make the file with <code className="font-mono text-foreground/80"><CommandText command={CCUSAGE_EXPORT_COMMAND} /></code>
     </p>
   );
 
