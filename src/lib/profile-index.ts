@@ -33,3 +33,38 @@ export function profileHandle(profile: { githubUsername?: string | null; usernam
 export function isIndexableProfile(profile: { handle: string; submissionCount: number }): boolean {
   return profile.submissionCount > 0 && isGithubHandle(profile.handle);
 }
+
+export interface ProfileRow {
+  username: string;
+  githubUsername: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * The sitemap's profile list: the rows isIndexableProfile accepts, counting
+ * submissions the way the page finds them (by username, case aside), one
+ * entry per handle whatever its casing. Order is kept, so pass rows newest
+ * first and the newest casing wins.
+ */
+export function indexableProfiles(
+  profiles: ProfileRow[],
+  submissionUsernames: string[]
+): { handle: string; updatedAt: string | null }[] {
+  const submissionCounts = new Map<string, number>();
+  for (const name of submissionUsernames) {
+    const key = name.toLowerCase();
+    submissionCounts.set(key, (submissionCounts.get(key) ?? 0) + 1);
+  }
+
+  const seen = new Set<string>();
+  const out: { handle: string; updatedAt: string | null }[] = [];
+  for (const row of profiles) {
+    const handle = profileHandle(row);
+    const submissionCount = submissionCounts.get(row.username.toLowerCase()) ?? 0;
+    if (!isIndexableProfile({ handle, submissionCount })) continue;
+    if (seen.has(handle.toLowerCase())) continue;
+    seen.add(handle.toLowerCase());
+    out.push({ handle, updatedAt: row.updatedAt });
+  }
+  return out;
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { computeStreaks } from "@/lib/streaks";
 import { formatTokensCompact } from "@/lib/utils";
+import { isGithubHandle, isIndexableProfile, profileHandle } from "@/lib/profile-index";
 import { getProfileCached } from "./getProfile";
 
 interface ProfileParams {
@@ -25,6 +26,14 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
         robots: { index: false, follow: true },
       };
     }
+
+    // The sitemap applies the same rule, so it never lists a page that asks
+    // not to be indexed. A real profile under a handle GitHub couldn't have
+    // ("Kevin Foster") still gets its share card, just not a search listing.
+    const indexable = isIndexableProfile({
+      handle: profileHandle(profile),
+      submissionCount: profile.submissions.length,
+    });
 
     const display = profile.githubName || profile.githubUsername || profile.username;
     const totalCost = profile.submissions.reduce((acc, s) => acc + s.totalCost, 0);
@@ -129,6 +138,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
         description,
         images: [ogImage],
       },
+      ...(indexable ? {} : { robots: { index: false, follow: true } }),
     };
   } catch {
     return {
@@ -180,7 +190,7 @@ export default async function ProfileLayout({
           "@type": "Person",
           "name": display,
           "identifier": profile.githubUsername || profile.username,
-          "sameAs": profile.githubUsername
+          "sameAs": isGithubHandle(profile.githubUsername)
             ? [`https://github.com/${profile.githubUsername}`]
             : undefined,
           "description": `AI coding user, ${profile.totalSubmissions} submission${profile.totalSubmissions === 1 ? "" : "s"} totaling $${totalCost.toFixed(0)} of API-equivalent usage on Viberank.`,
