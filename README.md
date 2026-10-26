@@ -21,7 +21,7 @@ Live at **[viberank.app](https://www.viberank.app)**.
 - 📊 **Profile pages** at `viberank.app/profile/{username}` — global rank, daily charts, token breakdown, tools used
 - ⚡ **Server-rendered** — homepage, profiles, and tool boards are SSR'd with structured data (FAQPage, ProfilePage, BreadcrumbList) for fast paint and full crawlability
 - 🚀 **Four ways to submit**: `npx viberank-cli`, plain `curl`, signed-in web upload, or MCP
-- ♾️ **Autosubmit** — `viberank login` once, `viberank autosubmit` once, and your usage keeps arriving daily. Claude Code deletes session transcripts after 30 days by default, so this is the difference between a permanent record and whatever survived the last cleanup
+- ♾️ **Autosubmit** — `viberank login` once, `viberank autosubmit` once, and your usage keeps arriving daily; `viberank status` says whether it is working. Claude Code deletes session transcripts after 30 days by default, so this is the difference between a permanent record and whatever survived the last cleanup
 - 🔐 **GitHub OAuth + API tokens** — OAuth and token submissions show a blue check; header-only CLI submissions show a `cli` pill
 - 🖥️ **Multi-machine** — a laptop and a desktop sum into one profile instead of overwriting each other
 - 📈 **[`/stats`](https://www.viberank.app/stats)** — site-wide spend curve, monthly trend, and where your burn lands against everyone else
@@ -40,18 +40,28 @@ Live at **[viberank.app](https://www.viberank.app)**.
 npx viberank-cli
 ```
 
-This generates a fresh `cc.json` via `ccusage daily --json` (the aggregate report across **all** your detected tools) and POSTs it to `/api/submit`. It reads your GitHub username from your git remote and asks you to confirm it. If there is no GitHub remote it shows what `git config user.name` says but makes you type the handle yourself — that value is usually a display name, and accepting it silently created profiles belonging to nobody (#141).
+It needs Node.js 18 or newer.
+
+This runs `ccusage@20 daily --json` (the aggregate report across **all** your detected tools), writes the report to `~/.viberank/cc.json` rather than your current folder, and POSTs it to `/api/submit`. It reads your GitHub username from your git remote and asks you to confirm it. If there is no GitHub remote it shows what `git config user.name` says but makes you type the handle yourself — that value is usually a display name, and accepting it silently created profiles belonging to nobody (#141). If ccusage finds no usage at all, nothing is submitted and the CLI says where ccusage looked.
+
+**Without a terminal** (an agent's shell, CI), the CLI never prompts. It submits when it has a token (`npx viberank-cli login --token vbr_…`, or `VIBERANK_TOKEN`), or with `npx viberank-cli --user <github-handle> --yes` as an unverified submission; otherwise it says which of those to use. `npx viberank-cli --help` lists every command and option.
 
 **Set it and forget it.** A one-off submission captures only what survives on disk today, and freezes your rank there. Mint a token at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), then:
 
 ```bash
-npx viberank-cli login       # paste the token once
+npx viberank-cli login       # paste the token once (or: login --token vbr_…)
 npx viberank-cli autosubmit  # daily background submission
 ```
 
+`autosubmit` without a saved token walks you through `login` first. A scheduled job cannot see `VIBERANK_TOKEN`, so it needs the saved one.
+
 Claude Code deletes session transcripts older than `cleanupPeriodDays` — 30 by default — on startup, with no warning. Every tool that reads `~/.claude/projects` loses that history at the same moment; what has already been submitted here does not. Submitting daily is what makes the record outlive the local files. (Raising `cleanupPeriodDays` in `~/.claude/settings.json` stops the deletion at the source.)
 
-`autosubmit` registers with your platform's own scheduler — launchd, systemd user timers, or Task Scheduler — rather than running a daemon of its own, so it survives reboots and catches up after a missed run. `npx viberank-cli status` shows the token and schedule state; `autosubmit off` removes it. Token submissions are verified, so they carry a blue check without a browser sign-in.
+`autosubmit` registers with your platform's own scheduler — launchd, systemd user timers, or Task Scheduler — rather than running a daemon of its own, so it survives reboots and catches up after a missed run. It runs at the hour you pick (9 by default) and a minute fixed per machine, so submissions spread across the hour. If the scheduler refuses the job (WSL without systemd, say), nothing is left half-installed and you see the scheduler's own error. Every run writes one dated line to `~/.viberank/autosubmit.log`.
+
+`npx viberank-cli status` shows whose token it is (or that it was revoked), the schedule and the scheduler's last exit code, the last successful submission and how long ago, a warning after 48 hours without one, and the recent log lines. `autosubmit off` removes the job, and `logout` removes it along with the token. Token submissions are verified, so they carry a blue check without a browser sign-in.
+
+> **Turned autosubmit on before 1.13?** Run `npx viberank-cli autosubmit` once. Older jobs started without a PATH, could not find node, and never submitted; a job that cannot start cannot update itself either.
 
 ### Option 2: curl
 

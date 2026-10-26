@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -59,14 +59,91 @@ export function resolveNpxArgv(env = {}) {
 const quote = (arg) => (/[\s"^&|<>]/.test(arg) ? `"${arg.replace(/"/g, '""')}"` : arg);
 
 /**
- * Run `npx <args>` synchronously, returning stdout.
- * @param {string[]} args
- * @param {import('child_process').ExecFileSyncOptions} options
+ * `env` with the running node's directory first on PATH.
+ *
+ * npx starts ccusage, and a scheduler starts viberank itself, through bins
+ * whose `#!/usr/bin/env node` line needs a node on PATH. A scheduled job may
+ * have none, which is how every launchd run ended in exit 127. Windows spells
+ * the variable `Path`, so the lookup ignores case: adding a second `PATH`
+ * beside it would leave the platform to pick one.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @param {string} execPath
+ * @param {string} [platform]
  */
-export function runNpx(args, options = {}) {
+export function withNodeOnPath(env, execPath, platform = process.platform) {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const separator = platform === 'win32' ? ';' : ':';
+  const key = Object.keys(env).find((name) => name.toUpperCase() === 'PATH') ?? 'PATH';
+  const dir = p.dirname(execPath);
+  const rest = (env[key] ?? '').split(separator).filter((entry) => entry && entry !== dir);
+  return { ...env, [key]: [dir, ...rest].join(separator) };
+}
+
+/** The last few lines of a child's stderr: the error, not the whole log. */
+function tail(text, lines = 6) {
+  return text.trim().split(/\r?\n/).slice(-lines).join('\n');
+}
+
+/**
+ * Run `npx <args>` without blocking the event loop, resolving with
+ * `{ stdout, stderr }`.
+ *
+ * Asynchronous so a spinner can keep turning: ccusage reads every transcript
+ * on the machine and takes 15-25 s, and the synchronous call this replaced
+ * froze the terminal for all of it. Rejects with an Error carrying `stderr`,
+ * `exitCode` and `timedOut`, so a caller can tell a refused flag from a hang.
+ *
+ * @param {string[]} args
+ * @param {{ timeoutMs?: number, maxBuffer?: number }} [options]
+ * @returns {Promise<{ stdout: string, stderr: string }>}
+ */
+export function runNpx(args, { timeoutMs = 0, maxBuffer = 256 * 1024 * 1024 } = {}) {
   const { argv, shell } = resolveNpxArgv();
   const [command, ...prefix] = argv;
   const full = [...prefix, ...args];
-  if (!shell) return execFileSync(command, full, { windowsHide: true, ...options });
-  return execFileSync(quote(command), full.map(quote), { windowsHide: true, ...options, shell: true });
+  const options = { windowsHide: true, env: withNodeOnPath(process.env, process.execPath) };
+  const child = shell
+    ? spawn(quote(command), full.map(quote), { ...options, shell: true })
+    : spawn(command, full, options);
+
+  return new Promise((resolve, reject) => {
+    const stdout = [];
+    const stderr = [];
+    let size = 0;
+    let stopped = null;
+    const stop = (reason) => {
+      stopped = reason;
+      child.kill();
+    };
+    const timer = timeoutMs ? setTimeout(() => stop('timeout'), timeoutMs) : null;
+
+    child.stdout.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > maxBuffer) stop('overflow');
+      else stdout.push(chunk);
+    });
+    // stderr is only ever shown as a tail, so there is no point keeping it all.
+    child.stderr.on('data', (chunk) => {
+      stderr.push(chunk);
+      if (stderr.length > 64) stderr.shift();
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (exitCode) => {
+      clearTimeout(timer);
+      const out = Buffer.concat(stdout).toString('utf8');
+      const err = Buffer.concat(stderr).toString('utf8');
+      if (exitCode === 0 && !stopped) return resolve({ stdout: out, stderr: err });
+
+      const message = stopped === 'timeout' ? `timed out after ${Math.round(timeoutMs / 1000)} s`
+        : stopped === 'overflow' ? `printed more than ${Math.round(maxBuffer / 1024 / 1024)} MB`
+        : tail(err) || `exited with code ${exitCode}`;
+      const error = new Error(message);
+      Object.assign(error, { stderr: err, exitCode, timedOut: stopped === 'timeout' });
+      reject(error);
+    });
+  });
 }

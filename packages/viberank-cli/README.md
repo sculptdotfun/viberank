@@ -11,9 +11,24 @@ npx viberank-cli
 ```
 
 This will:
-1. Generate your usage data with `ccusage daily --json` (aggregated across **all** AI coding tools detected on your machine)
+1. Generate your usage data with `ccusage@20 daily --json` (aggregated across **all** AI coding tools detected on your machine), saved to `~/.viberank/cc.json` rather than your current folder
 2. Submit it to the viberank leaderboard
 3. Give you a link to your profile
+
+If ccusage finds no usage at all, nothing is submitted, and the CLI says where ccusage looked and the usual reasons it came back empty (a different machine, WSL versus Windows, a custom config folder).
+
+### Without a terminal
+
+In an agent's shell, CI or a pipe, the CLI never prompts. It submits when it has a token, or when you name the account and confirm up front:
+
+```bash
+npx viberank-cli login --token vbr_…          # once; or set VIBERANK_TOKEN
+npx viberank-cli                              # then submits, verified
+
+npx viberank-cli --user your-github-handle --yes   # unverified, no token
+```
+
+With neither, it prints those options and exits without submitting.
 
 ## Stay on the board
 
@@ -32,16 +47,31 @@ To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `
 
 `autosubmit` registers with your operating system's own scheduler — **launchd** on macOS, a **systemd user timer** on Linux, **Task Scheduler** on Windows — instead of running a daemon of its own. Those already survive reboots, catch up after a missed run, and write logs; a node process sitting in your tray to fire once a day would be a worse version of software you already have.
 
+It runs at the hour you choose (9 by default) and at a minute fixed per machine, so not everyone submits at once. Without a saved token it walks you through `login` first; a scheduled job cannot see `VIBERANK_TOKEN`, so it needs the saved one. If the scheduler refuses the job, nothing is left half-installed and you see the scheduler's own error. Every scheduled run writes one dated line to `~/.viberank/autosubmit.log` (kept to the last 200).
+
+`npx viberank-cli status` tells you whether it is working: whose token it is, or that it was revoked; the schedule and the scheduler's last exit code; the last successful submission and how long ago, with a warning after 48 hours without one; and the recent log lines.
+
+> **Turned autosubmit on before 1.13?** Run `npx viberank-cli autosubmit` once. Older jobs started without a PATH, so they could not find node and never submitted, and a job that cannot start cannot update itself.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `npx viberank-cli` | Submit now, interactively |
-| `npx viberank-cli login` | Save an API token |
-| `npx viberank-cli logout` | Forget the saved token |
+| `npx viberank-cli` | Submit now (interactively when there is a terminal) |
+| `npx viberank-cli login` | Save an API token: paste it, or pass `--token vbr_…` |
+| `npx viberank-cli logout` | Forget the saved token, and turn autosubmit off |
 | `npx viberank-cli autosubmit` | Submit once a day in the background |
 | `npx viberank-cli autosubmit off` | Stop submitting automatically |
-| `npx viberank-cli status` | Show token and schedule state |
+| `npx viberank-cli status` | Token, schedule, last submission and recent runs |
+| `npx viberank-cli --help` | Every command and option |
+
+| Option | What it does |
+|---|---|
+| `--user <handle>` | GitHub handle to submit as, when there is no token |
+| `-y`, `--yes` | Submit without asking for confirmation |
+| `--token <token>` | With `login`: the token to save, without a prompt |
+| `--quiet` | Scheduled mode: no prompts, one line per run in the log |
+| `-v`, `--version` | Print the version |
 
 ### Global install (optional)
 
@@ -52,7 +82,7 @@ viberank
 
 ## Prerequisites
 
-- Node.js 14 or higher
+- Node.js 18 or higher
 - You've used at least one supported AI coding tool (Claude Code, Codex, Gemini CLI, …)
 - Either an API token (`viberank login`), or git configured with your GitHub username
 
@@ -76,17 +106,12 @@ Your totals also never silently drop: if a re-submission reports less than that 
 
 ## Manual usage
 
-Generate the data yourself first if you prefer:
+The CLI always generates a fresh report, so a stale one is never what gets sent; it no longer picks up a `cc.json` in the current folder. To send a report you made yourself, upload it on the site or post it directly:
 
 ```bash
 # Generate usage data across all detected tools
-npx ccusage@latest daily --json > cc.json
-
-# Submit it
-npx viberank-cli
+npx ccusage@20 daily --json --by-agent > cc.json
 ```
-
-The CLI detects the existing `cc.json` and asks whether to use it.
 
 ## Direct API usage
 
@@ -112,11 +137,14 @@ Without one, the username prompt pre-fills the handle this machine last submitte
 ## Troubleshooting
 
 - **"npx viberank-cli" not found** — try `npx viberank-cli@latest` or clear the npx cache with `npx clear-npx-cache`
-- **"Failed to submit data"** — regenerate with `npx ccusage@latest daily --json > cc.json` and retry
+- **"Failed to submit data"** — the report that was sent is in `~/.viberank/cc.json`; make sure you are on the latest CLI (`npx viberank-cli@latest`) and retry
 - **"GitHub username not found"** — just type it at the prompt. The CLI no longer pre-fills `git config user.name`, because that is usually a display name and accepting it created profiles belonging to nobody (#141)
-- **"No usage data"** — make sure you've used a supported AI coding tool at least once on this machine
-- **Autosubmit isn't firing** — `npx viberank-cli status` prints the schedule state and the last few log lines from `~/.viberank/autosubmit.log`
-- **"@you is verified, so submissions to it need to be signed"** — your profile is verified and this run had no token. Run `npx viberank-cli login`, then submit again
+- **"ccusage found no usage"** — the CLI lists where ccusage looked. Run it on the machine (or the side of WSL) where you use your AI coding tools, or point `CLAUDE_CONFIG_DIR` / `CODEX_HOME` at a custom folder
+- **"There is no terminal here to ask questions in"** — see [Without a terminal](#without-a-terminal)
+- **Autosubmit isn't firing** — `npx viberank-cli status` shows the scheduler's last exit code, the last successful submission, and the last few lines of `~/.viberank/autosubmit.log`. Exit code 127 means the job could not find node: run `npx viberank-cli autosubmit` once to rewrite it
+- **WSL: "systemctl --user daemon-reload failed"** — WSL runs without systemd unless `[boot] systemd=true` is set in `/etc/wsl.conf` (then `wsl --shutdown`). Or run `npx viberank-cli submit --quiet` from cron
+- **"Rate limit exceeded"** — the server limits how often one account can submit; the CLI says how long to wait, and a scheduled run sits out a wait of up to ten minutes by itself
+- **"@you is verified, so submissions to it need to be signed"** — your profile is verified and this run had no token. In a terminal the CLI offers to sign you in and resends the same report; elsewhere, run `npx viberank-cli login --token vbr_…`, then submit again
 - **"Cost per token ratio is unrealistic"** — the report claims more tokens than its cost could buy at those models' prices. Regenerate with the latest `ccusage`; if it still fails with honest data from a cheap model, open an issue with the model names
 - **"Invalid token"** — it may have been revoked; mint a fresh one at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens) and run `login` again
 
