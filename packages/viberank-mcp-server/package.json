@@ -2,6 +2,7 @@
   "name": "viberank-mcp",
   "version": "1.2.0",
   "description": "MCP server for viberank: submit your AI coding usage (Claude Code, Codex, Gemini CLI and more) and read the leaderboard",
+  "mcpName": "io.github.sculptdotfun/viberank",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
