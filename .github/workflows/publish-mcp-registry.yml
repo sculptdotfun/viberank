@@ -1,0 +1,45 @@
+# Publishes packages/viberank-mcp-server/server.json to the official MCP registry
+# (https://registry.modelcontextprotocol.io) as io.github.sculptdotfun/viberank.
+#
+# It runs in Actions because the registry only lets an org namespace be
+# published by an org Owner whose credential can read org roles. The
+# interactive `mcp-publisher login github` flow cannot, while GitHub's OIDC
+# token for a workflow in this repo proves the namespace with no stored secret.
+#
+# Run it by hand after publishing a new viberank-mcp version to npm: the
+# registry checks that the npm package's `mcpName` matches server.json.
+name: Publish MCP server to the registry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/viberank-mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to a release and checked against its published checksum, so a
+      # new publisher release never changes what this job runs unannounced.
+      - name: Install mcp-publisher 1.8.4
+        run: |
+          curl -fsSL -o mcp-publisher.tar.gz \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.4/mcp-publisher_linux_amd64.tar.gz
+          echo "5dc2fd415369c73551259f31cd33e2aacc9e0d1021e7f08fef1492d93b781628  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+
+      - name: Validate server.json
+        run: ./mcp-publisher validate
+
+      - name: Log in with the workflow's OIDC token
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        run: ./mcp-publisher publish
