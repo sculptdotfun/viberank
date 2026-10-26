@@ -15,7 +15,7 @@ import { useCheckClaimableSubmissions, useClaimAndMergeSubmissions } from "@/lib
 import { formatNumber } from "@/lib/utils";
 import { TIERS } from "@/lib/tiers";
 import { TAKO_URL } from "@/lib/sponsor";
-import { takoClicked } from "@/lib/analytics";
+import { takoClicked, cliCommandCopied, type CopySource } from "@/lib/analytics";
 import { HOME_FAQS } from "@/lib/home-faqs";
 import type { Submission, GlobalStats } from "@/lib/data/types";
 
@@ -74,8 +74,9 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
   );
   const { mutate: claimAndMerge } = useClaimAndMergeSubmissions();
 
-  const copyCommand = () => {
+  const copyCommand = (source: CopySource) => {
     navigator.clipboard.writeText("npx viberank-cli");
+    cliCommandCopied(source);
     setCopiedToClipboard(true);
     setTimeout(() => setCopiedToClipboard(false), 2000);
   };
@@ -162,7 +163,7 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
               {/* CTA — mobile/tablet only; the sidebar card covers desktop */}
               <div className="flex flex-wrap items-center gap-3 mt-6 lg:hidden">
                 <button
-                  onClick={copyCommand}
+                  onClick={() => copyCommand("hero")}
                   className="group flex items-center gap-3 rounded-lg bg-surface-1 border border-border hover:border-accent/50 px-4 py-3 transition-colors"
                 >
                   <Terminal className="w-4 h-4 text-muted" />
@@ -195,7 +196,7 @@ export default function HomeClient({ initialItems, initialStats, initialHasMore 
             <div className="rounded-lg border border-border bg-surface-1 p-4">
               <div className="micro-label mb-3">Get on the board</div>
               <button
-                onClick={copyCommand}
+                onClick={() => copyCommand("sidebar")}
                 className="group w-full flex items-center justify-between gap-2 rounded-md bg-background border border-border hover:border-accent/50 px-3 py-2.5 transition-colors"
               >
                 <span className="flex items-center gap-2 min-w-0">

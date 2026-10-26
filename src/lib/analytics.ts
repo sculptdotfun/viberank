@@ -35,11 +35,20 @@ function emit(event: string, props?: Props) {
 /** Submit modal opened. `from` distinguishes nav, empty state, post-search CTA. */
 export const submitOpened = (from: string) => emit("submit_opened", { from });
 
-/** `npx viberank-cli` copied — the CLI path's intent signal. */
-export const cliCommandCopied = () => emit("cli_command_copied");
+/**
+ * Which copy button was pressed. Only the modal's fired before, so the hero
+ * and sidebar buttons, the first ones most visitors see, were invisible.
+ */
+export type CopySource = "hero" | "sidebar" | "profile" | "profile_not_found" | "modal" | "upload_success";
 
-/** `npx viberank-cli autosubmit` copied — the retention intent signal. */
-export const autosubmitCommandCopied = () => emit("autosubmit_command_copied");
+/** `npx viberank-cli` copied — the CLI path's intent signal. */
+export const cliCommandCopied = (source: CopySource) => emit("cli_command_copied", { source });
+
+/** `npx viberank-cli login && … autosubmit` copied — the retention intent signal. */
+export const autosubmitCommandCopied = (source: CopySource) => emit("autosubmit_command_copied", { source });
+
+/** The `claude mcp add … viberank-mcp` line copied — the agent path's intent signal. */
+export const mcpCommandCopied = (source: CopySource) => emit("mcp_command_copied", { source });
 
 /** Landed on the token page, i.e. started enabling autosubmit for real. */
 export const tokenPageViewed = (from: string) => emit("token_page_viewed", { from });
