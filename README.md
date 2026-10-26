@@ -89,11 +89,33 @@ Web uploads come back with a verified badge automatically. CLI submissions are v
 
 ### Option 4: MCP server
 
-If you use an MCP-compatible client, [`viberank-mcp`](https://www.npmjs.com/package/viberank-mcp) ([source](./packages/viberank-mcp-server)) exposes submit and lookup tools:
+[`viberank-mcp`](https://www.npmjs.com/package/viberank-mcp) ([source](./packages/viberank-mcp-server)) lets your agent read your usage, submit it, and look up the leaderboard, profiles and site stats. In Claude Code:
 
 ```bash
-npx viberank-mcp
+claude mcp add --scope user viberank -- npx -y viberank-mcp
 ```
+
+With an API token from [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), submissions are verified and filed under the token's account, with no username to confirm:
+
+```bash
+claude mcp add --scope user viberank --env VIBERANK_TOKEN=vbr_… -- npx -y viberank-mcp
+```
+
+Without a token, the agent has to confirm your GitHub username with you before it submits. On native Windows, use `-- cmd /c npx -y viberank-mcp`. For Claude Desktop, add this to `claude_desktop_config.json` (on Windows, `"command": "cmd"` with `"args": ["/c", "npx", "-y", "viberank-mcp"]`):
+
+```json
+{
+  "mcpServers": {
+    "viberank": {
+      "command": "npx",
+      "args": ["-y", "viberank-mcp"],
+      "env": { "VIBERANK_TOKEN": "vbr_…" }
+    }
+  }
+}
+```
+
+Other MCP clients can run `npx -y viberank-mcp` as a stdio server. The [package README](./packages/viberank-mcp-server#readme) lists the tools.
 
 ## Data validation
 
