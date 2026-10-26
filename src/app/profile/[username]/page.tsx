@@ -358,6 +358,16 @@ export default async function ProfilePage({ params }: ProfileParams) {
             </div>
           </div>
 
+          {/* Most visitors arrive from a shared link and aren't on the board
+              yet; this is their way on, placed before the long Workflow
+              section so a phone reaches it without scrolling past nine
+              tiles. The owner doesn't see it. */}
+          <div className="mt-3">
+            <CliCta title="Where do you rank?" source="profile" hideFor={handle}>
+              One command ranks your Claude Code, Codex, Gemini and more. Only totals leave your machine.
+            </CliCta>
+          </div>
+
           {workInsights.activeDays >= 3 && workTiles.length > 0 && (
             <section className="mt-6" aria-labelledby="work-insights-heading">
               <h2 id="work-insights-heading" className="text-base font-medium mb-3 flex items-center gap-2">
@@ -408,14 +418,6 @@ export default async function ProfilePage({ params }: ProfileParams) {
                 </span>
               )}
             </div>
-          </div>
-
-          {/* Most visitors arrive from a shared link and aren't on the board
-              yet; this is their way on. The owner doesn't see it. */}
-          <div className="mt-3">
-            <CliCta title="Where do you rank?" source="profile" hideFor={handle}>
-              One command ranks your Claude Code, Codex, Gemini and more. Only totals leave your machine.
-            </CliCta>
           </div>
         </div>
 
