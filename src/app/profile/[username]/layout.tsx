@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { computeStreaks } from "@/lib/streaks";
+import { formatTokensCompact } from "@/lib/utils";
 import { getProfileCached } from "./getProfile";
 
 interface ProfileParams {
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     const display = profile.githubName || profile.githubUsername || profile.username;
     const totalCost = profile.submissions.reduce((acc, s) => acc + s.totalCost, 0);
     const totalTokens = profile.submissions.reduce((acc, s) => acc + s.totalTokens, 0);
-    const tokensB = totalTokens >= 1e9 ? `${(totalTokens / 1e9).toFixed(1)}B` : `${(totalTokens / 1e6).toFixed(0)}M`;
+    const tokensCompact = formatTokensCompact(totalTokens);
     const cost = `$${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
     // Build the tool list from the profile's actual usage (Claude sorts first),
@@ -47,7 +48,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       tools.length === 0 ? "AI coding tools" : tools.map(cap).join(", ");
 
     const title = `${display} — ${cost} API-equivalent on ${toolsShort} | Viberank`;
-    const description = `${display} has logged ${cost} of API-equivalent usage across ${tokensB} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
+    const description = `${display} has logged ${cost} of API-equivalent usage across ${tokensCompact} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
     const canonical = `https://www.viberank.app/profile/${encodeURIComponent(profile.username)}`;
 
     // Rich share card: avatar, rank, tier, cost, tokens. Rank and tier match
@@ -96,7 +97,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       type: "profile",
       username: profile.githubUsername || profile.username,
       cost: String(Math.round(bestCost)),
-      tokens: tokensB,
+      tokens: tokensCompact,
     });
     if (rank) ogParams.set("rank", String(rank));
     if (avatar) ogParams.set("avatar", avatar);
