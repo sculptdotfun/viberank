@@ -1,5 +1,61 @@
 # Changelog
 
+## CLI 1.13.0, MCP 1.2.0 and the site — submissions that keep arriving (October 2026)
+
+### Fixed
+- **Autosubmit could not start on macOS** (CLI 1.13.0).
+  - launchd starts a job with almost no PATH, so every scheduled run exited 127 before the CLI ran, while `status` still said "on". The same happened on Linux with nvm, fnm or volta.
+  - The plist and the systemd service now carry an explicit PATH and a stable node path (not the versioned Homebrew Cellar path an upgrade deletes), and systemd arguments are quoted.
+  - Windows runs a small `~/.viberank/autosubmit.cmd` that sets PATH.
+  - A scheduler that refuses the job leaves nothing half-installed and shows its own error.
+  - **Anyone who turned autosubmit on before 1.13 must run `npx viberank-cli autosubmit` once.** The old job cannot start, so it cannot update itself. The server now says so in the submit response to token users on older CLIs.
+- **A second machine lost its usage every day.** The limit was one submission an hour per username, and every machine was scheduled for 09:00.
+  - Signed-in submissions now get one slot an hour per machine, under a ceiling of six per username. Web uploads have their own slot.
+  - 429s carry `Retry-After`. Scheduled runs wait once for short waits.
+  - The schedule's minute now comes from the machine id.
+- **Runs without a terminal no longer count as scheduled.** Claude Code's shell, CI and agents used to hit "no API token… re-enable autosubmit". Now:
+  - a token submits;
+  - `--user <handle> --yes` submits unverified;
+  - otherwise the CLI says how to proceed, and it never prompts.
+- **`status` tells the truth.** It shows the token's owner (checked with the server), the last successful submission and its age (with a warning after 48 hours), the scheduler's last exit code, and the recent runs. Every platform now writes one dated line per run to `~/.viberank/autosubmit.log`.
+- **Rejected reports are 400s that say what is wrong.** Validators throw a typed error. Several "exceeds realistic limits" and "don't add up" messages used to fall through to a 500 that blamed the file and pointed at support.
+- **The MCP server submits to the right account** (MCP 1.2.0).
+  - With a token, the account comes from `/api/token/whoami`.
+  - Without one, `github_username` is required. A detected handle (a personal account only, never an org) is offered for the user to confirm, not used.
+  - It used to take the git remote's owner, often an organization.
+- **Share cards keep their image:** robots.txt allowed `/api/og` and `/api/badge` to nobody, and X reads robots.txt.
+
+### Added
+- **CLI:** `login --token`, `--help` and `--version` (they used to start a submission), and an inline login when `autosubmit` or a verified profile needs one.
+  - ccusage runs asynchronously with a live spinner and a 180-second timeout, pinned to `ccusage@20`.
+  - It retries without `--by-agent` only when that option is unknown.
+  - An empty report says no usage was found and where ccusage looked.
+  - `cc.json` lives in `~/.viberank` and is regenerated every run, never reused from the working folder.
+  - `logout` also turns autosubmit off.
+  - Node 18+ and the built-in fetch.
+- **MCP:**
+  - A Claude Code install line: `claude mcp add --scope user viberank -- npx -y viberank-mcp` (the example config named a package that does not exist).
+  - The submit result carries rank, badge and the autosubmit hint.
+  - `get_leaderboard`, `get_profile` and a new `get_stats` read real data.
+  - The MCP uses the CLI's machine id, runs ccusage without a shell, and has registry metadata (`server.json`, `mcpName`).
+- **Read-only JSON routes for clients:** `/api/leaderboard?limit=&tool=` and `/api/profile/{username}`.
+- **Client tracking:** submissions record `X-Viberank-Client` (`cli/…`, `mcp/…`, `web`) on `submit_completed`.
+- **Profiles invite visitors:** a "Where do you rank?" card with the command, and Share on X / Copy link for everyone. The profile 404 page has the nav and an "Is this you?" card.
+- **A web upload ends with somewhere to go:** rank, top % and tier, a profile link, Share on X and the daily autosubmit line, instead of closing after 1.5 seconds.
+- **The upload asks for sign-in before the file,** comes back to the open modal after sign-in, and shows the command that makes `cc.json`.
+- **The avatar opens an account menu** (My profile, API tokens and autosubmit, Sign out) instead of signing you out.
+- Every copy button reports its source.
+
+### Changed
+- **The Claude Code and Codex usage posts lead with the answer in their titles and descriptions:**
+  - "How to Check Claude Code Usage & Limits: /usage Command (2026)";
+  - "How to Check Codex Usage & Limits: Dashboard + /status (2026)".
+
+  Each had about 30K impressions a month at position 4–5 and under 0.7% CTR. Compare from 2026-10-26.
+- **One rule decides which profiles are indexed, and the sitemap follows it:** real submission rows and a valid GitHub handle. 137 legacy handles such as "Kevin Foster" are noindex and lose the GitHub link that 404'd.
+- `/admin` is noindex. Profile cards and badges share one token formatter ("1.2T", not "1167.3B"). The dead DevBurn link is plain text. llms.txt and the MCP post give the MCP route.
+- Profiles read rank and the cohort baselines together, and rank once per request.
+
 ## Site — comparison pages lead with measured cost (October 2026)
 
 ### Added

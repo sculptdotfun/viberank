@@ -1,6 +1,7 @@
 import { BLOG_POSTS } from "@/lib/blogPosts";
 import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
 import { COMPARE_MATCHUPS, matchupTitle } from "@/lib/compare";
+import { AUTOSUBMIT_COMMAND, CLI_COMMAND, MCP_COMMAND } from "@/lib/commands";
 
 const SITE = "https://www.viberank.app";
 
@@ -57,7 +58,15 @@ ${posts}
 
 ## Submitting data
 
-Developers join the board by running \`npx viberank-cli\`, which reads local ccusage data and submits usage totals (never code or prompts). Profiles live at ${SITE}/profile/{github-username} and README badges at ${SITE}/api/badge/{username}.
+Developers join the board by running \`${CLI_COMMAND}\`, which reads local ccusage data and submits usage totals (never code or prompts). \`${AUTOSUBMIT_COMMAND}\` keeps it current daily. Profiles live at ${SITE}/profile/{github-username} and README badges at ${SITE}/api/badge/{username}.
+
+Agents can do it too. In Claude Code, add the viberank MCP server with \`${MCP_COMMAND}\`, then ask Claude to submit your usage or look up a rank.
+
+## JSON for agents
+
+- ${SITE}/api/leaderboard?limit=10&tool=claude: the top of the board (limit up to 50, tool optional)
+- ${SITE}/api/profile/{github-username}: one developer's rank, spend, tokens, days tracked and tools
+- ${SITE}/api/stats: site-wide statistics with a citation string
 `;
 
   return new Response(body, {

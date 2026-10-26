@@ -2,18 +2,26 @@ import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Gauge, Terminal, LineChart, RefreshCcw } from "lucide-react";
 import type { Metadata } from "next";
 
-const TITLE = "How to Check Your Claude Code Usage: /usage & ccusage";
+// Search Console, 28 days to 2026-10-26: 30K impressions at position 5.4 and
+// 0.6% CTR. "how to check claude code usage", "claude code check usage" and
+// "check claude code usage" all ranked between 3.6 and 4.6 without a single
+// click. The title now uses the queries' own words, adds limits and the year,
+// and names the command; the description is the answer itself.
+const TITLE = "How to Check Claude Code Usage & Limits: /usage Command (2026)";
 const DESC =
-  "Three ways to see exactly how much Claude Code you've used — the /usage command for limits, ccusage for token-level history and API-equivalent cost, and the leaderboard that tracks it daily.";
+  "Type /usage in Claude Code (or open claude.ai/settings/usage) to see your 5-hour and weekly limits and resets. Tokens and cost: npx ccusage@latest daily.";
 const URL = "https://www.viberank.app/blog/how-to-check-claude-code-usage";
+const MODIFIED = "2026-10-26T00:00:00.000Z";
 const OG =
-  "/api/og?title=How%20to%20Check%20Your%20Claude%20Code%20Usage&description=%2Fusage%2C%20ccusage%2C%20and%20your%20real%20API-equivalent%20costs";
+  "/api/og?title=How%20to%20Check%20Claude%20Code%20Usage%20%26%20Limits&description=%2Fusage%20for%20limits%2C%20ccusage%20for%20tokens%20and%20real%20cost";
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   keywords: [
     "how to check claude code usage",
+    "check claude code usage",
+    "claude code usage limit",
     "claude code token usage",
     "claude code usage command",
     "ccusage",
@@ -30,6 +38,7 @@ export const metadata: Metadata = {
     url: URL,
     type: "article",
     publishedTime: "2026-08-18T00:00:00.000Z",
+    modifiedTime: MODIFIED,
     authors: ["Viberank Team"],
     images: [{ url: OG, width: 1200, height: 630, alt: TITLE }],
   },
@@ -68,7 +77,7 @@ export default function Post() {
       description: DESC,
       image: "https://www.viberank.app" + OG,
       datePublished: "2026-08-18T00:00:00.000Z",
-      dateModified: "2026-08-18T00:00:00.000Z",
+      dateModified: MODIFIED,
       author: { "@type": "Organization", name: "Viberank", url: "https://www.viberank.app" },
       publisher: {
         "@type": "Organization",
@@ -109,7 +118,7 @@ export default function Post() {
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
             <span className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              August 18, 2026
+              Updated October 26, 2026
             </span>
             <span className="flex items-center gap-2">
               <Clock className="w-4 h-4" />7 min read

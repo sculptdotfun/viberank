@@ -25,6 +25,39 @@ const TOKEN_SLOP = 1;
 // newer normalizer and backfilled.
 export const PARSER_VERSION = "viberank-normalize-v1";
 
+/**
+ * A problem with the submitted report itself, which the user can fix.
+ *
+ * The submit route used to decide what was the user's fault by matching
+ * substrings of the message, and the list drifted from the validators: "Total
+ * cost exceeds realistic limits" never matched "exceed realistic limits", so
+ * it and the per-day checks reached people as a generic 500 asking them to
+ * contact support. Throwing a type the route can recognise keeps the two in
+ * step by construction.
+ */
+export class SubmissionValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SubmissionValidationError";
+  }
+}
+
+/** True for a SubmissionValidationError, including one from a second copy of this module. */
+export function isSubmissionValidationError(error: unknown): error is SubmissionValidationError {
+  return (
+    error instanceof SubmissionValidationError ||
+    (error instanceof Error && error.name === "SubmissionValidationError")
+  );
+}
+
+/**
+ * The most common rejection by far is a report with no days in it, and it is
+ * not a format problem: ccusage found nothing to report on this machine.
+ */
+export const NO_USAGE_MESSAGE =
+  "No usage found on this machine: cc.json has no days in it ('daily' must be a non-empty array). " +
+  "Run this on the computer where you use Claude Code, Codex or another supported agent, after at least one session.";
+
 /** A daily entry as it arrives from ccusage, before normalization. */
 interface RawDailyEntry {
   date?: string;
@@ -750,12 +783,17 @@ function reconciledAgentSlices(entry: RawDailyEntry): Record<string, AgentSlice>
 
 /**
  * Normalize raw ccusage JSON into one canonical, deduped, date-keyed shape.
- * Throws validation-style Errors (message surfaced to the client) for input
+ * Throws SubmissionValidationError (message surfaced to the client) for input
  * that cannot be made sense of.
  */
 export function normalizeCcData(raw: RawCcData): NormalizedCcData {
-  if (!Array.isArray(raw.daily) || raw.daily.length === 0) {
-    throw new Error("Invalid cc.json format. 'daily' must be a non-empty array.");
+  if (!Array.isArray(raw.daily)) {
+    throw new SubmissionValidationError(
+      "Invalid cc.json format. 'daily' must be a non-empty array. Regenerate it with: npx ccusage@latest daily --json > cc.json"
+    );
+  }
+  if (raw.daily.length === 0) {
+    throw new SubmissionValidationError(NO_USAGE_MESSAGE);
   }
 
   const rows = selectAuthoritativeRows(raw.daily);
@@ -766,7 +804,7 @@ export function normalizeCcData(raw: RawCcData): NormalizedCcData {
   for (const entry of rows) {
     const date = entry.date ?? entry.period;
     if (!date) {
-      throw new Error("Invalid date format: undefined. Expected YYYY-MM-DD");
+      throw new SubmissionValidationError("Invalid date format: undefined. Expected YYYY-MM-DD");
     }
 
     const agents = resolveAgents(entry);
@@ -907,8 +945,8 @@ function minimumPlausibleCost(daily: NormalizedDaily[]): number {
 }
 
 /**
- * Validate normalized ccusage data. Throws validation-style Errors whose
- * messages are surfaced to the client. Pure and side-effect free so it can be
+ * Validate normalized ccusage data. Throws SubmissionValidationError, whose
+ * message is surfaced to the client. Pure and side-effect free so it can be
  * unit-tested and reused across ingestion paths.
  *
  * @param now injectable clock for the future-date check (defaults to real time)
@@ -929,16 +967,16 @@ export function validateCcData(
     ccData.totals.cacheReadTokens;
 
   if (ccData.totals.totalTokens < componentTokens - TOKEN_SLOP) {
-    throw new Error(
+    throw new SubmissionValidationError(
       "Token totals don't match. Please use official ccusage tool."
     );
   }
 
   if (ccData.totals.totalCost < 0 || ccData.totals.totalTokens < 0) {
-    throw new Error("Negative values are not allowed.");
+    throw new SubmissionValidationError("Negative values are not allowed.");
   }
   if (ccData.totals.totalCost > MAX_DAILY_COST * 365) {
-    throw new Error("Total cost exceeds realistic limits.");
+    throw new SubmissionValidationError("Total cost exceeds realistic limits.");
   }
   // Exclude cache-read tokens: they're ~free and legitimately balloon
   // `totalTokens` for heavy context-reuse, so they don't belong against a
@@ -946,7 +984,7 @@ export function validateCcData(
   const nonCacheReadTokens =
     ccData.totals.totalTokens - ccData.totals.cacheReadTokens;
   if (nonCacheReadTokens > MAX_DAILY_TOKENS * 365) {
-    throw new Error("Total tokens exceed realistic limits.");
+    throw new SubmissionValidationError("Total tokens exceed realistic limits.");
   }
 
   // Cost/token ratio is the primary anti-inflation guard now that the token-sum
@@ -961,7 +999,7 @@ export function validateCcData(
     const tokensUnpaidFor =
       ccData.totals.totalCost < minimumPlausibleCost(ccData.daily) * (1 - 1e-9);
     if (tokensUnpaidFor || costPerToken > MAX_COST_PER_TOKEN) {
-      throw new Error(
+      throw new SubmissionValidationError(
         "Cost per token ratio is unrealistic. Please check your data."
       );
     }
@@ -986,10 +1024,15 @@ export function validateCcData(
 
   for (const day of ccData.daily) {
     if (!dateRegex.test(day.date)) {
-      throw new Error(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
+      throw new SubmissionValidationError(`Invalid date format: ${day.date}. Expected YYYY-MM-DD`);
     }
     if (new Date(day.date + "T00:00:00Z") > cutoffUTC) {
-      throw new Error(`Future date detected: ${day.date}`);
+      // Nearly always a machine clock or timezone set wrong, since ccusage
+      // dates each day by the local clock. Say so, or people hunt for a
+      // broken file.
+      throw new SubmissionValidationError(
+        `Future date detected: ${day.date} is more than a day ahead. Check this computer's clock, date and timezone, then run it again.`
+      );
     }
     if (
       day.totalCost < 0 ||
@@ -999,7 +1042,7 @@ export function validateCcData(
       day.cacheCreationTokens < 0 ||
       day.cacheReadTokens < 0
     ) {
-      throw new Error("Negative values are not allowed in daily data.");
+      throw new SubmissionValidationError("Negative values are not allowed in daily data.");
     }
     const dayComponents =
       day.inputTokens +
@@ -1007,13 +1050,13 @@ export function validateCcData(
       day.cacheCreationTokens +
       day.cacheReadTokens;
     if (day.totalTokens < dayComponents - TOKEN_SLOP) {
-      throw new Error(`Token components don't sum correctly for ${day.date}.`);
+      throw new SubmissionValidationError(`Token components don't sum correctly for ${day.date}.`);
     }
     if (day.totalCost > MAX_SINGLE_DAY_COST) {
-      throw new Error(`Cost for ${day.date} exceeds realistic limits.`);
+      throw new SubmissionValidationError(`Cost for ${day.date} exceeds realistic limits.`);
     }
     if (day.totalCost > SPLIT_REQUIRED_ABOVE_COST && !splitAccountsForDay(day)) {
-      throw new Error(
+      throw new SubmissionValidationError(
         `The per-model costs for ${day.date} don't add up to its total. Please use official ccusage output.`
       );
     }

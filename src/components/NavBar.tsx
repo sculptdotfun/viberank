@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Github, Sparkles, Menu, X } from "lucide-react";
+import { Upload, Github, Sparkles, Menu, X, LogOut } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import Avatar from "./Avatar";
+import UserMenu, { accountLinks } from "./UserMenu";
+import { takeSubmitParam } from "@/lib/submit-modal";
 
 // Modals only matter on interaction — split them out of the shell bundle
 // (SubmitModal drags in react-dropzone via FileUpload).
@@ -38,6 +40,14 @@ export default function NavBar() {
   const pathname = usePathname();
 
   const isAdmin = checkIsAdmin(session?.user?.username);
+  const login = session?.user?.username;
+
+  // Back from "Sign in with GitHub to upload": reopen the modal they were in.
+  // Read once from the URL rather than useSearchParams, which would opt
+  // every static page that mounts the nav out of static rendering.
+  useEffect(() => {
+    if (takeSubmitParam()) setShowSubmit(true);
+  }, []);
 
   const navItems = [
     { name: "Stats", href: "/stats" },
@@ -99,19 +109,7 @@ export default function NavBar() {
             </a>
 
             {session ? (
-              <button
-                onClick={() => signOut()}
-                className="h-9 inline-flex items-center gap-2 px-2.5 text-sm border border-border rounded-md hover:bg-surface-2 transition-colors"
-              >
-                <Avatar
-                  src={session.user?.image}
-                  name={session.user?.name || session.user?.username}
-                  size="sm"
-                  showRing={false}
-                  className="w-6 h-6"
-                />
-                <span className="hidden lg:inline text-muted">Sign out</span>
-              </button>
+              <UserMenu login={login} name={session.user?.name} image={session.user?.image} />
             ) : (
               <button
                 onClick={() => signIn("github")}
@@ -151,6 +149,7 @@ export default function NavBar() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Menu"
+              aria-expanded={mobileMenuOpen}
               className="h-8 w-8 inline-flex items-center justify-center text-muted hover:text-foreground rounded-md"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -196,19 +195,36 @@ export default function NavBar() {
 
                 <div className="pt-2 border-t border-border">
                   {session ? (
-                    <button
-                      onClick={() => { signOut(); setMobileMenuOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
-                    >
-                      <Avatar
-                        src={session.user?.image}
-                        name={session.user?.name || session.user?.username}
-                        size="sm"
-                        showRing={false}
-                        className="w-5 h-5"
-                      />
-                      Sign out
-                    </button>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted">
+                        <Avatar
+                          src={session.user?.image}
+                          name={session.user?.name || login}
+                          size="sm"
+                          showRing={false}
+                          className="w-5 h-5"
+                        />
+                        <span className="truncate">{login ? `@${login}` : session.user?.name}</span>
+                      </div>
+                      {accountLinks(login).map(({ href, label, icon: Icon }) => (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
+                        >
+                          <Icon className="w-4 h-4 text-muted" />
+                          {label}
+                        </Link>
+                      ))}
+                      <button
+                        onClick={() => { signOut(); setMobileMenuOpen(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
+                      >
+                        <LogOut className="w-4 h-4 text-muted" />
+                        Sign out
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={() => { signIn("github"); setMobileMenuOpen(false); }}

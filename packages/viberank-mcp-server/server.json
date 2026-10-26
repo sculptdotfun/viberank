@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sculptdotfun/viberank",
+  "title": "viberank",
+  "description": "Submit your AI coding usage (Claude Code, Codex, Gemini CLI) to viberank and read the leaderboard.",
+  "websiteUrl": "https://www.viberank.app",
+  "repository": {
+    "url": "https://github.com/sculptdotfun/viberank",
+    "source": "github",
+    "subfolder": "packages/viberank-mcp-server"
+  },
+  "version": "1.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "viberank-mcp",
+      "version": "1.2.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VIBERANK_TOKEN",
+          "description": "Optional API token from https://www.viberank.app/settings/tokens. Signs submissions so they are verified and filed under your account.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string",
+          "placeholder": "vbr_..."
+        }
+      ]
+    }
+  ]
+}

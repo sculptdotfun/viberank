@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, Terminal, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import FileUpload from "./FileUpload";
-import { cliCommandCopied, autosubmitCommandCopied } from "@/lib/analytics";
+import { cliCommandCopied, autosubmitCommandCopied, mcpCommandCopied } from "@/lib/analytics";
+import { AUTOSUBMIT_COMMAND, CLI_COMMAND, MCP_COMMAND } from "@/lib/commands";
+import CommandText from "./CommandText";
 
 interface SubmitModalProps {
   open: boolean;
@@ -15,6 +17,7 @@ interface SubmitModalProps {
 export default function SubmitModal({ open, onClose }: SubmitModalProps) {
   const [copied, setCopied] = useState(false);
   const [copiedAuto, setCopiedAuto] = useState(false);
+  const [copiedMcp, setCopiedMcp] = useState(false);
 
   // Esc to close + lock body scroll while open.
   useEffect(() => {
@@ -30,17 +33,24 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
   }, [open, onClose]);
 
   const copyCommand = () => {
-    navigator.clipboard.writeText("npx viberank-cli");
-    cliCommandCopied();
+    navigator.clipboard.writeText(CLI_COMMAND);
+    cliCommandCopied("modal");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const copyAutosubmit = () => {
-    navigator.clipboard.writeText("npx viberank-cli autosubmit");
-    autosubmitCommandCopied();
+    navigator.clipboard.writeText(AUTOSUBMIT_COMMAND);
+    autosubmitCommandCopied("modal");
     setCopiedAuto(true);
     setTimeout(() => setCopiedAuto(false), 2000);
+  };
+
+  const copyMcp = () => {
+    navigator.clipboard.writeText(MCP_COMMAND);
+    mcpCommandCopied("modal");
+    setCopiedMcp(true);
+    setTimeout(() => setCopiedMcp(false), 2000);
   };
 
   return (
@@ -97,18 +107,31 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
                 </p>
                 <button
                   onClick={copyAutosubmit}
-                  className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 mt-1.5 border border-border hover:border-accent/50 transition-colors"
+                  aria-label={`Copy ${AUTOSUBMIT_COMMAND}`}
+                  className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 mt-1.5 border border-border hover:border-accent/50 transition-colors text-left"
                 >
-                  <code className="text-xs font-mono text-accent">npx viberank-cli autosubmit</code>
-                  {copiedAuto ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-3.5 h-3.5 text-muted" />}
+                  <code className="text-xs font-mono text-accent min-w-0"><CommandText command={AUTOSUBMIT_COMMAND} /></code>
+                  {copiedAuto ? <Check className="w-4 h-4 text-success flex-shrink-0" /> : <Copy className="w-3.5 h-3.5 text-muted flex-shrink-0" />}
                 </button>
                 <p className="text-[11px] text-muted mt-2 leading-relaxed">
-                  Submits daily in the background via your OS scheduler.{" "}
+                  Submits daily in the background via your OS scheduler. <code className="font-mono">login</code> asks
+                  for a token from{" "}
                   <Link href="/settings/tokens" className="text-accent hover:underline">
-                    Needs a token
+                    your tokens page
                   </Link>
                   .
                 </p>
+
+                {/* Agents can submit for you once the MCP server is added. */}
+                <p className="text-[11px] text-muted mt-3 leading-relaxed">Using Claude Code? Add the MCP server, then ask Claude to submit:</p>
+                <button
+                  onClick={copyMcp}
+                  aria-label={`Copy ${MCP_COMMAND}`}
+                  className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 mt-1.5 border border-border hover:border-accent/50 transition-colors text-left"
+                >
+                  <code className="text-xs font-mono text-accent min-w-0"><CommandText command={MCP_COMMAND} /></code>
+                  {copiedMcp ? <Check className="w-4 h-4 text-success flex-shrink-0" /> : <Copy className="w-3.5 h-3.5 text-muted flex-shrink-0" />}
+                </button>
               </div>
 
               {/* Divider */}
@@ -124,7 +147,8 @@ export default function SubmitModal({ open, onClose }: SubmitModalProps) {
                   <Upload className="w-4 h-4 text-muted" />
                   <span className="font-medium">Upload cc.json</span>
                 </div>
-                <FileUpload onSuccess={onClose} />
+                {/* Stays open on success: the result is the next step. */}
+                <FileUpload />
               </div>
             </div>
           </motion.div>

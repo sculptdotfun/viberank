@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { computeStreaks } from "@/lib/streaks";
-import { getProfileCached } from "./getProfile";
+import { formatTokensCompact } from "@/lib/utils";
+import { isGithubHandle, isIndexableProfile, profileHandle } from "@/lib/profile-index";
+import { getProfileCached, getGlobalRankCached } from "./getProfile";
 
 interface ProfileParams {
   params: Promise<{ username: string }>;
@@ -25,10 +27,18 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       };
     }
 
+    // The sitemap applies the same rule, so it never lists a page that asks
+    // not to be indexed. A real profile under a handle GitHub couldn't have
+    // ("Kevin Foster") still gets its share card, just not a search listing.
+    const indexable = isIndexableProfile({
+      handle: profileHandle(profile),
+      submissionCount: profile.submissions.length,
+    });
+
     const display = profile.githubName || profile.githubUsername || profile.username;
     const totalCost = profile.submissions.reduce((acc, s) => acc + s.totalCost, 0);
     const totalTokens = profile.submissions.reduce((acc, s) => acc + s.totalTokens, 0);
-    const tokensB = totalTokens >= 1e9 ? `${(totalTokens / 1e9).toFixed(1)}B` : `${(totalTokens / 1e6).toFixed(0)}M`;
+    const tokensCompact = formatTokensCompact(totalTokens);
     const cost = `$${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
     // Build the tool list from the profile's actual usage (Claude sorts first),
@@ -47,7 +57,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       tools.length === 0 ? "AI coding tools" : tools.map(cap).join(", ");
 
     const title = `${display} — ${cost} API-equivalent on ${toolsShort} | Viberank`;
-    const description = `${display} has logged ${cost} of API-equivalent usage across ${tokensB} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
+    const description = `${display} has logged ${cost} of API-equivalent usage across ${tokensCompact} tokens on ${toolsLong}. See the full breakdown, daily usage, and how they rank on the Viberank leaderboard.`;
     const canonical = `https://www.viberank.app/profile/${encodeURIComponent(profile.username)}`;
 
     // Rich share card: avatar, rank, tier, cost, tokens. Rank and tier match
@@ -55,11 +65,8 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     const bestCost = profile.submissions.reduce((acc, s) => Math.max(acc, s.totalCost), 0);
     let rank: number | null = null;
     try {
-      if (bestCost > 0) {
-        const { getServerDataLayer } = await import("@/lib/data");
-        const dataLayer = await getServerDataLayer();
-        rank = await dataLayer.submissions.getGlobalRank(bestCost);
-      }
+      // Shared with the page, which shows the same rank (see getGlobalRankCached).
+      if (bestCost > 0) rank = await getGlobalRankCached(bestCost);
     } catch {
       // rank is nice-to-have on the card; render without it on failure
     }
@@ -96,7 +103,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
       type: "profile",
       username: profile.githubUsername || profile.username,
       cost: String(Math.round(bestCost)),
-      tokens: tokensB,
+      tokens: tokensCompact,
     });
     if (rank) ogParams.set("rank", String(rank));
     if (avatar) ogParams.set("avatar", avatar);
@@ -128,6 +135,7 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
         description,
         images: [ogImage],
       },
+      ...(indexable ? {} : { robots: { index: false, follow: true } }),
     };
   } catch {
     return {
@@ -179,7 +187,7 @@ export default async function ProfileLayout({
           "@type": "Person",
           "name": display,
           "identifier": profile.githubUsername || profile.username,
-          "sameAs": profile.githubUsername
+          "sameAs": isGithubHandle(profile.githubUsername)
             ? [`https://github.com/${profile.githubUsername}`]
             : undefined,
           "description": `AI coding user, ${profile.totalSubmissions} submission${profile.totalSubmissions === 1 ? "" : "s"} totaling $${totalCost.toFixed(0)} of API-equivalent usage on Viberank.`,

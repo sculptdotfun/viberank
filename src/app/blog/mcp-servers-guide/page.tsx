@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Plug, Database, Github, MessageSquare, FileText, Server, Settings, Lightbulb, CheckCircle } from "lucide-react";
 import type { Metadata } from "next";
+import { CLI_COMMAND, MCP_COMMAND } from "@/lib/commands";
+import CommandText from "@/components/CommandText";
 
 export const metadata: Metadata = {
   title: "MCP Servers Guide: Connect Claude Code to GitHub & Databases",
@@ -452,10 +454,20 @@ await server.connect(transport);`}</code>
             <p className="text-muted mb-4">See your Claude Code stats and join the leaderboard</p>
             <div className="bg-background rounded-lg px-6 py-4 inline-flex items-center gap-3 font-mono">
               <span className="text-stone-500">$</span>
-              <span className="text-accent text-lg">npx viberank-cli</span>
+              <span className="text-accent text-lg">{CLI_COMMAND}</span>
             </div>
             <p className="text-stone-500 text-sm mt-4">
-              Upload your cc.json and compare your usage with other developers
+              Reads your local usage with ccusage and submits the totals, never code or prompts.
+            </p>
+
+            {/* This post is about MCP, and viberank has an MCP server of its own. */}
+            <p className="text-muted mt-8 mb-4">Or let Claude do it: add viberank as an MCP server</p>
+            <div className="bg-background rounded-lg px-4 sm:px-6 py-4 inline-flex items-start gap-3 font-mono text-left max-w-full">
+              <span className="text-stone-500">$</span>
+              <span className="text-accent text-sm sm:text-base min-w-0"><CommandText command={MCP_COMMAND} /></span>
+            </div>
+            <p className="text-stone-500 text-sm mt-4">
+              Then ask Claude to submit your usage to viberank, or where you rank.
             </p>
           </div>
         </section>

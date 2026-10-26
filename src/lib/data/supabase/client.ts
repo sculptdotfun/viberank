@@ -39,7 +39,7 @@ import type {
 } from "../types";
 import { generateToken, hashToken, looksLikeToken } from "@/lib/tokens";
 import { monthsUserDeleted, monthOfDate, corpusCoversDay, type CorpusSize } from "@/lib/drift";
-import { SupabaseRateLimiter } from "./rate-limiter";
+import { SupabaseRateLimiter, RateLimitError, submitRateLimitChecks } from "./rate-limiter";
 import type { BurnRow } from "@/lib/spend-curve";
 import { buildWorkInsightBaselines, type WorkInsightBaselines } from "@/lib/work-insights";
 import {
@@ -574,18 +574,14 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     const existing = await this.findTargetSubmission(data);
     const existingSubmissions = existing ? [existing] : [];
 
-    // Check rate limit
-    const rateLimitResult = await this.rateLimiter.checkLimit(
-      "submitData",
-      data.username
-    );
-    if (!rateLimitResult.allowed) {
-      const waitSeconds = Math.ceil(
-        ((rateLimitResult.retryAfter || Date.now() + 3600000) - Date.now()) / 1000
-      );
-      throw new Error(
-        `Rate limit exceeded. Please wait ${waitSeconds} seconds before submitting again.`
-      );
+    // Per machine (or per web upload) first, then the username's overall
+    // ceiling; see submitRateLimitChecks for why the slots are split.
+    for (const check of submitRateLimitChecks(data)) {
+      const result = await this.rateLimiter.checkLimit(check.limitType, check.key);
+      if (!result.allowed) {
+        const retryAt = result.retryAfter || Date.now() + 3600000;
+        throw new RateLimitError(check.scope, (retryAt - Date.now()) / 1000);
+      }
     }
 
     // Extract date range and models

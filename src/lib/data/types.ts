@@ -199,6 +199,25 @@ export interface PatternSearchOptions {
 // QUERY/MUTATION RESULTS
 // ============================================================================
 
+/** Where a successful submission landed, as POST /api/submit reports it. */
+export interface SubmitStanding {
+  rank: number;
+  totalDevelopers: number;
+  topPercent: number;
+  tier: string;
+  badgeMarkdown: string;
+}
+
+/** POST /api/submit's success body. */
+export interface SubmitResponse {
+  submissionId: string;
+  profileUrl?: string;
+  /** Null when the rank lookup failed; the submission still landed. */
+  standing: SubmitStanding | null;
+  hint: string | null;
+  notice: string | null;
+}
+
 export interface LeaderboardResult {
   items: Submission[];
   page: number;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 
-const { resolveNpxArgv } = await import("../packages/viberank-cli/lib/npx.js");
+const { resolveNpxArgv, withNodeOnPath, runNpx } = await import("../packages/viberank-cli/lib/npx.js");
 
 let passed = 0;
 const check = (label: string) => { passed++; console.log(`✓ ${label}`); };
@@ -77,6 +77,31 @@ const noSymlinks = () => null;
   assert.deepEqual(posix.argv, ["npx"]);
   assert.equal(posix.shell, false);
   check("falls back to the shim, then to bare npx on PATH");
+}
+
+{
+  // ccusage and viberank start through `#!/usr/bin/env node` bins, so the
+  // child needs node on PATH even when the scheduler gave it none.
+  const posix = withNodeOnPath({ PATH: "/usr/bin:/opt/homebrew/bin:/bin", HOME: "/h" }, "/opt/homebrew/bin/node", "darwin");
+  assert.equal(posix.PATH, "/opt/homebrew/bin:/usr/bin:/bin", "moved to the front, not repeated");
+  assert.equal(posix.HOME, "/h");
+  assert.equal(withNodeOnPath({}, "/usr/local/bin/node", "linux").PATH, "/usr/local/bin");
+
+  // Windows spells it Path. A second PATH key beside it would leave the
+  // platform to choose which one the child sees.
+  const win = withNodeOnPath({ Path: "C:\\Windows\\system32" }, winNode, "win32");
+  assert.deepEqual(Object.keys(win), ["Path"]);
+  assert.equal(win.Path, "C:\\Program Files\\nodejs;C:\\Windows\\system32");
+  check("the npx child gets node's directory first on PATH, whatever its spelling");
+}
+
+{
+  // The real thing, offline: npx answers --version without the registry.
+  const { stdout } = await runNpx(["--version"], { timeoutMs: 60_000 });
+  assert.match(stdout.trim(), /^\d+\.\d+\.\d+/);
+  await assert.rejects(runNpx(["-c", "exit 3"], { timeoutMs: 60_000 }),
+    (error: Error & { exitCode?: number }) => error.exitCode === 3);
+  check("runNpx runs npx asynchronously and rejects with the exit code");
 }
 
 console.log(`\n${passed} checks passed`);
