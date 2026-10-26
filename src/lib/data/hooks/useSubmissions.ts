@@ -15,6 +15,7 @@ import type {
   LeaderboardResult,
   DateRangeLeaderboardResult,
   SubmitData,
+  SubmitResponse,
   ClaimStatus,
   ClaimResult,
 } from "../types";
@@ -24,9 +25,10 @@ import type {
 // ============================================================================
 
 /**
- * Hook for fetching the leaderboard (regular, paginated)
+ * Hook for fetching the leaderboard (regular, paginated). Changing
+ * `refreshKey` refetches the same params, e.g. after a submission lands.
  */
-export function useLeaderboard(params: LeaderboardParams | "skip") {
+export function useLeaderboard(params: LeaderboardParams | "skip", refreshKey = 0) {
   const [supabaseData, setSupabaseData] = useState<LeaderboardResult | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<Error | null>(null);
@@ -60,7 +62,7 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
 
     // Unmount (or a param change) abandons whatever is still in flight.
     return () => g.abandon();
-  }, [JSON.stringify(params)]);
+  }, [JSON.stringify(params), refreshKey]);
 
   return {
     data: supabaseData,
@@ -72,7 +74,7 @@ export function useLeaderboard(params: LeaderboardParams | "skip") {
 /**
  * Hook for fetching date-filtered leaderboard
  */
-export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "skip") {
+export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "skip", refreshKey = 0) {
   const [supabaseData, setSupabaseData] = useState<DateRangeLeaderboardResult | undefined>();
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [supabaseError, setSupabaseError] = useState<Error | null>(null);
@@ -106,7 +108,7 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
 
     // Unmount (or a param change) abandons whatever is still in flight.
     return () => g.abandon();
-  }, [JSON.stringify(params)]);
+  }, [JSON.stringify(params), refreshKey]);
 
   return {
     data: supabaseData,
@@ -120,27 +122,43 @@ export function useLeaderboardByDateRange(params: DateRangeLeaderboardParams | "
 // ============================================================================
 
 /**
+ * Fired on window after a submission lands, so the board can refetch instead
+ * of showing the pre-submit rows it was rendered with.
+ */
+export const SUBMITTED_EVENT = "viberank:submitted";
+
+/**
  * Hook for submitting usage data
  */
 export function useSubmit() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const mutate = useCallback(async (data: SubmitData): Promise<string> => {
+  // Resolves to the whole response, not just the id: the rank, profile link
+  // and hint are what the upload modal shows next.
+  const mutate = useCallback(async (data: SubmitData): Promise<SubmitResponse> => {
     setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Viberank-Client": "web" },
         body: JSON.stringify(data.ccData),
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(body?.error || "Submit failed");
       }
-      return body.submissionId as string;
+      const result: SubmitResponse = {
+        submissionId: body.submissionId,
+        profileUrl: body.profileUrl ?? undefined,
+        standing: body.standing ?? null,
+        hint: body.hint ?? null,
+        notice: body.notice ?? null,
+      };
+      window.dispatchEvent(new CustomEvent(SUBMITTED_EVENT, { detail: result }));
+      return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);

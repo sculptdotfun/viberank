@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Github } from "lucide-react";
-import { useSession, signIn } from "next-auth/react";
+import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Github, Share2, Copy, Check, ArrowRight } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { track } from "@vercel/analytics";
+import { signInAndReopenSubmit } from "@/lib/submit-modal";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 import { useSubmit } from "@/lib/data/hooks/useSubmissions";
+import { autosubmitCommandCopied } from "@/lib/analytics";
+import { AUTOSUBMIT_COMMAND, CCUSAGE_EXPORT_COMMAND } from "@/lib/commands";
+import type { ModelBreakdown, SubmitResponse } from "@/lib/data/types";
 
 interface CCData {
   daily: Array<{
@@ -19,7 +24,7 @@ interface CCData {
     totalTokens: number;
     totalCost: number;
     modelsUsed: string[];
-    modelBreakdowns?: any[];
+    modelBreakdowns?: ModelBreakdown[];
   }>;
   totals: {
     inputTokens: number;
@@ -31,15 +36,99 @@ interface CCData {
   };
 }
 
-interface FileUploadProps {
-  onSuccess?: () => void;
+/** Path part of the profile URL the API returns, so links stay on this host. */
+function profilePath(result: SubmitResponse, fallbackUsername: string): string {
+  try {
+    if (result.profileUrl) return new URL(result.profileUrl).pathname;
+  } catch {
+    // fall through to the session's handle
+  }
+  return `/profile/${encodeURIComponent(fallbackUsername)}`;
 }
 
-export default function FileUpload({ onSuccess }: FileUploadProps) {
-  const { data: session } = useSession();
+function SubmitSuccess({ result, username }: { result: SubmitResponse; username: string }) {
+  const [copied, setCopied] = useState(false);
+  const standing = result.standing && result.standing.totalDevelopers > 0 ? result.standing : null;
+  const shareUrl = result.profileUrl ?? `https://www.viberank.app${profilePath(result, username)}`;
+
+  const shareToX = () => {
+    const text = standing
+      ? `I'm ranked #${standing.rank} of ${standing.totalDevelopers.toLocaleString("en-US")} developers on viberank 🏆\n\n${standing.tier} tier · top ${standing.topPercent}% by AI coding spend\n\nWhere do you rank?`
+      : "My AI coding usage is on viberank 🏆\n\nWhere do you rank?";
+    window.open(
+      `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  const copyAutosubmit = () => {
+    navigator.clipboard.writeText(AUTOSUBMIT_COMMAND);
+    autosubmitCommandCopied("upload_success");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-3 bg-surface-1 rounded-lg border border-border"
+      role="status"
+    >
+      <div className="flex items-center gap-2 text-sm font-medium text-green-400">
+        <CheckCircle className="w-4 h-4" />
+        Submitted
+      </div>
+      <p className="text-sm text-foreground mt-2">
+        {standing ? (
+          <>
+            <span className="font-mono font-bold text-accent">#{standing.rank}</span> of{" "}
+            {standing.totalDevelopers.toLocaleString("en-US")} developers · top {standing.topPercent}% ·{" "}
+            {standing.tier} tier
+          </>
+        ) : (
+          "You're on the board."
+        )}
+      </p>
+
+      <div className="flex gap-2 mt-3">
+        <Link
+          href={profilePath(result, username)}
+          className="flex-1 py-2 bg-accent text-white text-sm rounded-md hover:bg-accent-hover transition-colors flex items-center justify-center gap-1.5"
+        >
+          View your profile
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+        <button
+          onClick={shareToX}
+          className="px-3 py-2 text-sm border border-border rounded-md hover:bg-surface-2 transition-colors flex items-center gap-1.5"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          Share on X
+        </button>
+      </div>
+
+      {/* A one-off upload freezes the profile on today. */}
+      <p className="text-[11px] text-muted mt-3 leading-relaxed">Keep it up to date daily:</p>
+      <button
+        onClick={copyAutosubmit}
+        aria-label={`Copy ${AUTOSUBMIT_COMMAND}`}
+        className="w-full flex items-center justify-between gap-2 bg-background rounded-md px-3 py-2 mt-1.5 border border-border hover:border-accent/50 transition-colors text-left"
+      >
+        <code className="text-xs font-mono text-accent min-w-0">{AUTOSUBMIT_COMMAND}</code>
+        {copied ? <Check className="w-4 h-4 text-success flex-shrink-0" /> : <Copy className="w-3.5 h-3.5 text-muted flex-shrink-0" />}
+      </button>
+    </motion.div>
+  );
+}
+
+export default function FileUpload() {
+  const { data: session, status } = useSession();
   const [uploadState, setUploadState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [parsedData, setParsedData] = useState<CCData | null>(null);
+  const [result, setResult] = useState<SubmitResponse | null>(null);
 
   const { mutate: submit } = useSubmit();
 
@@ -62,7 +151,7 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
 
         setParsedData(data);
         setUploadState("idle");
-      } catch (error) {
+      } catch {
         setErrorMessage("Invalid file format. Please upload a valid cc.json file.");
         setUploadState("error");
       }
@@ -76,55 +165,68 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
     maxFiles: 1
   });
 
-  const handleSubmit = async () => {
-    if (!parsedData) return;
+  const username = session?.user?.username;
 
-    if (!session?.user?.username) {
-      setErrorMessage("Please sign in with GitHub to submit.");
-      setUploadState("error");
-      return;
-    }
+  const handleSubmit = async () => {
+    if (!parsedData || !username) return;
 
     setUploadState("loading");
     try {
-      await submit({
-        username: session.user.username,
-        githubUsername: session.user.username,
-        githubName: session.user.name || undefined,
-        githubAvatar: session.user.image || undefined,
+      const response = await submit({
+        username,
+        githubUsername: username,
+        githubName: session?.user?.name || undefined,
+        githubAvatar: session?.user?.image || undefined,
         source: "oauth",
         verified: true,
         ccData: parsedData,
       });
+      setResult(response);
       setUploadState("success");
       track("submit_completed", { source: "web" });
       setParsedData(null);
-      setTimeout(() => onSuccess?.(), 1500);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to submit");
       setUploadState("error");
     }
   };
 
-  return (
-    <div>
-      {/* Auth status */}
-      {!session && (
-        <div className="flex items-center justify-between p-2.5 mb-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-          <div className="flex items-center gap-2 text-xs">
-            <AlertCircle className="w-3.5 h-3.5 text-yellow-500" />
-            <span>Sign in to get verified</span>
-          </div>
+  if (uploadState === "success" && result && username) {
+    return <SubmitSuccess result={result} username={username} />;
+  }
+
+  const howToMakeFile = (
+    <p className="text-[11px] text-muted mt-2 leading-relaxed">
+      Make the file with <code className="font-mono text-foreground/80 break-words">{CCUSAGE_EXPORT_COMMAND}</code>
+    </p>
+  );
+
+  // Uploads are filed under your GitHub account, so sign-in comes before the
+  // file rather than after it (see signInAndReopenSubmit).
+  if (status === "loading") {
+    return <div className="h-[104px] rounded-lg border border-dashed border-border animate-pulse" aria-hidden />;
+  }
+  if (!username) {
+    return (
+      <div>
+        <div className="border border-dashed border-border rounded-lg p-5 text-center">
+          <FileJson className="w-7 h-7 mx-auto mb-2 text-muted" />
+          <p className="text-xs text-muted mb-3">Uploads are filed under your GitHub account.</p>
           <button
-            onClick={() => signIn("github")}
-            className="text-xs px-2.5 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 transition-colors flex items-center gap-1"
+            onClick={signInAndReopenSubmit}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-sm font-medium border border-border rounded-md hover:bg-surface-2 transition-colors"
           >
-            <Github className="w-3 h-3" />
-            Sign in
+            <Github className="w-4 h-4" />
+            Sign in with GitHub to upload
           </button>
         </div>
-      )}
+        {howToMakeFile}
+      </div>
+    );
+  }
 
+  return (
+    <div>
       {/* Dropzone */}
       <div
         {...getRootProps()}
@@ -138,6 +240,7 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
           {isDragActive ? "Drop cc.json here" : "Drop cc.json or click to browse"}
         </p>
       </div>
+      {howToMakeFile}
 
       {/* Preview */}
       <AnimatePresence>
@@ -200,21 +303,11 @@ export default function FileUpload({ onSuccess }: FileUploadProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="mt-3 p-2.5 bg-red-500/10 text-red-400 rounded-lg flex items-center gap-2 text-xs"
+            role="alert"
+            className="mt-3 p-2.5 bg-red-500/10 text-red-400 rounded-lg flex items-start gap-2 text-xs"
           >
-            <AlertCircle className="w-3.5 h-3.5" />
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
             {errorMessage}
-          </motion.div>
-        )}
-        {uploadState === "success" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="mt-3 p-2.5 bg-green-500/10 text-green-400 rounded-lg flex items-center gap-2 text-xs"
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-            Submitted successfully!
           </motion.div>
         )}
       </AnimatePresence>
