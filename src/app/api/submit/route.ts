@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { track } from "@vercel/analytics/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
-import { normalizeCcData, isClientMachineId } from "@/lib/ccusage";
+import { normalizeCcData, isClientMachineId, NO_USAGE_MESSAGE } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
-import { VERIFIED_PROFILE_ERROR } from "@/lib/data/supabase/client";
-import { getCliNotice } from "@/lib/sponsor";
+import { getPaidCliNotice, TAKO_CLI_NOTICE } from "@/lib/sponsor";
+import { isGithubHandle } from "@/lib/profile-index";
+import { readClient, submitErrorResponse, submitNotice } from "@/lib/submit-api";
 import { bearerFrom } from "@/lib/tokens";
 import { readCorpusScope } from "@/lib/drift";
 import { getTier } from "@/lib/tiers";
@@ -133,7 +135,7 @@ export async function POST(request: NextRequest) {
       // public profile pages and sitemap entries (#119). Only a plausible
       // GitHub handle may create a profile this way; token and OAuth
       // identities above come from GitHub itself and need no check.
-      if (!/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(githubUsername)) {
+      if (!isGithubHandle(githubUsername)) {
         return NextResponse.json(
           {
             error: `"${githubUsername.slice(0, 60)}" is not a valid GitHub username (1-39 letters, digits, single hyphens). Pass your GitHub handle in X-GitHub-User, or run npx viberank-cli login to submit with a token.`,
@@ -182,12 +184,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate daily entries
-    if (!Array.isArray(ccData.daily) || ccData.daily.length === 0) {
+    // Validate daily entries. An empty list is the most common rejection and
+    // isn't a broken file: ccusage found no usage on that machine.
+    if (!Array.isArray(ccData.daily)) {
       return NextResponse.json(
         { error: "Invalid cc.json format. 'daily' must be a non-empty array." },
         { status: 400 }
       );
+    }
+    if (ccData.daily.length === 0) {
+      return NextResponse.json({ error: NO_USAGE_MESSAGE }, { status: 400 });
     }
 
     const sentMachineId = request.headers.get("X-Machine-Id");
@@ -312,7 +318,9 @@ export async function POST(request: NextRequest) {
         console.error("Submission data size:", JSON.stringify(ccData).length, "bytes");
       }
 
-      throw new Error(errorMessage);
+      // Typed errors (a rate limit, a rejected report) are rethrown as they
+      // are: their class is what decides the status code below.
+      throw dbError instanceof Error ? dbError : new Error(errorMessage);
     }
 
     // Analytics events never block or fail a submission.
@@ -321,7 +329,19 @@ export async function POST(request: NextRequest) {
       verified,
       tools: (normalized.tools ?? []).join(","),
       cliVersion: cliVersion || "unknown",
+      // The program that sent it (cli/1.13.0, mcp/1.2.0, web). `source`
+      // can't say: an MCP submission with a token is "cli" there.
+      client: readClient(request.headers.get("X-Viberank-Client")),
     }).catch((e) => console.error("Analytics track failed:", e));
+
+    // A profile page is cached for two minutes, and the CLI and the upload
+    // modal both link straight to it, so without this the first look after a
+    // submission could still show the old numbers. Best effort.
+    try {
+      revalidatePath(`/profile/${encodeURIComponent(githubUsername)}`);
+    } catch (e) {
+      console.error("Profile revalidation failed:", e);
+    }
 
     // Where they landed, plus something worth pasting somewhere.
     //
@@ -363,8 +383,15 @@ export async function POST(request: NextRequest) {
       message: `Successfully submitted data for ${githubUsername}`,
       profileUrl: profileUrl(githubUsername),
       standing,
-      // Optional sponsor line the CLI prints after a successful submission.
-      notice: getCliNotice(),
+      // The grey line the CLI prints after a successful submission: a fix an
+      // older CLI's user needs to hear about, a paid sponsor, or the house
+      // promo (see submitNotice).
+      notice: submitNotice({
+        cliVersion,
+        tokenVerified: Boolean(tokenOwner),
+        paidNotice: getPaidCliNotice(),
+        houseNotice: TAKO_CLI_NOTICE,
+      }),
       // Only for submissions that did not carry a token — i.e. someone who
       // has no way to submit on a schedule yet. It disappears the moment they
       // set one up, so it nags exactly once per person rather than forever.
@@ -380,135 +407,20 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Submission error:", error);
-
-    // Provide specific error messages for validation errors
     if (error instanceof Error) {
-      // Log full error details for debugging
       console.error("Detailed error:", {
         message: error.message,
         stack: error.stack,
         name: error.name,
-        errorType: error.constructor.name,
-        errorString: error.toString(),
       });
-
-      // Handle rate limit errors
-      if (error.message.includes("Rate limit exceeded")) {
-        console.error("Rate limit error:", error.message);
-        // Extract wait time from error message if present
-        const waitMatch = error.message.match(/wait (\d+) seconds/);
-        const waitSeconds = waitMatch ? parseInt(waitMatch[1]) : 60;
-        return NextResponse.json(
-          {
-            error: error.message,
-            retryAfter: waitSeconds
-          },
-          {
-            status: 429,
-            headers: {
-              'Retry-After': String(waitSeconds),
-              'X-RateLimit-Limit': '1',
-              'X-RateLimit-Remaining': '0',
-            }
-          }
-        );
-      }
-
-      if (error.message.includes(VERIFIED_PROFILE_ERROR)) {
-        return NextResponse.json({ error: error.message }, { status: 403 });
-      }
-
-      // Handle validation errors with 400 status. Only genuine problems with
-      // the submitted payload belong here — a "Failed to query/update/create"
-      // is our fault, not the user's, and telling them to fix cc.json for it
-      // sends them chasing a file that was always valid (#93).
-      const validationErrors = [
-        "Token totals don't match",
-        "Invalid date format",
-        "Future date detected",
-        "Negative values are not allowed",
-        "exceed realistic limits",
-        "Cost per token ratio is unrealistic",
-        "Token components don't sum correctly",
-      ];
-
-      if (validationErrors.some(msg => error.message.includes(msg))) {
-        console.error("Validation error detected:", error.message);
-        return NextResponse.json(
-          { error: error.message },
-          { status: 400 }
-        );
-      }
-
-      // Database clients spell this both ways ("timeout" and "timed out");
-      // matching only the first let genuine timeouts fall through to the
-      // generic 500 that blames the user's file.
-      if (/timeout|timed out|deadline/i.test(error.message)) {
-        return NextResponse.json(
-          { error: "Request timed out. Please try again or submit smaller batches of data." },
-          { status: 504 }
-        );
-      }
-
-      // Our own data-layer failures are retryable infrastructure errors. This
-      // is checked before the looser "mutation"/"query" substring match below,
-      // which would otherwise catch "Failed to query …" and report it as a 500.
-      if (error.message.includes("Failed to query") ||
-          error.message.includes("Failed to update") ||
-          error.message.includes("Failed to create")) {
-        // Don't echo the raw DB message — it can leak schema/table names.
-        console.error("Database operation error:", error.message);
-        return NextResponse.json(
-          { error: "Database operation failed. Please try again later." },
-          { status: 503 }
-        );
-      }
-
-      // Handle authentication/configuration errors
-      if (error.message.includes("Unauthenticated") || error.message.includes("authentication")) {
-        console.error("Database authentication error - check configuration");
-        return NextResponse.json(
-          { error: "Server configuration error. The service is temporarily unavailable. Please try again later." },
-          { status: 503 }
-        );
-      }
-
-      // Handle server errors more specifically
-      if (error.message.includes("Server Error")) {
-        return NextResponse.json(
-          {
-            error: "The database service is temporarily unavailable. Please try again in a few moments.",
-            details: "This is usually a temporary issue with the database service. If it persists for more than 5 minutes, please report it.",
-            retryAdvice: "Wait 30 seconds and try submitting again."
-          },
-          { status: 503 }
-        );
-      }
-
-      if (error.message.includes("mutation") || error.message.includes("query")) {
-        // Don't echo the raw DB message — it can leak schema/table names.
-        console.error("Database mutation/query error:", error.message);
-        return NextResponse.json(
-          { error: "Database operation failed. Please try again later." },
-          { status: 500 }
-        );
-      }
     }
 
-    // Log the error type for unknown errors
-    console.error("Unknown error type:", {
-      error: error,
-      isError: error instanceof Error,
-      constructor: (error as any)?.constructor?.name,
-      message: (error as any)?.message || (error as any)?.toString(),
-    });
-
-    // Don't forward the raw error string to the client — it may include
-    // database schema details or internal stack info.
-    return NextResponse.json(
-      { error: "Failed to submit data. Please check your cc.json file format and try again. If this issue persists, please contact support." },
-      { status: 500 }
-    );
+    // Only genuine problems with the submitted payload are a 400: a "Failed
+    // to query/update/create" is our fault, not the user's, and telling them
+    // to fix cc.json for it sends them chasing a file that was always valid
+    // (#93). submitErrorResponse makes that call from the error's type.
+    const { status, body, headers } = submitErrorResponse(error);
+    return NextResponse.json(body, { status, headers });
   }
 }
 
@@ -519,7 +431,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-GitHub-User, X-Machine-Id, X-CLI-Version",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-GitHub-User, X-Machine-Id, X-CLI-Version, X-Viberank-Client",
     },
   });
 }
