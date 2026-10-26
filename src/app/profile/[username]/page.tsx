@@ -23,9 +23,8 @@ import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
 import { computeWorkInsights, percentile, type ComparableMetric } from "@/lib/work-insights";
 import { getWorkInsightBaselinesCached } from "@/lib/work-insight-baselines";
-import { getServerDataLayer } from "@/lib/data";
 import { buildProfileChartDays } from "@/lib/profile-chart-data";
-import { getProfileCached } from "./getProfile";
+import { getProfileCached, getGlobalRankCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
 import BadgeSnippet from "./BadgeSnippet";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
@@ -44,6 +43,11 @@ export const revalidate = 120;
 
 // No pre-built paths — profiles are rendered on first hit, then served from
 // the ISR cache. Without this, Next treats the route as fully dynamic.
+//
+// Pre-building the top profiles was considered and left out: unlike every
+// page that does prerender, this one lets a failed read throw (a daily
+// breakdown page that errors), so a database blip during the build would
+// fail the deploy, and catching it would cache a 404 for a top profile.
 export function generateStaticParams(): { username: string }[] {
   return [];
 }
@@ -83,9 +87,17 @@ export default async function ProfilePage({ params }: ProfileParams) {
   });
   const dedupedSeries = uniqueDaily.map((d) => ({ date: d.date, cost: d.totalCost }));
   const workInsights = computeWorkInsights(uniqueDaily);
-  const workBaselines = uniqueDaily.length >= 3
-    ? await getWorkInsightBaselinesCached().catch(() => null)
-    : null;
+
+  // Best submission drives both global rank and tier, matching the board.
+  const bestCost = submissions.length > 0 ? Math.max(...submissions.map((s) => s.totalCost)) : 0;
+
+  // Both are independent reads and were awaited one after the other, on the
+  // path that decides how long an uncached profile takes to start rendering.
+  // Rank is a nice-to-have; render without it on failure.
+  const [workBaselines, globalRank] = await Promise.all([
+    uniqueDaily.length >= 3 ? getWorkInsightBaselinesCached().catch(() => null) : null,
+    Number.isFinite(bestCost) && bestCost > 0 ? getGlobalRankCached(bestCost).catch(() => null) : null,
+  ]);
   const comparison = (metric: ComparableMetric) => {
     const values = workBaselines?.values[metric];
     const ownValue = workBaselines?.byUser[profileData.username.toLowerCase()]?.[metric] ?? null;
@@ -160,20 +172,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
   const displayName = profileData.githubName || profileData.githubUsername || username;
   const handle = profileData.githubUsername || username;
 
-  // Best submission drives both global rank and tier, matching the board.
-  const bestCost = submissions.length > 0 ? Math.max(...submissions.map((s) => s.totalCost)) : 0;
   const tierInfo = getTierProgress(bestCost);
-
-  // Global leaderboard position, based on the profile's best submission.
-  let globalRank: number | null = null;
-  try {
-    if (Number.isFinite(bestCost) && bestCost > 0) {
-      const dataLayer = await getServerDataLayer();
-      globalRank = await dataLayer.submissions.getGlobalRank(bestCost);
-    }
-  } catch {
-    // rank is nice-to-have; render without it on failure
-  }
 
   const tokenRows = [
     { label: "Input", value: tokenAgg.input, color: "bg-accent" },

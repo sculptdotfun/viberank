@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { computeStreaks } from "@/lib/streaks";
 import { formatTokensCompact } from "@/lib/utils";
 import { isGithubHandle, isIndexableProfile, profileHandle } from "@/lib/profile-index";
-import { getProfileCached } from "./getProfile";
+import { getProfileCached, getGlobalRankCached } from "./getProfile";
 
 interface ProfileParams {
   params: Promise<{ username: string }>;
@@ -65,11 +65,8 @@ export async function generateMetadata({ params }: ProfileParams): Promise<Metad
     const bestCost = profile.submissions.reduce((acc, s) => Math.max(acc, s.totalCost), 0);
     let rank: number | null = null;
     try {
-      if (bestCost > 0) {
-        const { getServerDataLayer } = await import("@/lib/data");
-        const dataLayer = await getServerDataLayer();
-        rank = await dataLayer.submissions.getGlobalRank(bestCost);
-      }
+      // Shared with the page, which shows the same rank (see getGlobalRankCached).
+      if (bestCost > 0) rank = await getGlobalRankCached(bestCost);
     } catch {
       // rank is nice-to-have on the card; render without it on failure
     }
