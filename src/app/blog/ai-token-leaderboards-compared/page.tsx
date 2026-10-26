@@ -94,8 +94,10 @@ const BOARDS = [
     angle: "Live-updating board with per-tool filters",
   },
   {
+    // devburn.com stopped resolving (no DNS, checked 2026-10-26) and no new
+    // home could be found, so the name stays and the link goes.
     name: "DevBurn",
-    url: "https://devburn.com",
+    url: null,
     scale: "Early",
     tools: "Claude Code (Codex/Cursor planned)",
     identity: "Account sign-in",
@@ -217,9 +219,13 @@ export default function Post() {
                 {BOARDS.map((b, i) => (
                   <tr key={b.name} className={i % 2 ? "bg-card/50" : ""}>
                     <td className="border border-border p-3 font-medium">
-                      <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-accent no-underline hover:underline">
-                        {b.name}
-                      </a>
+                      {b.url ? (
+                        <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-accent no-underline hover:underline">
+                          {b.name}
+                        </a>
+                      ) : (
+                        b.name
+                      )}
                     </td>
                     <td className="border border-border p-3">{b.scale}</td>
                     <td className="border border-border p-3">{b.tools}</td>
@@ -252,8 +258,7 @@ export default function Post() {
             </li>
             <li>
               <strong>You want streak/fitness framing over raw spend</strong> —{" "}
-              <a href="https://straude.com" target="_blank" rel="noopener noreferrer">Straude</a> or{" "}
-              <a href="https://devburn.com" target="_blank" rel="noopener noreferrer">DevBurn</a>&apos;s
+              <a href="https://straude.com" target="_blank" rel="noopener noreferrer">Straude</a> or DevBurn&apos;s
               points formula. (Viberank tracks streaks and active days on profiles too.)
             </li>
             <li>
