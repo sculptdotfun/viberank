@@ -258,3 +258,15 @@ body {
   z-index: 50;
   pointer-events: none;
 }
+
+/* Keep edge-week tooltips inside the heatmap's horizontal scroll area. */
+[data-tip-align="start"]:hover::after {
+  left: 0;
+  transform: none;
+}
+
+[data-tip-align="end"]:hover::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
