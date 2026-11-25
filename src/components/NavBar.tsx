@@ -34,8 +34,8 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 // Site-wide nav, restyled for v2. Owns the submit + updates modals so any
-// page can mount it with no props. "Join week NN" opens the submit modal,
-// which carries the CLI line and the upload path.
+// page can mount it with no props. "Join week NN" goes to /start, every way
+// in; the submit modal still reopens after GitHub sign-in (?submit=1).
 export default function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
@@ -62,9 +62,9 @@ export default function NavBar() {
   ];
 
   const join = (
-    <button type="button" className="vr-btn" onClick={() => setShowSubmit(true)} suppressHydrationWarning>
+    <Link href="/start" className="vr-btn" style={{ color: "var(--btn-ink)" }} suppressHydrationWarning>
       Join week {week}
-    </button>
+    </Link>
   );
 
   return (

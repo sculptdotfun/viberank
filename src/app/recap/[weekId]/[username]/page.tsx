@@ -127,6 +127,7 @@ export default async function RecapPage({ params }: RecapParams) {
             visitorText={recapPostText(recap, false)}
             imagePath={`/api/og/week/${weekId}/${encodeURIComponent(username)}`}
             fileName={`viberank-week-${wk}-${username}.png`}
+            challenge
           />
         </div>
 

@@ -487,8 +487,25 @@ export function createDemoDataLayer(): DataLayer {
       async joinByCode(): Promise<never> {
         throw new Error("Leagues need the live backend.");
       },
-      async getBySlug() {
-        return null;
+      // One read-only league so the league page can be seen without the live
+      // backend: known demo handles plus one member who never synced.
+      async getBySlug(slug: string) {
+        if (slug !== DEMO_LEAGUE_SLUG) return null;
+        const members = [...DEMO_KNOWN_HANDLES.slice(0, 7), "not-synced-yet"].map((username) => {
+          const submission = findSubmission(username);
+          return {
+            username,
+            joinedAt: "2026-10-01T00:00:00Z",
+            totalCost: submission?.totalCost ?? 0,
+            totalTokens: submission?.totalTokens ?? 0,
+            verified: Boolean(submission?.verified),
+          };
+        });
+        members.sort((a, b) => b.totalCost - a.totalCost);
+        return {
+          league: { id: "demo", slug: DEMO_LEAGUE_SLUG, name: "Demo Team", createdBy: DEMO_KNOWN_HANDLES[0], createdAt: "2026-10-01T00:00:00Z" },
+          members,
+        };
       },
       async getInviteCode() {
         return null;
@@ -557,6 +574,7 @@ export function createDemoDataLayer(): DataLayer {
 const DEMO_HISTORY_WEEKS = 20;
 const DEMO_POPULATION = 170;
 
+const DEMO_LEAGUE_SLUG = "demo-team";
 const DEMO_KNOWN_HANDLES = [
   "nikshepsvn", "iabdulwasey", "B-EtterDigital", "azamara", "tokenmaxed", "StartupBros",
   "dprvda", "sigridjineth", "sahir2k", "trac3rOO",

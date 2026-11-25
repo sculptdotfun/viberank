@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PLAN_EQ_USD_PER_WEEK, type BoardResult, type BoardRow, type Standing } from "@/lib/v2/contract";
 import { countdown, money, plans, tokens, toolName, weekNumber } from "../format";
 import { Countdown, CopyCommand } from "./bits";
@@ -127,6 +128,7 @@ export default function Hero({ board, standing, facts }: { board: BoardResult; s
         <div className="vr-cta">
           <CopyCommand source="hero" />
           <a className="vr-more" href="#board">See this week’s board</a>
+          <Link className="vr-more" href="/start">Other ways to join →</Link>
         </div>
         <div className="vr-facts">
           {facts && (
