@@ -39,7 +39,7 @@ export const submitOpened = (from: string) => emit("submit_opened", { from });
  * Which copy button was pressed. Only the modal's fired before, so the hero
  * and sidebar buttons, the first ones most visitors see, were invisible.
  */
-export type CopySource = "hero" | "sidebar" | "profile" | "profile_not_found" | "modal" | "upload_success";
+export type CopySource = "hero" | "sidebar" | "profile" | "profile_not_found" | "modal" | "upload_success" | "closing";
 
 /** `npx viberank-cli` copied — the CLI path's intent signal. */
 export const cliCommandCopied = (source: CopySource) => emit("cli_command_copied", { source });
