@@ -7,6 +7,7 @@ import NavBar from "@/components/NavBar";
 import TierBadge from "@/components/TierBadge";
 import { formatNumber, formatCurrency, toolLabel, toolBlurb, FEATURED_TOOLS } from "@/lib/utils";
 import { COMPARE_MATCHUPS, matchupTitle } from "@/lib/compare";
+import { toolBoardParams } from "@/lib/leaderboard-query";
 
 interface ToolParams {
   params: Promise<{ tool: string }>;
@@ -104,7 +105,9 @@ export default async function ToolPage({ params }: ToolParams) {
   let items: Awaited<ReturnType<Awaited<ReturnType<typeof getServerDataLayer>>["submissions"]["getLeaderboard"]>>["items"] = [];
   try {
     const dataLayer = await getServerDataLayer();
-    const lb = await dataLayer.submissions.getLeaderboard({ sortBy: "cost", page: 0, pageSize: 50, tool });
+    // Sort goes through toolBoardParams (#200) so the page can pass ?sort=
+    // once the filter row offers it; still cost here to keep the page static.
+    const lb = await dataLayer.submissions.getLeaderboard(toolBoardParams(tool, "cost"));
     items = lb.items;
   } catch {
     // render empty state
