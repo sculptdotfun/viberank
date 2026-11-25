@@ -2,26 +2,53 @@
 @plugin "@tailwindcss/typography";
 
 :root {
-  /* Modern flat dark — higher contrast, no gradients */
-  --background: #0a0a0b;
-  --background-secondary: #101012;
-  --foreground: #fafafa;
-  --muted: #9a9aa5;
-  --accent: #f97316;
-  --accent-hover: #fb8a3c;
-  --accent-soft: rgba(249, 115, 22, 0.12);
-  --card: #131316;
-  --card-hover: #1a1a1f;
-  --border: #26262d;
-  --border-subtle: #1b1b21;
-  --success: #22c55e;
-  --error: #ef4444;
+  /* v2 tokens: warm near-black, Geist, one heat accent used for data only
+     (live dot, your row, usage bars). Buttons are ink-on-dark, not orange. */
+  --bg: #0b0a09;
+  --panel: #121110;
+  --raised: #191816;
+  --line: rgba(255, 244, 230, 0.09);
+  --line-2: rgba(255, 244, 230, 0.17);
+  --ink: #f3f0eb;
+  --ink-2: #b5aea4;
+  --ink-3: #7f786e;
+  --heat: #ff6b1a;
+  --heat-soft: rgba(255, 107, 26, 0.13);
+  --up: #3fcf8e;
+  --down: #f0575c;
+  --warn: #e3b04b;
+  --btn: #f3f0eb;
+  --btn-ink: #0b0a09;
+  /* Heat ramp for heatmaps and bars, empty to hottest. */
+  --h0: #1c1a17;
+  --h1: #4a2410;
+  --h2: #8a3a10;
+  --h3: #d15412;
+  --h4: #ff8a3d;
+  /* Vendor colours for models and tools. */
+  --v-anthropic: #d97757;
+  --v-openai: #e8e6e1;
+  --v-google: #6ea8fe;
+  --v-open: #9a948a;
 
-  /* Surface colors (flat, stepped) */
-  --surface-1: #0f0f12;
-  --surface-2: #16161a;
-  --surface-3: #1e1e23;
-  --surface-4: #26262d;
+  /* Legacy names, remapped to v2 so older pages adopt the palette. */
+  --background: var(--bg);
+  --background-secondary: var(--panel);
+  --foreground: var(--ink);
+  --muted: var(--ink-2);
+  --accent: var(--heat);
+  --accent-hover: #ff8a3d;
+  --accent-soft: var(--heat-soft);
+  --card: var(--panel);
+  --card-hover: var(--raised);
+  --border: var(--line-2);
+  --border-subtle: var(--line);
+  --success: var(--up);
+  --error: var(--down);
+  --surface-1: #0f0e0d;
+  --surface-2: var(--panel);
+  --surface-3: var(--raised);
+  --surface-4: #22201d;
 }
 
 @theme inline {
@@ -40,6 +67,30 @@
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
   --color-surface-4: var(--surface-4);
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-heat: var(--heat);
+  --color-heat-soft: var(--heat-soft);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-warn: var(--warn);
+  --color-btn: var(--btn);
+  --color-btn-ink: var(--btn-ink);
+  --color-h0: var(--h0);
+  --color-h1: var(--h1);
+  --color-h2: var(--h2);
+  --color-h3: var(--h3);
+  --color-h4: var(--h4);
+  --color-v-anthropic: var(--v-anthropic);
+  --color-v-openai: var(--v-openai);
+  --color-v-google: var(--v-google);
+  --color-v-open: var(--v-open);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
