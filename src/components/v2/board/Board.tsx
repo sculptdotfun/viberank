@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
 import { boardViewed, bracketToggled } from "@/lib/analytics";
 import { FLEET_PLAN_EQ, type BoardClass, type BoardResult, type BoardRow as Row, type BoardWindow, type Standing } from "@/lib/v2/contract";
@@ -167,7 +167,17 @@ export default function Board({
     () => ({ window: initial.window, cls: initial.cls, sort: initial.sort, tool: lockedTool ?? null }),
     [initial.window, initial.cls, initial.sort, lockedTool],
   );
-  const { query: q, setQuery, result, status, more, retry } = useBoard(initial, defaults, pageSize, source, failed);
+  // The tabs one click away from whatever is shown, warmed after first paint.
+  const neighboursOf = useCallback(
+    (cur: BoardQuery): BoardQuery[] => [
+      ...windows.filter((w) => w !== cur.window).map((w) => ({ ...cur, window: w })),
+      ...classes.filter((c) => c !== cur.cls).map((c) => ({ ...cur, cls: c })),
+    ],
+    // Joined so a caller's inline array literal does not refire the prefetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [windows.join(), classes.join()],
+  );
+  const { query: q, setQuery, result, status, more, retry } = useBoard(initial, defaults, pageSize, source, failed, neighboursOf);
   const [bracket, setBracket] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -220,7 +230,12 @@ export default function Board({
             Could not load this board. <button type="button" onClick={retry}>Try again</button>
           </div>
         )}
-        {status !== "error" && rows.length === 0 && (
+        {status === "loading" && rows.length === 0 && (
+          <div className="vr-empty" role="status">
+            Loading the board…
+          </div>
+        )}
+        {status === "ready" && rows.length === 0 && (
           <div className="vr-empty">
             Nobody here yet{q.window === "week" ? " this week" : ""}. Be first: <code>npx viberank-cli</code>
           </div>
