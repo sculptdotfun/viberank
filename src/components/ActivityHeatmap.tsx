@@ -6,6 +6,8 @@ interface ActivityHeatmapProps {
 }
 
 const DAY_MS = 86_400_000;
+// At the 680px minimum width, eight weeks leave room for half a tooltip.
+const TOOLTIP_EDGE_WEEKS = 8;
 const WEEKDAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -23,7 +25,7 @@ function toIso(utc: number): string {
 
 /**
  * GitHub-style contribution calendar of the trailing year's daily spend.
- * Server-rendered: plain divs with native title tooltips, no client JS.
+ * Server-rendered: plain divs with CSS tooltips, no client JS.
  * Cells are fluid (1fr columns, square cells) so the grid fills the card;
  * a min-width keeps it readable on phones via horizontal scroll.
  */
@@ -107,13 +109,14 @@ export default function ActivityHeatmap({ daily }: ActivityHeatmapProps) {
               {label}
             </span>
           ))}
-          {cells.map(({ date, cost, level }) =>
+          {cells.map(({ date, cost, level }, i) =>
             level < 0 ? (
               <span key={date} className="w-full aspect-square" />
             ) : (
               <span
                 key={date}
                 data-tip={`${date} · $${formatCurrency(cost)}`}
+                data-tip-align={i < 7 * TOOLTIP_EDGE_WEEKS ? "start" : i >= (weeks - TOOLTIP_EDGE_WEEKS) * 7 ? "end" : undefined}
                 className={`w-full aspect-square rounded-[2px] ${LEVEL_CLASSES[level]}`}
               />
             )
