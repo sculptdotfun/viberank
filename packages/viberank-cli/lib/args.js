@@ -15,6 +15,7 @@ export const COMMANDS = [
   ['autosubmit', 'Submit once a day in the background'],
   ['autosubmit off', 'Stop submitting automatically'],
   ['status', 'Token, schedule, last submission and recent runs'],
+  ['status --format', 'One line of weekly standing for a status line (offline)'],
   ['help', 'Show this help'],
 ];
 
@@ -24,6 +25,8 @@ export const OPTIONS = [
   { names: ['-y', '--yes'], key: 'yes', help: 'Submit without asking for confirmation' },
   { names: ['--token'], value: '<token>', key: 'token', help: 'With login: the token to save, without a prompt' },
   { names: ['--quiet'], key: 'quiet', help: 'Scheduled mode: no prompts, one line per run in ~/.viberank/autosubmit.log' },
+  { names: ['--every'], value: '<hours>', key: 'every', help: 'With --quiet: skip if a submission landed within this many hours (default 20)' },
+  { names: ['--format'], value: '<format>', key: 'format', help: 'With status: short, compact, long, json, or a template like "{rank}/{of} {move}"' },
   { names: ['-h', '--help'], key: 'help', help: 'Show this help' },
   { names: ['-v', '--version'], key: 'version', help: 'Print the version' },
 ];
@@ -31,13 +34,14 @@ export const OPTIONS = [
 /**
  * @param {string[]} argv process.argv.slice(2)
  * @returns {{ command: string | undefined, arg: string | undefined,
- *   flags: { user: string | null, yes: boolean, token: string | null, quiet: boolean, help: boolean, version: boolean },
+ *   flags: { user: string | null, yes: boolean, token: string | null, quiet: boolean, every: string | null,
+ *     format: string | null, help: boolean, version: boolean },
  *   unknown: string[], missing: string[] }}
  *   `unknown` holds options nobody defined; `missing` holds options that take
  *   a value but were given none.
  */
 export function parseArgs(argv) {
-  const flags = { user: null, yes: false, token: null, quiet: false, help: false, version: false };
+  const flags = { user: null, yes: false, token: null, quiet: false, every: null, format: null, help: false, version: false };
   const positional = [];
   const unknown = [];
   const missing = [];
@@ -103,6 +107,26 @@ export function submitMode({ quiet, interactive, hasToken, user, yes }) {
   if (hasToken) return 'unattended';
   if (user && yes) return 'unattended';
   return 'blocked';
+}
+
+/**
+ * How long a scheduled run waits after a success before it submits again.
+ * The daily job keeps the 20-hour default (its catch-up triggers fire on every
+ * boot); the Claude Code plugin passes --every 1 so a session's usage lands
+ * within the hour. Anything that is not a positive number keeps the default.
+ */
+export function skipWithinMs(every, defaultHours = 20) {
+  const hours = Number(every);
+  return (Number.isFinite(hours) && hours > 0 ? hours : defaultHours) * 60 * 60 * 1000;
+}
+
+/**
+ * Whether `status` prints the one-line standing instead of the full report:
+ * when a format is asked for, or when nobody is reading a terminal (a status
+ * line runs it with stdout piped). The one-liner never touches the network.
+ */
+export function wantsStatusLine({ format, stdoutIsTTY }) {
+  return format !== null && format !== undefined ? true : !stdoutIsTTY;
 }
 
 /** What to print in 'blocked' mode. Plain lines; the caller styles them. */

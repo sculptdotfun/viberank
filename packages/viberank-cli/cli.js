@@ -11,11 +11,13 @@ import { getToken, getSavedToken, getMachineId, readConfig, writeConfig, clearTo
 import { remoteOwnerKind, resolveTokenOwner, whoami } from './lib/identity.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus, corpusScope } from './lib/corpus.js';
-import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
-import { blockedMessage, helpText, parseArgs, submitMode } from './lib/args.js';
+import { autosubmitOneLine, keepLocalHistoryHint } from './lib/pitch.js';
+import { blockedMessage, helpText, parseArgs, skipWithinMs, submitMode, wantsStatusLine } from './lib/args.js';
 import { CCUSAGE, generateReport, noUsageHelp, parseReport } from './lib/ccusage.js';
 import { SITE, describeWait, failureMessage, isVerifiedRefusal, networkErrorCode, postReport, submitHeaders } from './lib/submit.js';
 import { appendLog, formatLogLine, isOverdue, lastSuccess, timeAgo } from './lib/runlog.js';
+import { fetchStanding, meUrl, recapUrl, standingLines, toRecord, usernameFromProfileUrl } from './lib/standing.js';
+import { STANDING_FILE, readStandingFile, statusLine, writeStandingFile } from './lib/statusline.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,8 +44,9 @@ const INTERACTIVE = !QUIET && process.stdin.isTTY === true;
 const REPORT_FILE = path.join(CONFIG_DIR, 'cc.json');
 
 // RunAtLoad and logon triggers fire on every boot, so a scheduled run skips
-// itself within this long of a success.
-const SKIP_WITHIN_MS = 20 * 60 * 60 * 1000;
+// itself within this long of a success: 20 hours, or --every <hours> (the
+// Claude Code plugin syncs hourly).
+const SKIP_WITHIN_MS = skipWithinMs(ARGS.flags.every);
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -270,7 +273,15 @@ function scheduleWarnings(s, token) {
   return notes;
 }
 
+/** One line of weekly standing from ~/.viberank/standing.json. No network:
+ * a status line runs this on every prompt. */
+function printStatusLine() {
+  const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
+  console.log(statusLine(readStandingFile(STANDING_FILE), { format: ARGS.flags.format ?? 'short', color }));
+}
+
 async function showStatus() {
+  if (wantsStatusLine({ format: ARGS.flags.format, stdoutIsTTY: process.stdout.isTTY === true })) return printStatusLine();
   const token = getToken();
   const config = readConfig();
   const s = autosubmit.status();
@@ -282,6 +293,8 @@ async function showStatus() {
 
   const last = lastSuccess(config);
   console.log(`  last submit  ${last ? `${last.toLocaleString()} (${timeAgo(last)})` : chalk.gray('none recorded on this machine')}`);
+  const saved = readStandingFile(STANDING_FILE);
+  console.log(`  this week    ${saved ? `${statusLine(saved, { format: 'long' })} ${chalk.gray(Number.isNaN(Date.parse(saved.updatedAt)) ? '' : `(as of ${timeAgo(new Date(saved.updatedAt))})`)}` : chalk.gray('no standing saved yet; it is written after each submit')}`);
   if (isOverdue({ enabled: s.enabled, last, enabledAt: config.autosubmit?.enabledAt })) {
     console.log(chalk.yellow('  ! No successful submission in over 48 hours. The recent runs below should say why.'));
   }
@@ -449,7 +462,9 @@ async function quietSubmit() {
     writeConfig({ lastAutosubmit: now, lastSubmit: now });
     const as = owner.username ? ` as @${owner.username}` : '';
     const waited = outcome.waitedSeconds ? `, after waiting ${describeWait(outcome.waitedSeconds)} for the rate limit` : '';
-    logRun({ outcome: 'ok', status: outcome.status, detail: `submitted ${data.daily.length} days${as}${waited} ${outcome.body.profileUrl ?? ''}` });
+    const standing = await refreshStanding(owner.username ?? usernameFromProfileUrl(outcome.body.profileUrl));
+    const week = standing ? ` · ${statusLine(toRecord(standing), { format: 'long' })}` : '';
+    logRun({ outcome: 'ok', status: outcome.status, detail: `submitted ${data.daily.length} days${as}${waited} ${outcome.body.profileUrl ?? ''}${week}` });
     return;
   }
 
@@ -695,7 +710,39 @@ async function sendReport(payload, githubUser) {
 /** Where you landed, and the badge, right here. This is the one moment
  * someone is actually pleased with the tool, and it used to print a bare URL
  * — which is why almost nobody has ever put the badge up. */
-function showResult(result) {
+/**
+ * This week's standing from the v2 API, saved for status lines. Null when the
+ * server predates v2 or does not answer; the caller then prints what 1.13 did.
+ */
+async function refreshStanding(username) {
+  const standing = await fetchStanding(SITE, username, { fetch, version: CLI_VERSION });
+  if (!standing) return null;
+  try {
+    writeStandingFile(STANDING_FILE, toRecord(standing));
+  } catch {
+    // A read-only home only loses the status line.
+  }
+  return standing;
+}
+
+const PAINT = { bold: chalk.bold, accent: chalk.yellow.bold, gray: chalk.gray, green: chalk.green, red: chalk.red, yellow: chalk.yellow };
+
+/** The week first: rank in class, movement, spend, the gap above; then the links. */
+function showWeek(result, standing) {
+  console.log();
+  for (const line of standingLines(standing, { paint: PAINT })) console.log(`  ${line}`);
+  console.log(`\n  Recap:   ${chalk.green(recapUrl(SITE, standing.week.id, standing.username))}`);
+  const profile = result.profileUrl || `${SITE}/profile/${encodeURIComponent(standing.username)}`;
+  console.log(`  Profile: ${chalk.green(meUrl(profile, standing.username))}`);
+  const badge = result.standing?.badgeMarkdown;
+  if (badge) console.log(`\n  ${chalk.gray('Badge for your README:')}\n  ${chalk.cyan(badge)}`);
+  console.log('');
+  if (result.hint) console.log(chalk.yellow(result.hint) + '\n');
+  if (result.notice) console.log(chalk.gray(result.notice) + '\n');
+}
+
+function showResult(result, weekly = null) {
+  if (weekly) return showWeek(result, weekly);
   const st = result.standing;
   if (st && st.totalDevelopers > 0) {
     console.log(
@@ -752,7 +799,8 @@ async function main() {
   try {
     writeConfig({ lastSubmit: new Date().toISOString(), ...(githubUser ? { username: githubUser } : {}) });
   } catch { /* best effort */ }
-  showResult(result);
+  const standing = await refreshStanding(signedInAs ?? usernameFromProfileUrl(result.profileUrl) ?? githubUser);
+  showResult(result, standing);
 
   if (INTERACTIVE) await offerAutosubmit(data);
   console.log(chalk.green('\nDone! 🎉'));
@@ -783,20 +831,16 @@ async function offerAutosubmit(ccData) {
     return;
   }
 
-  // The pitch used to be about keeping a rank fresh. That is the vanity reason
-  // and it converts badly — 62 of ~1,100 people have ever sent a second report.
-  // The true reason is better: Claude Code deletes session transcripts after
-  // `cleanupPeriodDays`, 30 by default, with no warning and no recovery. Once
-  // it runs, the local history is gone for every tool that reads those files.
-  // What has already been submitted here survives it. That makes autosubmit a
-  // backup rather than a leaderboard chore, and it is the one thing viberank
-  // can offer that a tool reading the same folder cannot.
-  for (const line of autosubmitPitch(ccData)) console.log(chalk.gray(line));
+  // One line, then the question (1.14). The ten-line pitch sat under the
+  // result and pushed the week off the screen. With weekly ranks the live rank
+  // is a real reason now, and the backup (Claude Code deletes transcripts after
+  // `cleanupPeriodDays`, 30 by default) still rides along: see lib/pitch.js.
+  console.log(chalk.gray(autosubmitOneLine(ccData)));
 
   const { enable } = await prompts({
     type: 'confirm',
     name: 'enable',
-    message: 'Keep a running backup of my usage?',
+    message: 'Turn on autosubmit?',
     initial: true,
   });
   if (!enable) {

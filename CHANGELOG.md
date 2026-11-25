@@ -1,5 +1,18 @@
 # Changelog
 
+## CLI 1.14.0, MCP 1.3.0 and a Claude Code plugin — the week, in your terminal (November 2026)
+
+### Added
+- **CLI: the week comes first after a submit.** Week and day, rank of N on your board (Ranked, Open or Fleets, with the reason when held), movement since last week, spend, tokens and plan-equivalents this week, the gap to the person above (`$27 behind @palewave`) and the streak, from `GET /api/v2/standing/{username}`. Then the week's recap link and the profile with `?me=`. A server without the route gets the 1.13 output, silently.
+- **CLI: `~/.viberank/standing.json`** is written after every successful submit and scheduled sync, and the scheduled log line carries the standing.
+- **CLI: `status --format short|compact|long|json|<template>`** prints one line (`vr #41/126 ▲6 · $27 to @palewave`) from that file, without the network. Plain `status` does the same when stdout is not a terminal (a status line); in a terminal it shows the full report, now with the week.
+- **CLI: `--every <hours>`** sets how long a `--quiet` run skips after a success (default 20).
+- **Claude Code plugin** (`packages/viberank-claude-plugin`): SessionStart and SessionEnd hooks start `npx -y viberank-cli@latest submit --quiet --every 1` detached, at most hourly, only with a saved token, and print nothing into the session. A status-line script and `/viberank` read the standing file.
+- **MCP 1.3.0: `get_standing`**: the week's `Standing`, plus `gapToAbove` and `recapUrl`. Without a username, uses the saved token's owner.
+
+### Changed
+- **CLI: the autosubmit offer is one line and a yes/no question**, still only with a person at a terminal.
+
 ## CLI 1.13.0, MCP 1.2.0 and the site — submissions that keep arriving (October 2026)
 
 ### Fixed
