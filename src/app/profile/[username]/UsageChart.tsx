@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  type TooltipProps,
+  type TooltipContentProps,
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { SERIES_COLORS, OTHER_COLOR, modelColors } from "@/lib/chartColors";
@@ -33,7 +33,7 @@ interface UsageChartProps {
   colorByModel: Record<string, string>;
 }
 
-function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
+function ChartTooltip({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload || payload.length === 0) return null;
   const rows = payload.filter((p) => (p.value ?? 0) > 0);
   const total = rows.reduce((s, p) => s + (p.value ?? 0), 0);

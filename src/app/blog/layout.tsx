@@ -3,9 +3,7 @@ import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: {
-    default: 'AI Coding Costs, Limits & Usage Data — the Viberank Blog',
-  },
+  title: 'AI Coding Costs, Limits & Usage Data — the Viberank Blog',
   description: 'Data-backed writing on what AI coding actually costs: Claude Code and Codex usage limits, real spend benchmarks from 1,100+ developers, and how to measure your own.',
   // Without a self-canonical the index competes with its own posts for the
   // informational queries it collects impressions on.

@@ -96,7 +96,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { getServerDataLayer } = await import("@/lib/data");
       const site = await (await getServerDataLayer()).stats.getSiteStats();
       modelEntries = publishableModels(
-        buildModelEconomics(site.modelSpend ?? [], site.models ?? [])
+        buildModelEconomics(site?.modelSpend ?? [], site?.models ?? [])
       ).map((m) => ({
         url: `${SITE}/model/${m.slug}`,
         lastModified: new Date(),

@@ -4,7 +4,7 @@ import { track } from "@vercel/analytics/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
-import { normalizeCcData, isClientMachineId, NO_USAGE_MESSAGE } from "@/lib/ccusage";
+import { normalizeCcData, isClientMachineId, NO_USAGE_MESSAGE, type RawCcData } from "@/lib/ccusage";
 import { archiveRawSubmission } from "@/lib/data/supabase/rawArchive";
 import { getPaidCliNotice, TAKO_CLI_NOTICE } from "@/lib/sponsor";
 import { isGithubHandle } from "@/lib/profile-index";
@@ -64,9 +64,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the request body
-    let ccData;
+    // Untrusted until the checks below pass; the fields are optional for that reason.
+    let body: (Partial<RawCcData> & { tools?: string[] }) | null;
     try {
-      ccData = await request.json();
+      body = await request.json();
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
       return NextResponse.json(
@@ -145,11 +146,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if ccData is null or undefined
-    if (!ccData || typeof ccData !== 'object') {
-      console.error("Invalid cc.json data: ccData is null or not an object", {
-        ccData: ccData,
-        type: typeof ccData
+    // Check if body is null or undefined
+    if (!body || typeof body !== 'object') {
+      console.error("Invalid cc.json data: body is null or not an object", {
+        body: body,
+        type: typeof body
       });
       return NextResponse.json(
         { error: "Invalid submission data. Please ensure your cc.json file contains valid data." },
@@ -158,11 +159,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate the cc.json structure
-    if (!ccData.daily || !ccData.totals) {
+    if (!body.daily || !body.totals) {
       console.error("Invalid cc.json structure:", {
-        hasDaily: !!ccData.daily,
-        hasTotals: !!ccData.totals,
-        keys: Object.keys(ccData || {})
+        hasDaily: !!body.daily,
+        hasTotals: !!body.totals,
+        keys: Object.keys(body || {})
       });
       return NextResponse.json(
         { error: "Invalid cc.json format. Missing 'daily' or 'totals' field. Please regenerate using: npx ccusage@latest --json > cc.json" },
@@ -172,8 +173,9 @@ export async function POST(request: NextRequest) {
 
     // Validate totals structure
     const requiredTotalFields = ['inputTokens', 'outputTokens', 'cacheCreationTokens', 'cacheReadTokens', 'totalCost', 'totalTokens'];
+    const totals = body.totals;
     const missingTotalFields = requiredTotalFields.filter(field =>
-      ccData.totals[field] === undefined || ccData.totals[field] === null
+      totals[field] === undefined || totals[field] === null
     );
 
     if (missingTotalFields.length > 0) {
@@ -186,13 +188,13 @@ export async function POST(request: NextRequest) {
 
     // Validate daily entries. An empty list is the most common rejection and
     // isn't a broken file: ccusage found no usage on that machine.
-    if (!Array.isArray(ccData.daily)) {
+    if (!Array.isArray(body.daily)) {
       return NextResponse.json(
         { error: "Invalid cc.json format. 'daily' must be a non-empty array." },
         { status: 400 }
       );
     }
-    if (ccData.daily.length === 0) {
+    if (body.daily.length === 0) {
       return NextResponse.json({ error: NO_USAGE_MESSAGE }, { status: 400 });
     }
 
@@ -209,7 +211,8 @@ export async function POST(request: NextRequest) {
     // the single chokepoint every submission path funnels through.
     let normalized;
     try {
-      normalized = normalizeCcData(ccData);
+      // The shape checks above guarantee totals and a non-empty daily array.
+      normalized = normalizeCcData(body as RawCcData);
     } catch (normalizeError) {
       const message =
         normalizeError instanceof Error
@@ -220,11 +223,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Keep the pre-normalization payload for the raw archive (006): once
-    // ccData is reassigned below, the original report shape is gone.
-    const rawPayload = ccData;
+    // ccData replaces it below, the original report shape is gone.
+    const rawPayload = body;
 
     // Hand the data layer the canonical shape from here on.
-    ccData = {
+    const ccData = {
       totals: normalized.totals,
       daily: normalized.daily,
       tools: normalized.tools,

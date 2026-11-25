@@ -81,7 +81,7 @@ interface RawDailyEntry {
   agents?: unknown;
 }
 
-interface RawCcData {
+export interface RawCcData {
   totals: Record<string, number>;
   daily: RawDailyEntry[];
 }
