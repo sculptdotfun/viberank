@@ -99,11 +99,22 @@ RETURNS TABLE (
   agents TEXT[],
   model_breakdowns JSONB
 )
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
+SET plan_cache_mode = force_custom_plan
 AS $$
+#variable_conflict use_column
+BEGIN
+  -- plpgsql (not sql) on purpose: its plans are built for the actual
+  -- arguments, so the window bounds pick the date index and a NULL user key
+  -- folds away. A sql-language body is planned with unknown parameters, which
+  -- made the planner start from every submission and read each one's whole
+  -- history (nested loop on idx_daily_breakdowns_submission_id).
+  -- force_custom_plan keeps it that way: after five calls in one session
+  -- Postgres otherwise switches to a generic plan, which has the same flaw.
+  RETURN QUERY
   WITH kept AS (
     SELECT k.id, k.user_key, k.tools
     FROM v2_kept_submissions() k
@@ -211,6 +222,7 @@ AS $$
   FROM merged m
   LEFT JOIN merged_agents a ON a.user_key = m.user_key AND a.date = m.date
   LEFT JOIN merged_models mm ON mm.user_key = m.user_key AND mm.date = m.date;
+END;
 $$;
 
 -- ============================================================================
