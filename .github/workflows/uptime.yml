@@ -38,3 +38,21 @@ jobs:
             fi
           done
           exit $failed
+
+      # The v2 weekly board API feeds the home (once VIBERANK_HOME=v2), /week,
+      # the CLI's rank line and the plugin. A 200 with an HTML error page or an
+      # empty body is still down, so check it parses as a board.
+      - name: The v2 weekly board API answers 200 JSON
+        run: |
+          url="https://www.viberank.app/api/v2/board?window=week&cls=ranked"
+          for attempt in 1 2 3; do
+            code=$(curl -s -o board.json -w '%{http_code}' --max-time 30 "$url" || echo "000")
+            echo "$url -> $code (try $attempt)"
+            if [ "$code" = "200" ] && jq -e '.week.id and (.rows | type == "array")' board.json > /dev/null; then
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep 60
+          done
+          echo "::error::$url returned $code or a body that is not a board"
+          head -c 300 board.json || true
+          exit 1

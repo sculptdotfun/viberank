@@ -78,3 +78,19 @@ export const leagueJoined = () => emit("league_joined");
 export const citationCopied = () => emit("citation_copied");
 /** The public API was surfaced to a human (docs page, not the endpoint itself). */
 export const apiDocsViewed = () => emit("api_docs_viewed");
+
+/* ---------- v2 weekly league funnel ---------- */
+
+/** A board was shown: on load and on every window or class change. */
+export const boardViewed = (window: string, cls: string) => emit("board_view", { window, cls });
+/** "Top" / "Your bracket" switched on a board. */
+export const bracketToggled = (on: boolean) => emit("bracket_toggle", { on });
+/** A share card was shared. `card` says which: the week recap or Wrapped. */
+export type ShareMethod = "x" | "copy" | "download";
+export const recapShared = (method: ShareMethod, card: "week" | "wrapped") => emit("recap_share", { method, card });
+/** README badge markdown copied, for the week or all-time. */
+export const badgeCopied = (range: "week" | "all") => emit("badge_copy", { range });
+
+/** Page views worth a funnel step of their own; fired once on mount by <TrackView>. */
+export type ViewEvent = "wrapped_view" | "week_archive_view";
+export const viewTracked = (event: ViewEvent, props?: Props) => emit(event, props);

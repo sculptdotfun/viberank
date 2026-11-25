@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Check, Copy, Download } from "lucide-react";
+import { recapShared } from "@/lib/analytics";
 
 interface ShareActionsProps {
   /** Absolute page URL that goes into the post and the clipboard. */
@@ -15,6 +16,8 @@ interface ShareActionsProps {
   /** Same-origin OG image path offered as a download. */
   imagePath: string;
   fileName: string;
+  /** Which card is shared, for the recap_share event. */
+  card?: "week" | "wrapped";
 }
 
 function XGlyph() {
@@ -27,13 +30,14 @@ function XGlyph() {
 
 const BTN = "inline-flex items-center gap-2 h-9 px-3.5 rounded-md text-[13px] font-medium transition-colors";
 
-export default function ShareActions({ url, owner, text, visitorText, imagePath, fileName }: ShareActionsProps) {
+export default function ShareActions({ url, owner, text, visitorText, imagePath, fileName, card = "week" }: ShareActionsProps) {
   const { data: session } = useSession();
   const isOwner = session?.user?.username?.toLowerCase() === owner.toLowerCase();
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const post = () => {
+    recapShared("x", card);
     window.open(
       `https://x.com/intent/tweet?text=${encodeURIComponent(isOwner ? text : visitorText)}&url=${encodeURIComponent(url)}`,
       "_blank",
@@ -43,6 +47,7 @@ export default function ShareActions({ url, owner, text, visitorText, imagePath,
 
   const copy = async () => {
     await navigator.clipboard.writeText(url);
+    recapShared("copy", card);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -51,6 +56,7 @@ export default function ShareActions({ url, owner, text, visitorText, imagePath,
   // caching headers opens the PNG in a tab on some browsers instead.
   const download = async () => {
     setSaving(true);
+    recapShared("download", card);
     try {
       const res = await fetch(imagePath);
       if (!res.ok) throw new Error(`image ${res.status}`);

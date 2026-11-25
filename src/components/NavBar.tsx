@@ -11,6 +11,7 @@ import UserMenu, { accountLinks } from "./UserMenu";
 import { takeSubmitParam } from "@/lib/submit-modal";
 import { isAdmin as checkIsAdmin } from "@/lib/admin";
 import { currentWeek } from "./v2/week";
+import { useBoardHref } from "./HomeVariant";
 import { weekNumber } from "./v2/format";
 
 // Modals only matter on interaction — split them out of the shell bundle
@@ -30,7 +31,9 @@ export function Logo() {
 }
 
 function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  // "/week" must not light up on "/weeks", so match whole path segments.
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 // Site-wide nav, restyled for v2. Owns the submit + updates modals so any
@@ -44,6 +47,8 @@ export default function NavBar() {
   const pathname = usePathname() ?? "/";
   const login = session?.user?.username;
   const week = weekNumber(currentWeek());
+  // The weekly board is "/" once VIBERANK_HOME=v2, and "/week" until then.
+  const board = useBoardHref();
 
   // Back from "Sign in with GitHub to upload": reopen the modal they were in.
   // Read once from the URL rather than useSearchParams, which would opt
@@ -53,7 +58,7 @@ export default function NavBar() {
   }, []);
 
   const navItems = [
-    { name: "Board", href: "/" },
+    { name: "Board", href: board },
     { name: "Records", href: "/records" },
     { name: "Fleets", href: "/fleets" },
     { name: "Wrapped 2026", href: "/wrapped/2026" },

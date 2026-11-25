@@ -638,3 +638,27 @@ html:has(.v2-slide) {
   min-height: 100svh;
 }
 /* ---- end v2 share ---- */
+
+/* ---- v2 week archive (/week/{id}, /weeks) ---- */
+.vr-arch-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; font: 400 13px var(--vr-mono); color: var(--ink-2); padding-block: 14px; border-block: 1px solid var(--line); margin-bottom: 8px; }
+.vr-arch-nav a:hover { color: var(--ink); }
+.vr-arch-facts { margin: 22px 0 0; }
+.vr-arch-hl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 32px 0 40px; }
+.vr-arch-hl ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.vr-arch-hl li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 400 12.5px var(--vr-mono); color: var(--ink-3); }
+.vr-arch-hl .who { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink); font: 500 14px var(--vr-sans); }
+.vr-arch-hl .who b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vr-arch-hl p { margin: 0; font-size: 14px; color: var(--ink-3); }
+.vr-arch-year { margin-bottom: 40px; }
+.vr-arch-year h2 { font: 500 14px var(--vr-mono); color: var(--ink-3); margin: 0 0 10px; }
+.vr-arch-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.vr-arch-wk { display: grid; grid-template-columns: 96px 120px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 13px 4px; border-bottom: 1px solid var(--line); font: 400 13px var(--vr-mono); color: var(--ink-3); }
+.vr-arch-wk:hover { background: var(--panel); }
+.vr-arch-wk b { color: var(--ink); font: 500 14px var(--vr-sans); }
+.vr-arch-wk .who { display: flex; align-items: center; gap: 8px; color: var(--ink-2); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (max-width: 900px) {
+  .vr-arch-hl { grid-template-columns: minmax(0, 1fr); }
+  .vr-arch-wk { grid-template-columns: 84px minmax(0, 1fr); gap: 4px 12px; }
+  .vr-arch-wk .who, .vr-arch-wk .t { grid-column: 1 / -1; }
+}
+/* ---- end v2 week archive ---- */
