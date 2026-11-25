@@ -1,0 +1,16 @@
+{
+  "name": "viberank",
+  "version": "0.1.0",
+  "description": "Your weekly viberank rank in Claude Code: syncs your usage in the background when sessions start and end (at most hourly) and shows your standing in the status line.",
+  "author": {
+    "name": "SCULPT",
+    "url": "https://www.viberank.app"
+  },
+  "homepage": "https://www.viberank.app",
+  "repository": "https://github.com/sculptdotfun/viberank",
+  "license": "MIT",
+  "keywords": ["viberank", "leaderboard", "ccusage", "statusline", "usage"],
+  "network": {
+    "hosts": ["www.viberank.app", "registry.npmjs.org", "api.github.com"]
+  }
+}
