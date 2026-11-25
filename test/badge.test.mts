@@ -130,4 +130,21 @@ const check = (label: string) => { passed++; console.log(`✓ ${label}`); };
   check("range badges name their window");
 }
 
+{
+  const { renderBadgeV2, badgeStyleFrom, V2_BADGE } = await import("../src/lib/badge.ts");
+  assert.equal(badgeStyleFrom("v2"), "v2");
+  for (const other of [null, "", "V2", "flat"]) assert.equal(badgeStyleFrom(other as string), "classic");
+  const rank = renderBadgeV2({ label: "viberank this week", value: "#12", heat: true });
+  assert.match(rank, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.ok(rank.includes(`fill="${V2_BADGE.ground}"`), "warm near-black ground");
+  assert.ok(rank.includes(`fill="${V2_BADGE.heat}"`), "the rank is in heat");
+  assert.ok(rank.includes("Geist"), "Geist first in the font stack");
+  assert.ok(!rank.includes("linearGradient"), "flat, no shields gradient");
+  assert.match(rank, /aria-label="viberank this week: #12"/);
+  const muted = renderBadgeV2({ label: "tokens", value: "940M" });
+  assert.ok(!muted.includes(V2_BADGE.heat) && muted.includes(`fill="${V2_BADGE.ink}"`), "non-rank values use ink");
+  assert.ok(!renderBadgeV2({ label: '"><script>', value: "x" }).includes("<script>"), "escapes markup");
+  check("style=v2 renders the v2 look and the classic look stays the default");
+}
+
 console.log(`\n${passed} passed, 0 failed`);

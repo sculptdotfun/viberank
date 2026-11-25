@@ -53,6 +53,40 @@ export interface BadgeInput {
   color?: string;
 }
 
+export type BadgeStyle = "classic" | "v2";
+
+/** ?style=v2 picks the v2 look; anything else keeps the classic shields style. */
+export function badgeStyleFrom(value: string | null): BadgeStyle {
+  return value === "v2" ? "v2" : "classic";
+}
+
+/** v2 palette: warm near-black ground, ink text, heat for the rank. */
+export const V2_BADGE = { ground: "#0b0a09", ink: "#f3f0eb", heat: "#ff6b1a", rule: "#2a2622" } as const;
+
+/**
+ * The v2 badge: one flat warm-black pill, the label in muted ink and the
+ * value in ink, or in heat when `heat` is set (the rank). No gradient or
+ * text shadow, unlike the shields look.
+ */
+export function renderBadgeV2({ label, value, heat = false }: { label: string; value: string; heat?: boolean }): string {
+  const safeLabel = escapeXml(label);
+  const safeValue = escapeXml(value);
+  const padding = 10;
+  const labelWidth = textWidth(label) + padding * 2;
+  const valueWidth = textWidth(value) + padding * 2;
+  const total = labelWidth + valueWidth;
+  const valueColor = heat ? V2_BADGE.heat : V2_BADGE.ink;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="20" role="img" aria-label="${safeLabel}: ${safeValue}">
+  <title>${safeLabel}: ${safeValue}</title>
+  <rect width="${total}" height="20" rx="4" fill="${V2_BADGE.ground}"/>
+  <rect x="${labelWidth}" y="5" width="1" height="10" fill="${V2_BADGE.rule}"/>
+  <g text-anchor="middle" font-family="Geist,Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11">
+    <text x="${labelWidth / 2}" y="14" fill="${V2_BADGE.ink}" fill-opacity=".62" textLength="${labelWidth - padding * 2}">${safeLabel}</text>
+    <text x="${labelWidth + valueWidth / 2}" y="14" fill="${valueColor}" font-weight="600" textLength="${valueWidth - padding * 2}">${safeValue}</text>
+  </g>
+</svg>`;
+}
+
 export function renderBadge({ label, value, color = "#f97316" }: BadgeInput): string {
   const safeLabel = escapeXml(label);
   const safeValue = escapeXml(value);
