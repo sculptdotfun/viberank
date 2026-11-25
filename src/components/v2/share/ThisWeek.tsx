@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Standing } from "@/lib/v2/contract";
 import CopyBadge from "./CopyBadge";
+import ChallengeButton from "./ChallengeButton";
 import { WeekBars } from "./parts";
 import { CLASS_LABEL, closesIn, dayRange, movement, planEq, recapPath, tokens, usd, weekNumber, wrappedPath } from "./format";
 
@@ -35,6 +36,7 @@ function Actions({ username, standing }: { username: string; standing: Standing 
       >
         Wrapped 2026
       </Link>
+      <ChallengeButton owner={username} />
       <CopyBadge username={username} />
       <span className="font-mono text-xs text-ink-3 sm:ml-2">
         monthly:{" "}

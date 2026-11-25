@@ -260,7 +260,10 @@ export function Closing({ week }: { week: BoardResult["week"] }) {
       <h2>
         Week {weekNumber(week)} closes in <Countdown closesAt={week.closesAt} initial={countdown(week.closesAt)} />.
       </h2>
-      <CopyCommand source="closing" />
+      <div className="vr-cta">
+        <CopyCommand source="closing" />
+        <Link className="vr-more" href="/start">Other ways to join →</Link>
+      </div>
     </div>
   );
 }

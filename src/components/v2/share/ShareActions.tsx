@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Check, Copy, Download } from "lucide-react";
 import { recapShared } from "@/lib/analytics";
+import ChallengeButton from "./ChallengeButton";
 
 interface ShareActionsProps {
   /** Absolute page URL that goes into the post and the clipboard. */
@@ -18,6 +19,8 @@ interface ShareActionsProps {
   fileName: string;
   /** Which card is shared, for the recap_share event. */
   card?: "week" | "wrapped";
+  /** Show the Challenge button (recap page). */
+  challenge?: boolean;
 }
 
 function XGlyph() {
@@ -30,7 +33,7 @@ function XGlyph() {
 
 const BTN = "inline-flex items-center gap-2 h-9 px-3.5 rounded-md text-[13px] font-medium transition-colors";
 
-export default function ShareActions({ url, owner, text, visitorText, imagePath, fileName, card = "week" }: ShareActionsProps) {
+export default function ShareActions({ url, owner, text, visitorText, imagePath, fileName, card = "week", challenge = false }: ShareActionsProps) {
   const { data: session } = useSession();
   const isOwner = session?.user?.username?.toLowerCase() === owner.toLowerCase();
   const [copied, setCopied] = useState(false);
@@ -90,6 +93,7 @@ export default function ShareActions({ url, owner, text, visitorText, imagePath,
         <Download className="w-3.5 h-3.5" />
         {saving ? "Saving…" : "Download image"}
       </button>
+      {challenge && <ChallengeButton owner={owner} />}
     </div>
   );
 }
