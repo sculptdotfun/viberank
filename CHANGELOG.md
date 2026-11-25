@@ -1,5 +1,28 @@
 # Changelog
 
+## v2: the weekly league (November 2026)
+
+viberank now runs in weeks. Launch post: [/blog/viberank-v2-weekly-league](https://www.viberank.app/blog/viberank-v2-weekly-league).
+
+### Changed
+- **The home page is this week.** A new week starts every Monday 00:00 UTC and only usage dated inside it counts. The lifetime board moved to **`/records`**.
+- **Three boards instead of one.** **Ranked**: GitHub-verified, nothing under review, at most 10 plan-equivalents a week (one plan-equivalent is $1,300 of API-equivalent usage a week, #195). **Open**: everyone else below that line, with the reason on the row. **Fleets**: above 10 plan-equivalents a week.
+- **"Under review" now holds an entry.** It keeps its profile and sits on Open until a maintainer clears it. Before, the badge was shown and the rank kept (#183).
+- **Closed weeks are frozen** 12 hours after they close. Late days update the profile and `/records`, never a finished week (migration 024; a Monday cron snapshots the week).
+- Weekly boards are aggregated in SQL instead of in app memory.
+
+### Added
+- **Your row pinned** on the board, with the gap to the person above and your bracket.
+- **A Monday recap card** for every closed week, and **weekly archive pages** such as `/week/2026-W48`.
+- **Head to head:** `/vs/{a}/{b}` challenge links.
+- **`/start`**: every way to join on one page.
+- **Private team leagues** on the weekly board.
+- **Wrapped 2026**, opening December 10.
+- **README badge with weekly rank:** `/api/badge/{user}?style=v2&range=week` (also `7d` and `30d`, #198).
+- **Public read API:** `/api/v2/board`, `/api/v2/standing/{user}`, `/api/v2/recap/{user}/{week}`, `/api/v2/wrapped/{user}/{year}`. See the README.
+- **CLI 1.14, MCP 1.3 and the Claude Code plugin**: weekly standing after every submit, `status` for status lines, `get_standing`, and sync at session end. Details in the [entry below](#cli-1140-mcp-130-and-a-claude-code-plugin--the-week-in-your-terminal-november-2026).
+- **New post:** `/blog/viberank-v2-weekly-league`. `/blog/how-viberank-checks-submissions` now explains Ranked, Open, Fleets and the weekly freeze.
+
 ## CLI 1.14.0, MCP 1.3.0 and a Claude Code plugin — the week, in your terminal (November 2026)
 
 ### Added
