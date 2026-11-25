@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getWeeklyService } from "@/lib/data";
+import { cachedRecap } from "@/lib/v2/cached";
 import { CACHE, parseUsername, parseWeekParam } from "@/lib/v2/query";
 import { v2Json, v2Options, v2Unavailable } from "@/lib/v2/api";
 import { isFrozen } from "@/lib/v2/week";
@@ -26,8 +26,7 @@ export async function GET(
   if (typeof week === "object") return v2Json({ error: week.error }, 400, CACHE.missing);
 
   try {
-    const weekly = await getWeeklyService();
-    const recap = await weekly.getRecap(username, week);
+    const recap = await cachedRecap(username, week, now);
     if (!recap) return v2Json({ error: `No usage for ${username} in ${week}.` }, 404, CACHE.missing);
     return v2Json(recap, 200, isFrozen(week, now) ? CACHE.frozen : CACHE.live);
   } catch (error) {

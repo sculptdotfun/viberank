@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getWeeklyService } from "@/lib/data";
+import { cachedStanding } from "@/lib/v2/cached";
 import { CACHE, parseUsername, parseWeekParam } from "@/lib/v2/query";
 import { v2Json, v2Options, v2Unavailable } from "@/lib/v2/api";
 import { isFrozen } from "@/lib/v2/week";
@@ -22,8 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (week && typeof week === "object") return v2Json({ error: week.error }, 400, CACHE.missing);
 
   try {
-    const weekly = await getWeeklyService();
-    const standing = await weekly.getStanding(username, week);
+    const standing = await cachedStanding(username, week, now);
     if (!standing) return v2Json({ error: `No developer named ${username}.` }, 404, CACHE.missing);
     return v2Json(standing, 200, isFrozen(standing.week.id, now) ? CACHE.frozen : CACHE.live);
   } catch (error) {
