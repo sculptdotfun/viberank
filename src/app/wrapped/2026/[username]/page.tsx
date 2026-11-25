@@ -8,6 +8,7 @@ import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import type { YearWrapped } from "@/lib/v2/contract";
 import ShareActions from "@/components/v2/share/ShareActions";
+import TrackView from "@/components/v2/TrackView";
 import YearHeatmap from "@/components/v2/share/YearHeatmap";
 import { Avatar } from "@/components/v2/share/parts";
 import { loadYear } from "@/components/v2/share/load";
@@ -139,6 +140,7 @@ export default async function Wrapped2026Page({ params }: WrappedParams) {
   return (
     <div className="min-h-screen bg-bg">
       <NavBar />
+      <TrackView event="wrapped_view" props={{ year: YEAR }} />
       <main className="max-w-4xl mx-auto px-4 sm:px-6">
         <Slide n={1} label={`Wrapped ${YEAR}${running ? ` · so far, through ${last ? shortDate(last) : "today"}` : ""}`}>
           <div className="flex items-center gap-3 mb-6 text-ink font-medium">
@@ -229,6 +231,7 @@ export default async function Wrapped2026Page({ params }: WrappedParams) {
             visitorText={wrappedPostText(wrapped, false)}
             imagePath={`/api/og/wrapped/${YEAR}/${encodeURIComponent(username)}`}
             fileName={`viberank-wrapped-${YEAR}-${username}.png`}
+            card="wrapped"
           />
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-10 pt-6 border-t border-line text-sm text-ink-2">
             <Link href={`/profile/${encodeURIComponent(username)}`} className="hover:text-ink">

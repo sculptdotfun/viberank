@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Copy } from "lucide-react";
 import { SITE_URL, profileUrl } from "@/lib/site";
+import { badgeCopied } from "@/lib/analytics";
 
 type Range = "week" | "all";
 
@@ -38,6 +39,7 @@ export default function CopyBadge({ username }: { username: string }) {
 
   const copy = async (range: Range) => {
     await navigator.clipboard.writeText(markdown(username, range));
+    badgeCopied(range);
     setCopied(range);
     setTimeout(() => setCopied(null), 2000);
   };

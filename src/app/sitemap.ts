@@ -6,6 +6,8 @@ import { BLOG_POSTS } from "@/lib/blogPosts";
 import { COMPARE_MATCHUPS } from "@/lib/compare";
 import { buildModelEconomics, publishableModels } from "@/lib/model-economics";
 import { indexableProfiles } from "@/lib/profile-index";
+import { ARCHIVE_SITEMAP_WEEKS, closedWeekIds } from "@/lib/v2/archive";
+import { freezesAt } from "@/lib/v2/week";
 
 const SITE = "https://www.viberank.app";
 
@@ -23,6 +25,24 @@ const boardEntries: MetadataRoute.Sitemap = ["records", "fleets"].map((path) => 
   changeFrequency: "daily" as const,
   priority: 0.8,
 }));
+
+// The live weekly board, the week archive index, and the last closed weeks.
+// A closed week never changes after it freezes, so its lastModified is the freeze.
+function weekEntries(now: Date): MetadataRoute.Sitemap {
+  return [
+    { url: `${SITE}/week`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: `${SITE}/weeks`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    ...closedWeekIds(now, ARCHIVE_SITEMAP_WEEKS).map((id) => {
+      const frozen = new Date(freezesAt(id));
+      return {
+        url: `${SITE}/week/${id}`,
+        lastModified: frozen < now ? frozen : now,
+        changeFrequency: "yearly" as const,
+        priority: 0.6,
+      };
+    }),
+  ];
+}
 
 const compareEntries: MetadataRoute.Sitemap = COMPARE_MATCHUPS.map((m) => ({
   url: `${SITE}/compare/${m.slug}`,
@@ -62,6 +82,7 @@ function monthlyReportEntries(): MetadataRoute.Sitemap {
 const staticEntries: MetadataRoute.Sitemap = [
   { url: SITE, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
   ...boardEntries,
+  ...weekEntries(new Date()),
   ...toolEntries,
   ...compareEntries,
   { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },

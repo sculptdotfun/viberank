@@ -159,6 +159,16 @@ GITHUB_ID=<github-oauth-client-id>
 GITHUB_SECRET=<github-oauth-client-secret>
 ```
 
+Optional:
+
+```env
+# Which home "/" serves: "legacy" (the pre-v2 all-time board, the default when
+# unset) or "v2" (the weekly league). The v2 board is always live at /week,
+# and closed weeks at /week/<YYYY-Www> and /weeks, whichever home is set.
+# Read on the server when a page renders; redeploy after changing it.
+VIBERANK_HOME=legacy
+```
+
 Apply the schema:
 
 ```bash

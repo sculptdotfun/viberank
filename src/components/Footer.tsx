@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
 import { TAKO_URL } from "@/lib/sponsor";
+import { BoardLink } from "./HomeVariant";
 
-const BOARDS = [
-  { name: "This week", href: "/" },
+type FooterLink = { name: string; href: string; external?: boolean; board?: boolean };
+
+// "This week" follows VIBERANK_HOME ("/" or "/week"), so it renders through
+// BoardLink, which reads the flag the root layout passed down.
+const BOARDS: FooterLink[] = [
+  { name: "This week", href: "/week", board: true },
+  { name: "Weeks", href: "/weeks" },
   { name: "Records", href: "/records" },
   { name: "Fleets", href: "/fleets" },
   { name: "Wrapped 2026", href: "/wrapped/2026" },
@@ -33,14 +39,16 @@ const GUIDES = [
   { name: "Cut your AI coding bill", href: "/blog/reduce-ai-coding-costs" },
 ];
 
-function Column({ title, links }: { title: string; links: { name: string; href: string; external?: boolean }[] }) {
+function Column({ title, links }: { title: string; links: FooterLink[] }) {
   return (
     <div>
       <h3>{title}</h3>
       <ul>
         {links.map((l) => (
           <li key={l.href}>
-            {l.external ? (
+            {l.board ? (
+              <BoardLink>{l.name}</BoardLink>
+            ) : l.external ? (
               <a href={l.href} target="_blank" rel="noopener noreferrer">{l.name}</a>
             ) : (
               <Link href={l.href}>{l.name}</Link>
@@ -74,7 +82,7 @@ export default function Footer() {
         <div className="vr-ft">
           <span>viberank · open source, MIT · © {new Date().getFullYear()}</span>
           <span>
-            <Link href="/records">Records</Link> · <Link href="/fleets">Fleets</Link> · <Link href="/data">Data</Link> ·{" "}
+            <Link href="/records">Records</Link> · <Link href="/weeks">Weeks</Link> · <Link href="/fleets">Fleets</Link> · <Link href="/data">Data</Link> ·{" "}
             <Link href="/blog/how-viberank-checks-submissions">Rules</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
             <a href="https://github.com/sculptdotfun/viberank" target="_blank" rel="noopener noreferrer">GitHub</a>
           </span>

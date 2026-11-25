@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FEATURED_TOOLS, toolLabel } from "@/lib/utils";
+import { boardViewed, bracketToggled } from "@/lib/analytics";
 import { FLEET_PLAN_EQ, type BoardClass, type BoardResult, type BoardRow as Row, type BoardWindow, type Standing } from "@/lib/v2/contract";
 import { valueHeader, weekNumber, weekRange, WINDOW_LABEL } from "../format";
 import { BoardHead, BoardRow, type RowContext } from "./BoardRow";
@@ -174,6 +175,16 @@ export default function Board({
     if (syncUrl) setQuery(queryFromUrl(defaults, Boolean(lockedTool)));
   }, [syncUrl, defaults, lockedTool, setQuery]);
 
+  // Funnel: which boards people actually look at, first view and every tab change.
+  useEffect(() => {
+    boardViewed(q.window, q.cls);
+  }, [q.window, q.cls]);
+
+  const toggleBracket = (on: boolean) => {
+    setBracket(on);
+    bracketToggled(on);
+  };
+
   const setQ = (next: Partial<BoardQuery>) => {
     const merged = { ...q, ...next };
     setQuery(merged);
@@ -200,7 +211,7 @@ export default function Board({
       </div>
       <div className="vr-rule">
         <RuleLine result={result} />
-        <Controls q={q} setQ={setQ} showToolFilter={showToolFilter} bracket={hasBracket ? showBracket : null} onBracket={setBracket} />
+        <Controls q={q} setQ={setQ} showToolFilter={showToolFilter} bracket={hasBracket ? showBracket : null} onBracket={toggleBracket} />
       </div>
       <div className={`vr-grid c-${q.cls}${q.window === "week" ? "" : " nodays"}${status === "loading" ? " busy" : ""}`} role="table" aria-label={t.h}>
         <BoardHead ctx={ctx} valueLabel={valueHeader(q.sort, q.window)} />
