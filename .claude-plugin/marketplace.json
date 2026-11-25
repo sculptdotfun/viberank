@@ -1,0 +1,19 @@
+{
+  "name": "viberank",
+  "owner": {
+    "name": "SCULPT",
+    "url": "https://www.viberank.app"
+  },
+  "description": "viberank, the weekly league for AI coding usage, inside Claude Code.",
+  "plugins": [
+    {
+      "name": "viberank",
+      "description": "Background sync at session start and end, and your weekly rank in the status line.",
+      "source": {
+        "source": "git-subdir",
+        "url": "sculptdotfun/viberank",
+        "path": "packages/viberank-claude-plugin"
+      }
+    }
+  ]
+}

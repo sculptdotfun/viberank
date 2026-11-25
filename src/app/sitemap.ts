@@ -16,6 +16,14 @@ const toolEntries: MetadataRoute.Sitemap = FEATURED_TOOLS.map((t) => ({
   priority: 0.8,
 }));
 
+// v2 boards beside the weekly home: the lifetime board and the Fleets board.
+const boardEntries: MetadataRoute.Sitemap = ["records", "fleets"].map((path) => ({
+  url: `${SITE}/${path}`,
+  lastModified: new Date(),
+  changeFrequency: "daily" as const,
+  priority: 0.8,
+}));
+
 const compareEntries: MetadataRoute.Sitemap = COMPARE_MATCHUPS.map((m) => ({
   url: `${SITE}/compare/${m.slug}`,
   lastModified: new Date(),
@@ -53,6 +61,7 @@ function monthlyReportEntries(): MetadataRoute.Sitemap {
 
 const staticEntries: MetadataRoute.Sitemap = [
   { url: SITE, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
+  ...boardEntries,
   ...toolEntries,
   ...compareEntries,
   { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
