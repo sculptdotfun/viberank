@@ -171,7 +171,7 @@ export default function Post() {
           <li>The MCP server has a <code>get_standing</code> tool, so you can ask your agent where you are.</li>
           <li>
             A README badge shows your weekly rank:{" "}
-            <code>https://www.viberank.app/api/badge/&lt;you&gt;?style=v2&amp;range=week</code>
+            <code className="break-all">https://www.viberank.app/api/badge/&lt;you&gt;?style=v2&amp;range=week</code>
           </li>
           <li>
             A <code>/vs/you/friend</code> link puts two people side by side for the week. Send it to whoever you
