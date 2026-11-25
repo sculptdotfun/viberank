@@ -309,3 +309,29 @@ body {
   z-index: 50;
   pointer-events: none;
 }
+
+/* ---- v2 share: week recap, Wrapped 2026, profile this-week block ---- */
+
+/* Keep edge-week tooltips inside the heatmap's horizontal scroll area (#197). */
+[data-tip-align="start"]:hover::after {
+  left: 0;
+  transform: none;
+}
+
+[data-tip-align="end"]:hover::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* Wrapped slides: each section snaps into view; proximity, so the footer
+   and long slides on phones stay reachable. */
+html:has(.v2-slide) {
+  scroll-snap-type: y proximity;
+}
+
+.v2-slide {
+  scroll-snap-align: start;
+  min-height: 100svh;
+}
+/* ---- end v2 share ---- */
