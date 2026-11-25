@@ -138,6 +138,12 @@ export const AUTOSUBMIT_FIXED_IN = "1.13.0";
 export const AUTOSUBMIT_RERUN_NOTICE =
   "If you turned on autosubmit, run `npx viberank-cli autosubmit` once more. Older versions set up a schedule that couldn't find Node on macOS and some Linux setups, so daily runs never arrived.";
 
+/** The first CLI with the weekly league and the one-step `login`. */
+export const V2_CLI_VERSION = "1.14.0";
+
+export const V2_UPGRADE_NOTICE =
+  "viberank v2: weekly league is live. Run npx viberank-cli@latest to see your rank this week.";
+
 /**
  * The line the CLI prints in grey after a successful submission.
  *
@@ -146,8 +152,12 @@ export const AUTOSUBMIT_RERUN_NOTICE =
  * The only way to reach those people is an interactive run, and a token
  * means they most likely set autosubmit up, so it goes to exactly them.
  *
- * It outranks the house promo, which it replaces. A paid sponsor's line is
- * kept and follows it.
+ * Every CLI older than 1.14 is told the weekly league is live: it can't show
+ * the week, and `npx viberank-cli` without @latest can keep running a cached
+ * old copy. Only a parseable X-CLI-Version counts; the MCP and web send none.
+ *
+ * These outrank the house promo, which they replace. A paid sponsor's line is
+ * kept and follows them.
  */
 export function submitNotice(input: {
   cliVersion: string | null;
@@ -159,6 +169,7 @@ export function submitNotice(input: {
   if (input.tokenVerified && isVersionBelow(input.cliVersion, AUTOSUBMIT_FIXED_IN)) {
     lines.push(AUTOSUBMIT_RERUN_NOTICE);
   }
+  if (isVersionBelow(input.cliVersion, V2_CLI_VERSION)) lines.push(V2_UPGRADE_NOTICE);
   if (input.paidNotice) lines.push(input.paidNotice);
   return lines.length > 0 ? lines.join("\n\n") : input.houseNotice;
 }

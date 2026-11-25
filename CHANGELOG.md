@@ -3,6 +3,11 @@
 ## CLI 1.14.0, MCP 1.3.0 and a Claude Code plugin — the week, in your terminal (November 2026)
 
 ### Added
+- **One-step verification from the terminal.** `npx viberank-cli login` shows a short code (`HXKT-4Q2M`), opens `viberank.app/link?code=…`, and waits; you sign in with GitHub and click Approve, and the CLI saves a token labelled "CLI (linked <date>)". No token to copy. Approval also claims your earlier unverified CLI submissions.
+  - First run in a terminal without a token: after reading usage the CLI asks "Verify with GitHub to join the Ranked board? (Y/n)", then one question covers the submit and autosubmit (daily, once, or cancel). Declining submits unverified as before.
+  - In an agent's shell or CI it never asks; it prints one line pointing at `npx viberank-cli login`. `login --no-browser` prints the link only; `login --paste` keeps the old paste flow; `logout` removes the token.
+  - Server: `POST /api/v2/link/start` (rate-limited per IP), `/poll` (pending, slow_down, expired, or the token exactly once) and `/approve` (GitHub session), on migration 025 `cli_link_codes`. Codes expire after 10 minutes; only a hash of the device secret is stored, and the token is minted in the poll that collects it, so its plaintext is never stored.
+- **Server: CLIs older than 1.14 are told the weekly league is live** after a submit, with the command for the latest CLI.
 - **CLI: the week comes first after a submit.** Week and day, rank of N on your board (Ranked, Open or Fleets, with the reason when held), movement since last week, spend, tokens and plan-equivalents this week, the gap to the person above (`$27 behind @palewave`) and the streak, from `GET /api/v2/standing/{username}`. Then the week's recap link and the profile with `?me=`. A server without the route gets the 1.13 output, silently.
 - **CLI: `~/.viberank/standing.json`** is written after every successful submit and scheduled sync, and the scheduled log line carries the standing.
 - **CLI: `status --format short|compact|long|json|<template>`** prints one line (`vr #41/126 ▲6 · $27 to @palewave`) from that file, without the network. Plain `status` does the same when stdout is not a terminal (a status line); in a terminal it shows the full report, now with the week.
