@@ -14,6 +14,15 @@ import { readCorpusScope } from "@/lib/drift";
 import { getTier } from "@/lib/tiers";
 import { badgeMarkdown, profileUrl } from "@/lib/site";
 
+// What the data layers throw varies (Error, string, driver error with `data`),
+// so the catch narrows from unknown to this loose shape.
+type DbErrorShape = {
+  message?: string;
+  data?: { message?: string };
+  code?: unknown;
+  stack?: string;
+};
+
 /**
  * `{ "2026-07": { files, bytes } }` from the submission body, or undefined.
  *
@@ -288,7 +297,8 @@ export async function POST(request: NextRequest) {
         machineId,
         cliVersion: cliVersion || undefined,
       });
-    } catch (dbError: any) {
+    } catch (caught: unknown) {
+      const dbError = caught as DbErrorShape | null | undefined;
       console.error("Database mutation error:", {
         message: dbError?.message,
         data: dbError?.data,
@@ -304,8 +314,8 @@ export async function POST(request: NextRequest) {
 
       if (dbError?.message) {
         errorMessage = dbError.message;
-      } else if (typeof dbError === 'string') {
-        errorMessage = dbError;
+      } else if (typeof caught === 'string') {
+        errorMessage = caught;
       } else if (dbError?.data?.message) {
         errorMessage = dbError.data.message;
       }

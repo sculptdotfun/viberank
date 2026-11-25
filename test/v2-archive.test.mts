@@ -35,12 +35,12 @@ eq("before the archive starts", archive.archiveWeekState("2025-W01", wed), "inva
 console.log("closedWeekIds");
 eq("newest first", archive.closedWeekIds(wed, 3), ["2026-W47", "2026-W46", "2026-W45"]);
 eq("crosses the year", archive.closedWeekIds(new Date("2026-01-07T00:00:00Z"), 2), ["2026-W01", "2025-W52"]);
-eq("stops at the first archive week", archive.closedWeekIds(new Date("2025-07-09T00:00:00Z"), 5), ["2025-W27"]);
+eq("stops at the first archive week", archive.closedWeekIds(new Date("2025-09-10T00:00:00Z"), 5), ["2025-W36"]);
 
 console.log("neighbourWeeks");
 eq("latest closed week links to the live one", archive.neighbourWeeks("2026-W47", wed), { prev: "2026-W46", next: "current" });
 eq("older week links both ways", archive.neighbourWeeks("2026-W40", wed), { prev: "2026-W39", next: "2026-W41" });
-eq("first week has no prev", archive.neighbourWeeks("2025-W27", wed).prev, null);
+eq("first week has no prev", archive.neighbourWeeks("2025-W36", wed).prev, null);
 
 console.log("topMovers / newEntries");
 const row = (rank: number, username: string, movement: number | null) => ({

@@ -3,16 +3,14 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { AlertTriangle, CheckCircle, XCircle, ExternalLink } from "lucide-react";
+import { AlertTriangle, CheckCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { useFlaggedSubmissions, useUpdateFlagStatus } from "@/lib/data/hooks/useSubmissions";
 import { isAdmin as checkIsAdmin } from "@/lib/admin";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null);
 
   // Check if user is admin (shared allowlist, also enforced server-side)

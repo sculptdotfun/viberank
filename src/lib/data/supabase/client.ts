@@ -1353,7 +1353,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       .eq("id", id)
       .single();
 
-    const updates: any = {
+    const updates: { flagged_for_review: boolean; flag_reasons?: string[] | null } = {
       flagged_for_review: flagged,
     };
 
@@ -2477,7 +2477,7 @@ class SupabaseLeaguesService implements LeaguesService {
 
     // Best submission per member; the whole set is small (≤100 members), so
     // dedupe client-side rather than grow the query surface.
-    let best = new Map<string, { totalCost: number; totalTokens: number; verified: boolean }>();
+    const best = new Map<string, { totalCost: number; totalTokens: number; verified: boolean }>();
     if (usernames.length > 0) {
       const { data: subs } = await this.client
         .from("submissions")

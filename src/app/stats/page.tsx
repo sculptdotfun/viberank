@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, BarChart3, Cpu, DollarSign, Users, Wrench, Zap, CalendarDays, Database, Flame } from "lucide-react";
-import { formatNumber, formatCurrency, toolLabel, prettyModelName } from "@/lib/utils";
+import { formatNumber, toolLabel, prettyModelName } from "@/lib/utils";
 import { modelColors, toolColors } from "@/lib/chartColors";
 import { TIERS } from "@/lib/tiers";
 import { getServerDataLayer } from "@/lib/data";

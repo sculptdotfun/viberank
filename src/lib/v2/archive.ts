@@ -4,7 +4,7 @@ import type { BoardRow } from "./contract";
 import { isClosed, isFrozen, isWeekId, previousWeekId, shiftWeek, weekIdOf } from "./week";
 
 /** The first week the archive offers: weekly data before it is too thin to rank. */
-export const ARCHIVE_FIRST_WEEK = "2025-W27";
+export const ARCHIVE_FIRST_WEEK = "2025-W36"; // first week with tracked data (Sep 2025)
 
 /** Weeks listed on /weeks, and closed weeks in the sitemap. */
 export const ARCHIVE_INDEX_WEEKS = 52;

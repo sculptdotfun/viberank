@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src",
     "test": "for f in test/*.test.mts; do echo \"\n--- $f ---\"; node --import tsx \"$f\" || exit 1; done"
   },
   "dependencies": {

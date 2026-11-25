@@ -27,7 +27,6 @@ import type {
   PatternSearchOptions,
   ProfileWithSubmissions,
   Submission,
-  SubmitData,
 } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -359,7 +358,7 @@ export function createDemoDataLayer(): DataLayer {
         // Demo data is read-only.
         return false;
       },
-      async submit(_data: SubmitData): Promise<string> {
+      async submit(): Promise<string> {
         throw new Error("Demo data is read-only");
       },
       async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
@@ -427,7 +426,7 @@ export function createDemoDataLayer(): DataLayer {
       },
     },
     profiles: {
-      async getProfile(username: string, _submissionLimit?: number): Promise<ProfileWithSubmissions | null> {
+      async getProfile(username: string): Promise<ProfileWithSubmissions | null> {
         const submission = findSubmission(username);
         return submission ? profileFromSubmission(submission) : null;
       },

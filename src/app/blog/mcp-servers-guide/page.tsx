@@ -130,8 +130,8 @@ export default function MCPServersGuide() {
           </div>
 
           <p className="text-foreground text-lg leading-relaxed">
-            The beauty of MCP is that Claude doesn't need to know the implementation details. It just sees
-            available tools like "create_github_issue" or "query_database" and uses them naturally in conversation.
+            The beauty of MCP is that Claude doesn’t need to know the implementation details. It just sees
+            available tools like “create_github_issue” or “query_database” and uses them naturally in conversation.
           </p>
         </section>
 
@@ -143,7 +143,7 @@ export default function MCPServersGuide() {
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
             MCP servers are configured in your Claude Code settings file at <code className="bg-stone-800 px-2 py-1 rounded text-accent">~/.claude/settings.json</code>.
-            Here's how to add them:
+            Here’s how to add them:
           </p>
 
           <div className="bg-card rounded-lg p-6 border border-border my-8">
@@ -231,8 +231,8 @@ export default function MCPServersGuide() {
 
           <div className="bg-stone-800 p-4 rounded-lg my-8">
             <p className="text-foreground m-0">
-              <strong className="text-accent">Example prompt:</strong> "Create an issue titled 'Add dark mode support'
-              in the frontend repo with the labels 'enhancement' and 'ui'"
+              <strong className="text-accent">Example prompt:</strong> “Create an issue titled ‘Add dark mode support’
+              in the frontend repo with the labels ‘enhancement’ and ‘ui’”
             </p>
           </div>
         </section>
@@ -282,8 +282,8 @@ export default function MCPServersGuide() {
 
           <div className="bg-stone-800 p-4 rounded-lg my-8">
             <p className="text-foreground m-0">
-              <strong className="text-accent">Example prompt:</strong> "Show me the top 10 users by total purchases
-              this month, and create a summary report"
+              <strong className="text-accent">Example prompt:</strong> “Show me the top 10 users by total purchases
+              this month, and create a summary report”
             </p>
           </div>
 
@@ -303,7 +303,7 @@ export default function MCPServersGuide() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Connect Claude to your team's communication tools to automate notifications, summaries, and updates.
+            Connect Claude to your team’s communication tools to automate notifications, summaries, and updates.
           </p>
 
           <div className="space-y-6 my-8">
@@ -344,7 +344,7 @@ export default function MCPServersGuide() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Extend Claude's ability to work with files and fetch web content with these utility servers.
+            Extend Claude’s ability to work with files and fetch web content with these utility servers.
           </p>
 
           <div className="grid md:grid-cols-2 gap-6 my-8">
@@ -381,7 +381,7 @@ export default function MCPServersGuide() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Need an integration that doesn't exist? Building custom MCP servers is straightforward with the
+            Need an integration that doesn’t exist? Building custom MCP servers is straightforward with the
             official SDKs available in Python, TypeScript, and other languages.
           </p>
 
@@ -447,7 +447,7 @@ await server.connect(transport);`}</code>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
             As you integrate more MCP servers, your Claude Code usage becomes increasingly powerful. Track how
-            these integrations boost your productivity with Viberank's analytics.
+            these integrations boost your productivity with Viberank’s analytics.
           </p>
 
           <div className="bg-card border border-border rounded-lg p-8 text-center">
@@ -473,7 +473,7 @@ await server.connect(transport);`}</code>
         </section>
 
         <footer className="mt-16 pt-8 border-t border-border">
-          <h3 className="text-xl font-semibold text-foreground mb-4">Unlock Claude's Full Potential</h3>
+          <h3 className="text-xl font-semibold text-foreground mb-4">Unlock Claude’s Full Potential</h3>
           <p className="text-foreground mb-6">
             MCP servers transform Claude Code from a coding assistant into an automation platform. Start with
             GitHub and database servers, then expand as you discover new workflows. The ability to connect

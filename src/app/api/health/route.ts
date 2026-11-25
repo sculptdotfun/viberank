@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerDataLayer, getDatabaseBackend } from "@/lib/data";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const backend = getDatabaseBackend();
 
   const checks = {
@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     checks.backendConnection = "ok";
 
     return NextResponse.json(checks, { status: 200 });
-  } catch (error: any) {
+  } catch (caught: unknown) {
+    const error = caught as { message?: string } | null | undefined;
     console.error("Health check failed:", {
       error: error?.message || error,
       backend,
