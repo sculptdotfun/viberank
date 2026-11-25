@@ -94,6 +94,13 @@ One developer's profile: rank, cost, tokens, days tracked, tools and verified st
 
 - `username` (string, required): the GitHub username.
 
+### `get_standing`
+
+The week's standing from `/api/v2/standing/{username}` (weeks run Monday to Sunday, UTC): board class (ranked, open or fleets, with the reason when held), rank of N, movement since last week, cost, tokens and plan-equivalents this week, the rows above and below, your bracket and streak. Adds `gapToAbove` (dollars to pass the row above) and `recapUrl` (the week's shareable card). Says `found: false` when there is no standing.
+
+- `username` (string, optional): defaults to the saved token's owner, then the handle the CLI last submitted under.
+- `week` (string, optional): an ISO week id such as `2026-W48`; defaults to the current week.
+
 ### `get_stats`
 
 Site-wide numbers from [`/api/stats`](https://www.viberank.app/api/stats): developer count, total spend and tokens, monthly spend percentiles, tool and model adoption, the monthly trend and tiers, with methodology and caveats.

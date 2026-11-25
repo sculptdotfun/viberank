@@ -16,6 +16,7 @@ import {
   noUsage,
   profileResult,
   reply,
+  standingResult,
   statsResult,
   submitResult,
   usageResult,
@@ -91,6 +92,23 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_standing',
+    description:
+      "A developer's viberank standing for the week (weeks run Monday to Sunday, UTC): week id and day, board " +
+      'class (ranked, open or fleets, with heldReason when not ranked), rank of N in that class, movement since ' +
+      'last week, API-equivalent cost and tokens this week, plan-equivalents, the rows directly above and below, ' +
+      'the surrounding bracket, streak in weeks and best week. Also returns gapToAbove (dollars to pass the row ' +
+      'above) and recapUrl, a shareable card for the week. Without username it uses the account of the saved ' +
+      'viberank token, or the handle this machine last submitted under.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        username: { type: 'string', description: 'GitHub username. Leave it out for the user on this machine.' },
+        week: { type: 'string', description: 'ISO week id such as "2026-W48". Defaults to the current week.' },
+      },
+    },
+  },
+  {
     name: 'get_stats',
     description:
       'Site-wide viberank statistics: developer and submission counts, total tokens and API-equivalent cost, ' +
@@ -138,8 +156,8 @@ class ViberankMCPServer {
       {
         capabilities: { tools: {} },
         instructions:
-          'viberank is a public leaderboard of AI coding usage. The read tools (get_usage, get_leaderboard, ' +
-          'get_profile, get_stats) are safe to call. submit_to_viberank publishes data: call it only when the ' +
+          'viberank is a public leaderboard of AI coding usage, played in weeks (Monday to Sunday, UTC). The read ' +
+          'tools (get_usage, get_leaderboard, get_profile, get_standing, get_stats) are safe to call. submit_to_viberank publishes data: call it only when the ' +
           'user asks, and confirm their GitHub username with them unless a token is configured.',
       }
     );
@@ -160,6 +178,8 @@ class ViberankMCPServer {
           return this.getLeaderboard(args.limit, args.tool);
         case 'get_profile':
           return this.getProfile(argString(args.username));
+        case 'get_standing':
+          return this.getStanding(argString(args.username), argString(args.week));
         case 'get_stats':
           return statsResult(await getJson('/api/stats', API));
         default:
@@ -232,6 +252,34 @@ class ViberankMCPServer {
       return reply({ success: false, error: 'Pass username: a GitHub username (1-39 letters, digits and single hyphens).' }, true);
     }
     return profileResult(await getJson(`/api/profile/${encodeURIComponent(username)}`, API), username);
+  }
+
+  /** Whose standing to read when none was named: the saved token's owner, then
+   * the handle the CLI last submitted under. Local only; no whoami call. */
+  private localUsername(): string | null {
+    const token = readToken();
+    const owner = token.status === 'ok' ? savedTokenOwner(token.token) : null;
+    return owner ?? rememberedUsername();
+  }
+
+  private async getStanding(requested: string | undefined, week: string | undefined): Promise<ToolResult> {
+    const username = requested ?? this.localUsername() ?? undefined;
+    if (!username || !isGithubHandle(username)) {
+      return reply(
+        {
+          success: false,
+          error: requested
+            ? 'Pass username: a GitHub username (1-39 letters, digits and single hyphens).'
+            : 'No username given and none saved on this machine. Pass username, or run `npx viberank-cli` once.',
+        },
+        true
+      );
+    }
+    if (week !== undefined && !/^\d{4}-W\d{2}$/.test(week)) {
+      return reply({ success: false, error: `"${week.slice(0, 20)}" is not an ISO week id like 2026-W48.` }, true);
+    }
+    const query = week ? `?week=${encodeURIComponent(week)}` : '';
+    return standingResult(await getJson(`/api/v2/standing/${encodeURIComponent(username)}${query}`, API), username);
   }
 
   async start() {
