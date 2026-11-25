@@ -1,7 +1,7 @@
 // Server-side board loading for the pages. The weekly service is the source
 // of truth; this only adds a well-formed empty board for when it fails, so a
 // page still renders its shell and the client can retry.
-import { getServerDataLayer } from "@/lib/data";
+import { cachedBoard } from "@/lib/v2/cached";
 import type { BoardParams, BoardResult } from "@/lib/v2/contract";
 import { currentWeek } from "../week";
 
@@ -20,11 +20,18 @@ export function emptyBoard(params: BoardParams): BoardResult {
 }
 
 export async function loadBoard(params: BoardParams): Promise<{ board: BoardResult; failed: boolean }> {
-  try {
-    const dataLayer = await getServerDataLayer();
-    return { board: await dataLayer.weekly.getBoard(params), failed: false };
-  } catch (err) {
-    console.error("[v2] board load failed", params, err);
-    return { board: emptyBoard(params), failed: true };
+  // One retry: a blip (a timeout while a deploy prerenders every board at
+  // once) should not bake an error state into an ISR page for five minutes.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return { board: await cachedBoard(params), failed: false };
+    } catch (err) {
+      if (attempt < 2) {
+        console.warn("[v2] board load failed, retrying", params, err);
+        continue;
+      }
+      console.error("[v2] board load failed", params, err);
+      return { board: emptyBoard(params), failed: true };
+    }
   }
 }

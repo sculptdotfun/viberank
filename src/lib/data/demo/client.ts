@@ -25,9 +25,11 @@ import type {
   LeaderboardParams,
   LeaderboardResult,
   PatternSearchOptions,
+  ProfileSummary,
   ProfileWithSubmissions,
   Submission,
 } from "../types";
+import { sparkSeries } from "@/lib/profile-summary";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const START = Date.UTC(2026, 4, 6);
@@ -429,6 +431,24 @@ export function createDemoDataLayer(): DataLayer {
       async getProfile(username: string): Promise<ProfileWithSubmissions | null> {
         const submission = findSubmission(username);
         return submission ? profileFromSubmission(submission) : null;
+      },
+      async getProfileSummary(username: string): Promise<ProfileSummary | null> {
+        const submission = findSubmission(username);
+        if (!submission) return null;
+        const profile = profileFromSubmission(submission);
+        const days = (submission.dailyBreakdown ?? []).map((day) => ({ date: day.date, cost: day.totalCost }));
+        return {
+          username: profile.username,
+          githubUsername: profile.githubUsername,
+          githubName: profile.githubName,
+          avatar: profile.avatar,
+          totalCost: submission.totalCost,
+          totalTokens: submission.totalTokens,
+          daysActive: new Set(days.map((day) => day.date)).size,
+          bestCost: submission.totalCost,
+          tools: [...(submission.tools ?? [])].sort(),
+          spark: sparkSeries(days),
+        };
       },
       async setOpenToWork(): Promise<{ success: boolean; error?: string }> {
         return { success: false, error: "Demo data is read-only" };

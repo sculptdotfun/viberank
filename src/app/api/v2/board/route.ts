@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getWeeklyService } from "@/lib/data";
+import { cachedBoard } from "@/lib/v2/cached";
 import { CACHE, parseBoardQuery } from "@/lib/v2/query";
 import { v2Json, v2Options, v2Unavailable } from "@/lib/v2/api";
 import { isFrozen } from "@/lib/v2/week";
@@ -19,8 +19,7 @@ export async function GET(request: NextRequest) {
   if ("error" in params) return v2Json({ error: params.error }, 400, CACHE.missing);
 
   try {
-    const weekly = await getWeeklyService();
-    const board = await weekly.getBoard(params);
+    const board = await cachedBoard(params, now);
     const frozen = params.window === "week" && isFrozen(board.week.id, now);
     return v2Json(board, 200, frozen ? CACHE.frozen : CACHE.live);
   } catch (error) {

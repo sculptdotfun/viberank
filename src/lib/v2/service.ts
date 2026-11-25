@@ -337,8 +337,12 @@ export function createWeeklyService(source: WeeklySource, options: WeeklyService
     const start = weekStart(id);
     const end = weekEnd(id);
     const historyFrom = addDays(start, -7 * STREAK_LOOKBACK_WEEKS);
-    const full = await windowEntries({ from: start, to: end, withDays: true, historyFrom });
-    const values = tool ? await windowEntries({ from: start, to: end, tool, withDays: true }) : full;
+    // Independent reads: run them together rather than one after the other.
+    const [full, toolValues] = await Promise.all([
+      windowEntries({ from: start, to: end, withDays: true, historyFrom }),
+      tool ? windowEntries({ from: start, to: end, tool, withDays: true }) : null,
+    ]);
+    const values = toolValues ?? full;
     const fullByKey = new Map(full.map((entry) => [entry.userKey, entry]));
 
     return values
@@ -433,8 +437,10 @@ export function createWeeklyService(source: WeeklySource, options: WeeklyService
   async function weekBoard(params: BoardParams, sort: BoardSort, limit: number, offset: number): Promise<BoardResult> {
     const at = now();
     const id = params.weekId ?? weekIdOf(at);
-    const state = await loadWeek(id, params.tool, "full");
-    const previous = await loadWeek(previousWeekId(id), params.tool, "shallow");
+    const [state, previous] = await Promise.all([
+      loadWeek(id, params.tool, "full"),
+      loadWeek(previousWeekId(id), params.tool, "shallow"),
+    ]);
     const before = rankMap(previous.entries, sort);
     const ranked = rankClass(state.entries, params.cls, sort);
 
@@ -467,8 +473,11 @@ export function createWeeklyService(source: WeeklySource, options: WeeklyService
     const to = window === "month" ? month.to : null;
     const historyFrom = addDays(current.start, -7 * STREAK_LOOKBACK_WEEKS);
 
-    const full = await windowEntries({ from, to, historyFrom });
-    const values = params.tool ? await windowEntries({ from, to, tool: params.tool }) : full;
+    const [full, toolValues] = await Promise.all([
+      windowEntries({ from, to, historyFrom }),
+      params.tool ? windowEntries({ from, to, tool: params.tool }) : null,
+    ]);
+    const values = toolValues ?? full;
     const fullByKey = new Map(full.map((entry) => [entry.userKey, entry]));
 
     const entries: WeekEntry[] = values
@@ -543,11 +552,14 @@ export function createWeeklyService(source: WeeklySource, options: WeeklyService
   async function getStanding(username: string, weekId?: string): Promise<Standing | null> {
     const at = now();
     const id = weekId ?? weekIdOf(at);
-    const history = await cached(`h:${username.toLowerCase()}`, () => source.userHistory(username, null, null));
+    // The week loads do not depend on who is asking: start them with the
+    // history read instead of after it.
+    const [history, state, previous] = await Promise.all([
+      cached(`h:${username.toLowerCase()}`, () => source.userHistory(username, null, null)),
+      loadWeek(id, undefined, "full"),
+      loadWeek(previousWeekId(id), undefined, "shallow"),
+    ]);
     if (!history) return null;
-
-    const state = await loadWeek(id, undefined, "full");
-    const previous = await loadWeek(previousWeekId(id), undefined, "shallow");
     const mine = state.entries.find((entry) => entry.userKey === history.userKey) ?? state.entries.find((entry) => sameHandle(entry, username));
 
     // No usage this week: classify as an empty entry, so the page can still

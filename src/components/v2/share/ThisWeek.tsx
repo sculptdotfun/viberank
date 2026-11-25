@@ -63,20 +63,66 @@ function Fact({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-export default function ThisWeek({ username, standing }: { username: string; standing: Standing | null }) {
+/** Same frame and rough height as the block, while the standing streams in. */
+export function ThisWeekSkeleton() {
+  return (
+    <section aria-label="This week" aria-busy="true" className="border border-line-2 rounded-[14px] bg-panel p-5 sm:p-7 flex flex-col gap-6 animate-pulse">
+      <div className="h-4 w-56 max-w-full rounded bg-raised" />
+      <div className="flex flex-wrap items-end gap-6">
+        <div className="h-[70px] w-[120px] rounded bg-raised" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-[220px]">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-[52px] rounded bg-raised" />
+          ))}
+        </div>
+      </div>
+      <div className="border-t border-line pt-5 flex gap-2">
+        <div className="h-9 w-28 rounded-md bg-raised" />
+        <div className="h-9 w-28 rounded-md bg-raised" />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The profile's week block. `failed` means the standing could not be read,
+ * and says so: it used to fall through to "no usage", which was wrong for
+ * people sitting at #1 whenever the read timed out.
+ */
+export default function ThisWeek({
+  username,
+  standing,
+  failed = false,
+}: {
+  username: string;
+  standing: Standing | null;
+  failed?: boolean;
+}) {
   if (!standing || standing.rank === null) {
+    const streak = standing && standing.streakWeeks > 0 ? standing.streakWeeks : 0;
     return (
-      <section aria-label="This week" className="border border-line-2 rounded-[14px] bg-panel p-5 sm:p-6">
-        <p className="font-mono text-[12.5px] text-ink-3 m-0">
-          This week{standing ? ` · week ${weekNumber(standing.week.id)} · closes in ${closesIn(standing.week.closesAt)}` : ""}
-        </p>
-        <p className="text-ink text-lg font-medium tracking-[-0.02em] mt-2 mb-1">No usage recorded this week yet.</p>
-        <p className="text-sm text-ink-2 mb-5">
-          {standing && standing.streakWeeks > 0
-            ? `A ${standing.streakWeeks}-week streak is on the line; one submission keeps it.`
-            : "The week opens every Monday 00:00 UTC."}
-        </p>
-        <Actions username={username} standing={standing} />
+      <section aria-label="This week" className="border border-line-2 rounded-[14px] bg-panel p-5 sm:p-7 flex flex-col gap-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[12.5px] text-ink-3">
+          <span>
+            This week{standing ? ` · week ${weekNumber(standing.week.id)} · ${dayRange(standing.week.start, standing.week.end)}` : ""}
+          </span>
+          {standing && !standing.week.closed && <span>closes in {closesIn(standing.week.closesAt)}</span>}
+        </div>
+        <div>
+          <p className="text-ink text-xl font-medium tracking-[-0.02em] m-0">
+            {failed ? "This week's standing could not be loaded." : "No usage this week yet."}
+          </p>
+          <p className="text-sm text-ink-2 mt-1.5 mb-0 max-w-[60ch]">
+            {failed
+              ? "The rest of the profile is current. Refresh in a moment to see the week."
+              : streak > 0
+                ? `A ${streak}-week streak is on the line: one submission before Monday 00:00 UTC keeps it.`
+                : "The week runs Monday to Sunday, UTC. One submission puts this profile on the board."}
+          </p>
+        </div>
+        <div className="border-t border-line pt-5">
+          <Actions username={username} standing={standing} />
+        </div>
       </section>
     );
   }

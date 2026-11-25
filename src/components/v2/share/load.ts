@@ -3,6 +3,7 @@
 // VIBERANK_SHARE_FIXTURES=1 outside production, never as a fallback.
 import { cache } from "react";
 import { getServerDataLayer } from "@/lib/data";
+import { cachedRecap, cachedStanding } from "@/lib/v2/cached";
 import type { Standing, WeekRecap, YearWrapped } from "@/lib/v2/contract";
 import { asUser, fixtureRecap, fixtureStanding, fixtureYear } from "./__fixtures__";
 import { weekRange } from "./format";
@@ -16,8 +17,7 @@ export const loadRecap = cache(async (username: string, weekId: string): Promise
     const range = weekRange(weekId) ?? fixtureRecap.week;
     return asUser({ ...fixtureRecap, week: { ...fixtureRecap.week, id: weekId, ...range } }, username);
   }
-  const data = await getServerDataLayer();
-  return data.weekly.getRecap(username, weekId);
+  return cachedRecap(username, weekId);
 });
 
 export const loadYear = cache(async (username: string, year: number): Promise<YearWrapped | null> => {
@@ -28,6 +28,5 @@ export const loadYear = cache(async (username: string, year: number): Promise<Ye
 
 export const loadStanding = cache(async (username: string): Promise<Standing | null> => {
   if (useFixtures()) return asUser(fixtureStanding, username);
-  const data = await getServerDataLayer();
-  return data.weekly.getStanding(username);
+  return cachedStanding(username);
 });

@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 const UsageChart = dynamic(() => import("./UsageChart"), {
   ssr: false,
   loading: () => (
-    <div className="bg-surface-1 border border-border rounded-lg p-5 mb-6 animate-pulse" aria-hidden>
+    <div className="bg-panel border border-line rounded-[14px] p-5 mb-6 animate-pulse" aria-hidden>
       <div className="h-5 w-36 rounded bg-surface-3 mb-4" />
       <div className="h-[260px] rounded bg-surface-2" />
     </div>
