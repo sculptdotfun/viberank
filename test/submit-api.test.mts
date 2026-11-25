@@ -10,6 +10,7 @@ const {
   isVersionBelow,
   submitNotice,
   AUTOSUBMIT_RERUN_NOTICE,
+  V2_UPGRADE_NOTICE,
 } = await import("../src/lib/submit-api.ts");
 const { validateCcData, normalizeCcData, SubmissionValidationError, NO_USAGE_MESSAGE } = await import(
   "../src/lib/ccusage.ts"
@@ -154,23 +155,41 @@ const validate = (days: ReturnType<typeof day>[]) =>
 {
   const house = "Tako line";
   const base = { paidNotice: null, houseNotice: house };
+  const both = `${AUTOSUBMIT_RERUN_NOTICE}\n\n${V2_UPGRADE_NOTICE}`;
 
   assert.equal(
     submitNotice({ ...base, cliVersion: "1.12.0", tokenVerified: true }),
-    AUTOSUBMIT_RERUN_NOTICE,
-    "an old CLI with a token is told to re-run autosubmit, in place of the house promo"
+    both,
+    "an old CLI with a token is told to re-run autosubmit, then about the league, in place of the house promo"
   );
   assert.match(AUTOSUBMIT_RERUN_NOTICE, /npx viberank-cli autosubmit/);
 
-  assert.equal(submitNotice({ ...base, cliVersion: "1.12.0", tokenVerified: false }), house, "no token, no autosubmit to fix");
-  assert.equal(submitNotice({ ...base, cliVersion: "1.13.0", tokenVerified: true }), house, "fixed versions aren't nagged");
+  assert.equal(submitNotice({ ...base, cliVersion: "1.12.0", tokenVerified: false }), V2_UPGRADE_NOTICE, "no token, no autosubmit to fix");
+  assert.equal(submitNotice({ ...base, cliVersion: "1.13.0", tokenVerified: true }), V2_UPGRADE_NOTICE, "autosubmit fixed, league still new");
   assert.equal(submitNotice({ ...base, cliVersion: null, tokenVerified: true }), house, "MCP and web send no CLI version");
 
   const paid = submitNotice({ cliVersion: "1.11.2", tokenVerified: true, paidNotice: "Sponsored by Acme", houseNotice: house });
   assert.ok(paid.startsWith(AUTOSUBMIT_RERUN_NOTICE), "the fix comes first");
   assert.ok(paid.endsWith("Sponsored by Acme"), "a paid sponsor's line is kept, not overridden");
-  assert.equal(submitNotice({ cliVersion: "1.13.0", tokenVerified: true, paidNotice: "Sponsored by Acme", houseNotice: house }), "Sponsored by Acme");
+  assert.equal(submitNotice({ cliVersion: "1.14.0", tokenVerified: true, paidNotice: "Sponsored by Acme", houseNotice: house }), "Sponsored by Acme");
   check("the re-run notice reaches old token-holding CLIs without displacing a paid sponsor");
+}
+
+{
+  const house = "Tako line";
+  const base = { tokenVerified: false, paidNotice: null, houseNotice: house };
+  assert.equal(
+    V2_UPGRADE_NOTICE,
+    "viberank v2: weekly league is live. Run npx viberank-cli@latest to see your rank this week."
+  );
+  assert.ok(!V2_UPGRADE_NOTICE.includes("\n"), "one line");
+  for (const v of ["1.13.9", "1.13.0", "1.0.0", "0.9.1", "v1.12.3"]) {
+    assert.equal(submitNotice({ ...base, cliVersion: v }), V2_UPGRADE_NOTICE, `${v} is told`);
+  }
+  for (const v of ["1.14.0", "1.14.1", "1.15.0", "2.0.0", "dev", "", null]) {
+    assert.equal(submitNotice({ ...base, cliVersion: v }), house, `${v} is not told`);
+  }
+  check("CLIs older than 1.14 hear about the weekly league; 1.14+, unknown and absent versions don't");
 }
 
 console.log(`\n${passed} passed`);
