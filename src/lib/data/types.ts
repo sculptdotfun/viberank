@@ -414,11 +414,30 @@ export interface SubmissionsService {
   getGlobalRank(totalCost: number): Promise<number>;
 }
 
+/** What the profile sheet (the board's pull-up) shows: totals, no day rows. */
+export interface ProfileSummary {
+  username: string;
+  githubUsername?: string;
+  githubName?: string;
+  avatar?: string;
+  totalCost: number;
+  totalTokens: number;
+  /** Distinct days with usage. */
+  daysActive: number;
+  /** Best single submission's cost: drives tier and all-time rank, as on the board. */
+  bestCost: number;
+  tools: string[];
+  /** Cost per calendar day for the last 30 days (UTC), oldest first. */
+  spark: number[];
+}
+
 export interface ProfilesService {
   getProfile(
     username: string,
     submissionLimit?: number
   ): Promise<ProfileWithSubmissions | null>;
+  /** The sheet's summary in one round trip: no per-day rows leave the database. */
+  getProfileSummary(username: string): Promise<ProfileSummary | null>;
   /** Set the open-to-work flag for a GitHub-verified profile. */
   setOpenToWork(
     githubUsername: string,

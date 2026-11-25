@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import {
   Calendar,
@@ -11,14 +12,12 @@ import {
   Cpu,
   Wrench,
   BarChart3,
-  Gauge,
 } from "lucide-react";
-import { formatNumber, formatCurrency, toolLabel, sizedAvatarUrl, prettyModelName } from "@/lib/utils";
+import { formatNumber, formatCurrency, toolLabel, prettyModelName } from "@/lib/utils";
 import { modelColors, toolColors } from "@/lib/chartColors";
 import { getTierProgress } from "@/lib/tiers";
 import { computeStreaks } from "@/lib/streaks";
-import { computeWorkInsights, percentile, type ComparableMetric } from "@/lib/work-insights";
-import { getWorkInsightBaselinesCached } from "@/lib/work-insight-baselines";
+import { computeWorkInsights } from "@/lib/work-insights";
 import { buildProfileChartDays } from "@/lib/profile-chart-data";
 import { getProfileCached, getGlobalRankCached } from "./getProfile";
 import UsageChart from "./UsageChartLazy";
@@ -32,20 +31,9 @@ import OpenToWorkToggle from "@/components/OpenToWorkToggle";
 import CliCta from "@/components/CliCta";
 import { isGithubHandle } from "@/lib/profile-index";
 import ProfileShare from "./ProfileShare";
-import ThisWeek from "@/components/v2/share/ThisWeek";
-import { loadStanding } from "@/components/v2/share/load";
-import type { Standing } from "@/lib/v2/contract";
-
-// The week block is additive: a failed standing read shows the block's empty
-// state and is logged, rather than taking the whole profile down.
-async function standingFor(username: string): Promise<Standing | null> {
-  try {
-    return await loadStanding(username);
-  } catch (e: unknown) {
-    console.error(`profile: standing for ${username} failed`, e);
-    return null;
-  }
-}
+import { ThisWeekSkeleton } from "@/components/v2/share/ThisWeek";
+import Avatar from "@/components/v2/Avatar";
+import { ThisWeekSection, WorkflowSection, WorkflowTiles } from "./sections";
 
 // ISR the full profile page too — direct loads and sheet "view full profile"
 // both get cached HTML; data is at most 2 minutes stale.
@@ -101,33 +89,11 @@ export default async function ProfilePage({ params }: ProfileParams) {
   // Best submission drives both global rank and tier, matching the board.
   const bestCost = submissions.length > 0 ? Math.max(...submissions.map((s) => s.totalCost)) : 0;
 
-  // Both are independent reads and were awaited one after the other, on the
-  // path that decides how long an uncached profile takes to start rendering.
+  // The week's standing and the workflow cohort stream in their own
+  // Suspense boundaries (./sections), so only the rank (one head-only count,
+  // shared with the layout's metadata) is awaited before the page paints.
   // Rank is a nice-to-have; render without it on failure.
-  const [workBaselines, globalRank, standing] = await Promise.all([
-    uniqueDaily.length >= 3 ? getWorkInsightBaselinesCached().catch(() => null) : null,
-    Number.isFinite(bestCost) && bestCost > 0 ? getGlobalRankCached(bestCost).catch(() => null) : null,
-    standingFor(profileData.username),
-  ]);
-  const comparison = (metric: ComparableMetric) => {
-    const values = workBaselines?.values[metric];
-    const ownValue = workBaselines?.byUser[profileData.username.toLowerCase()]?.[metric] ?? null;
-    const rank = values ? percentile(workInsights[metric], values, metric === "costPerMillionTokens" ? "lower" : "higher", ownValue) : null;
-    return rank === null ? null : `${metric === "costPerMillionTokens" ? "Lower" : "Higher"} than ${rank}% of developers`;
-  };
-  const pct = (value: number) => `${Math.round(value * 100)}%`;
-  const decimal = (value: number) => value.toFixed(1);
-  const workTiles = [
-    { label: "Cache hit rate", value: workInsights.cacheHitRate === null ? null : pct(workInsights.cacheHitRate), detail: "Input served from cache", comparison: comparison("cacheHitRate") },
-    { label: "Cache reuse", value: workInsights.cacheReuse === null ? null : `${decimal(workInsights.cacheReuse)}×`, detail: "Reads per cached token", comparison: comparison("cacheReuse") },
-    { label: "Cost per 1M tokens", value: workInsights.costPerMillionTokens === null ? null : `$${formatCurrency(workInsights.costPerMillionTokens)}`, detail: "Blended cost across all tokens", comparison: comparison("costPerMillionTokens") },
-    { label: "Output share", value: workInsights.outputShare === null ? null : pct(workInsights.outputShare), detail: "Tokens generated as output", comparison: comparison("outputShare") },
-    { label: "Parallel tools", value: workInsights.parallelToolShare === null ? null : pct(workInsights.parallelToolShare), detail: `Days with 2+ tools · ${decimal(workInsights.averageTools ?? 0)} avg/day`, comparison: null },
-    { label: "Parallel machines", value: workInsights.parallelMachineShare === null ? null : pct(workInsights.parallelMachineShare), detail: `Days with 2+ machines · ${decimal(workInsights.averageMachines ?? 0)} avg, ${workInsights.maxMachines} max`, comparison: null },
-    { label: "Models per active day", value: workInsights.averageModels === null ? null : decimal(workInsights.averageModels), detail: "Distinct models used each day", comparison: null },
-    { label: "Daily cost variation", value: workInsights.costVariation === null ? null : decimal(workInsights.costVariation), detail: "Coefficient of variation; lower is steadier", comparison: null },
-    { label: "Active days in span", value: workInsights.activeDayShare === null ? null : pct(workInsights.activeDayShare), detail: "First to last active day", comparison: null },
-  ].filter((tile) => tile.value !== null);
+  const globalRank = Number.isFinite(bestCost) && bestCost > 0 ? await getGlobalRankCached(bestCost).catch(() => null) : null;
 
   // Per-model daily costs, uncollapsed: the chart ranks models within the
   // selected range, so the series match the days on screen.
@@ -247,8 +213,8 @@ export default async function ProfilePage({ params }: ProfileParams) {
     <div className="min-h-screen bg-background">
       <NavBar />
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <Link href="/" className="inline-flex items-center gap-1.5 micro-label hover:text-foreground transition-colors mb-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <Link href="/" className="inline-flex items-center gap-1.5 font-mono text-[12.5px] text-ink-3 hover:text-ink transition-colors mb-5">
           <ArrowLeft className="w-3.5 h-3.5" />
           Leaderboard
         </Link>
@@ -256,19 +222,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         {/* Profile header */}
         <div className="mb-8">
           <div className="flex items-start gap-4 sm:gap-5 mb-6">
-            {profileData.avatar && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={sizedAvatarUrl(profileData.avatar, 128)}
-                alt={displayName}
-                width={56}
-                height={56}
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                className="w-14 h-14 rounded-[12px] border border-line-2 bg-raised flex-none"
-              />
-            )}
+            <Avatar src={profileData.avatar} github={profileData.githubUsername} name={displayName} size={56} className="rounded-[12px]" priority />
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
                 <h1 className="text-[28px] sm:text-[34px] font-medium leading-none tracking-[-0.04em] text-ink">{displayName}</h1>
@@ -327,7 +281,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
             )}
           </div>
 
-          <ThisWeek username={profileData.username} standing={standing} />
+          <Suspense fallback={<ThisWeekSkeleton />}>
+            <ThisWeekSection username={profileData.username} />
+          </Suspense>
 
           {/* All-time key stats */}
           <p className="font-mono text-[12.5px] text-ink-3 mt-8 mb-3">All-time</p>
@@ -378,29 +334,14 @@ export default async function ProfilePage({ params }: ProfileParams) {
             </CliCta>
           </div>
 
-          {workInsights.activeDays >= 3 && workTiles.length > 0 && (
-            <section className="mt-6" aria-labelledby="work-insights-heading">
-              <h2 id="work-insights-heading" className="text-base font-medium mb-3 flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-accent" />
-                Workflow
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {workTiles.map((tile) => (
-                  <div key={tile.label} className="bg-surface-1 border border-border rounded-lg p-4 min-w-0">
-                    <p className="micro-label mb-1">{tile.label}</p>
-                    <p className="text-xl font-bold font-mono tabular-nums break-words">{tile.value}</p>
-                    <p className="text-xs text-muted mt-1">{tile.detail}</p>
-                    {tile.comparison && <p className="text-xs text-muted mt-2">{tile.comparison}</p>}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <Suspense fallback={<WorkflowTiles insights={workInsights} username={profileData.username} baselines={null} />}>
+            <WorkflowSection insights={workInsights} username={profileData.username} />
+          </Suspense>
 
           {/* Tier progress */}
-          <div className="bg-surface-1 border border-border rounded-lg p-4 mt-3">
+          <div className="bg-panel border border-line rounded-[14px] p-4 mt-6">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-              <span className="micro-label">Tier progress</span>
+              <span className="font-mono text-xs text-ink-3">tier progress</span>
               {tierInfo.next ? (
                 <span className="font-mono text-xs text-muted">
                   ${formatNumber(Math.ceil(tierInfo.remaining))} to{" "}
@@ -435,9 +376,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
         <UsageChart daily={chartDays} colorByModel={Object.fromEntries(modelColor)} />
 
         {/* Activity heatmap */}
-        <div className="bg-surface-1 border border-border rounded-lg p-5 mb-4">
-          <h2 className="text-base font-medium mb-4 flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-accent" />
+        <div className="bg-panel border border-line rounded-[14px] p-5 mb-4">
+          <h2 className="text-[15px] font-medium text-ink mb-4 flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-ink-3" aria-hidden />
             Activity
           </h2>
           <ActivityHeatmap daily={dedupedSeries} />
@@ -445,9 +386,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
 
         {/* Token breakdown + insights */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-surface-1 border border-border rounded-lg p-5">
-            <h2 className="text-base font-medium mb-4 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-accent" />
+          <div className="bg-panel border border-line rounded-[14px] p-5">
+            <h2 className="text-[15px] font-medium text-ink mb-4 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-ink-3" aria-hidden />
               Token breakdown
             </h2>
             <div className="space-y-3">
@@ -468,9 +409,9 @@ export default async function ProfilePage({ params }: ProfileParams) {
             </div>
           </div>
 
-          <div className="bg-surface-1 border border-border rounded-lg p-5">
-            <h2 className="text-base font-medium mb-4 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-accent" />
+          <div className="bg-panel border border-line rounded-[14px] p-5">
+            <h2 className="text-[15px] font-medium text-ink mb-4 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-ink-3" aria-hidden />
               Usage insights
             </h2>
             <div className="space-y-1">
@@ -500,13 +441,13 @@ export default async function ProfilePage({ params }: ProfileParams) {
 
         {/* Rhythm: weekday + monthly spend */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-          <div className="bg-surface-1 border border-border rounded-lg p-5">
+          <div className="bg-panel border border-line rounded-[14px] p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-medium flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-accent" />
+              <h2 className="text-[15px] font-medium text-ink flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-ink-3" aria-hidden />
                 Most active days
               </h2>
-              <span className="micro-label">by spend</span>
+              <span className="font-mono text-xs text-ink-3">by spend</span>
             </div>
             <div className="space-y-2.5">
               {WEEKDAYS.map(({ label, idx }) => (
@@ -525,13 +466,13 @@ export default async function ProfilePage({ params }: ProfileParams) {
           </div>
 
           {monthEntries.length > 0 && (
-            <div className="bg-surface-1 border border-border rounded-lg p-5">
+            <div className="bg-panel border border-line rounded-[14px] p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-medium flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-accent" />
+                <h2 className="text-[15px] font-medium text-ink flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-ink-3" aria-hidden />
                   Monthly API-equivalent
                 </h2>
-                <span className="micro-label">last {monthEntries.length} months</span>
+                <span className="font-mono text-xs text-ink-3">last {monthEntries.length} months</span>
               </div>
               <div className="flex items-end gap-1.5 sm:gap-2 h-32">
                 {monthEntries.map(([month, cost], i) => (
@@ -558,13 +499,13 @@ export default async function ProfilePage({ params }: ProfileParams) {
         {(topModels.length > 0 || toolEntries.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             {topModels.length > 0 && (
-              <div className="bg-surface-1 border border-border rounded-lg p-5">
+              <div className="bg-panel border border-line rounded-[14px] p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-medium flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-accent" />
+                  <h2 className="text-[15px] font-medium text-ink flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-ink-3" aria-hidden />
                     Models
                   </h2>
-                  <span className="micro-label">{hasModelCosts ? "by cost" : "by days used"}</span>
+                  <span className="font-mono text-xs text-ink-3">{hasModelCosts ? "by cost" : "by days used"}</span>
                 </div>
                 <div className="space-y-3">
                   {topModels.map(([name, value]) => (
@@ -605,13 +546,13 @@ export default async function ProfilePage({ params }: ProfileParams) {
             )}
 
             {toolEntries.length > 0 && (
-              <div className="bg-surface-1 border border-border rounded-lg p-5">
+              <div className="bg-panel border border-line rounded-[14px] p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-medium flex items-center gap-2">
-                    <Wrench className="w-4 h-4 text-accent" />
+                  <h2 className="text-[15px] font-medium text-ink flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-ink-3" aria-hidden />
                     Tools
                   </h2>
-                  <span className="micro-label">by active days</span>
+                  <span className="font-mono text-xs text-ink-3">by active days</span>
                 </div>
                 <div className="space-y-3">
                   {toolEntries.map(([tool, days]) => (
@@ -639,7 +580,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
           </div>
         )}
       </div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-10 space-y-6">
         {/* Monthly Wrapped links moved into the This week block at the top. */}
         <BadgeSnippet username={profileData.username} />
       </div>

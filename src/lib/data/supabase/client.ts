@@ -18,6 +18,7 @@ import type {
   DateRangeLeaderboardResult,
   Submission,
   DailyBreakdown,
+  ProfileSummary,
   ProfileWithSubmissions,
   GlobalStats,
   SiteStats,
@@ -54,6 +55,7 @@ import {
 } from "@/lib/ccusage";
 import { reviewReasonsFor, mergeReviewReasons } from "@/lib/review";
 import { createWeeklyService, type WeeklyDataService } from "@/lib/v2/service";
+import { sparkSeries } from "@/lib/profile-summary";
 import { createSupabaseWeeklySource, fetchWindowTotals } from "./weekly";
 
 // ============================================================================
@@ -1644,11 +1646,19 @@ export class SupabaseProfilesService implements ProfilesService {
   ): Promise<ProfileWithSubmissions | null> {
     // Case-insensitive, and never .single(): a handle can own one row per
     // casing, and .single() errors on all of them (see pickCanonicalProfile).
-    const { data: candidates, error } = await this.client
-      .from("profiles")
-      .select("*")
-      .ilike("username", likeLiteral(username))
-      .limit(10);
+    // The profile and its submissions are read together: both match the
+    // handle case-insensitively, and the canonical profile's username equals
+    // the requested one but for case, so the submission read need not wait.
+    const limit = Math.min(submissionLimit, 25);
+    const [{ data: candidates, error }, { data: submissions }] = await Promise.all([
+      this.client.from("profiles").select("*").ilike("username", likeLiteral(username)).limit(10),
+      this.client
+        .from("submissions")
+        .select("*")
+        .ilike("username", likeLiteral(username))
+        .order("submitted_at", { ascending: false })
+        .limit(limit),
+    ]);
 
     if (error) {
       console.error(`Failed to load profile ${username}:`, error.message);
@@ -1657,15 +1667,6 @@ export class SupabaseProfilesService implements ProfilesService {
 
     const profile = pickCanonicalProfile(candidates as DbProfile[] | null);
     if (!profile) return null;
-
-    const limit = Math.min(submissionLimit, 25);
-    // Use the stored username (with correct case) for submission lookup
-    const { data: submissions } = await this.client
-      .from("submissions")
-      .select("*")
-      .ilike("username", likeLiteral(profile.username))
-      .order("submitted_at", { ascending: false })
-      .limit(limit);
 
     // A heavy user's few submissions can still hold thousands of daily rows,
     // so an uncapped read here truncated the profile's own history.
@@ -1716,6 +1717,45 @@ export class SupabaseProfilesService implements ProfilesService {
       submissions: (submissions || []).map((s) =>
         convertDbSubmissionToSubmission(s, dailyBySubmission.get(s.id) || [])
       ),
+    };
+  }
+
+  async getProfileSummary(username: string): Promise<ProfileSummary | null> {
+    // Three independent reads in one round trip. Days come deduplicated from
+    // v2_user_history (one developer, so it is cheap) instead of paging every
+    // daily_breakdowns row into the server the way getProfile does.
+    const [profileRead, submissionsRead, historyRead] = await Promise.all([
+      this.client.from("profiles").select("*").ilike("username", likeLiteral(username)).limit(10),
+      this.client
+        .from("submissions")
+        .select("total_cost, total_tokens, tools, github_avatar")
+        .ilike("username", likeLiteral(username))
+        .or("flagged_for_review.is.null,flagged_for_review.eq.false"),
+      this.client.rpc("v2_user_history", { p_username: username, p_from: null, p_to: null }),
+    ]);
+    if (profileRead.error) throw new Error(`Failed to load profile ${username}: ${profileRead.error.message}`);
+    if (submissionsRead.error) throw new Error(`Failed to load submissions for ${username}: ${submissionsRead.error.message}`);
+    if (historyRead.error) throw new Error(`v2_user_history failed: ${historyRead.error.message}`);
+
+    const profile = pickCanonicalProfile(profileRead.data as DbProfile[] | null);
+    if (!profile) return null;
+
+    const rows = (submissionsRead.data ?? []) as Pick<DbSubmission, "total_cost" | "total_tokens" | "tools" | "github_avatar">[];
+    const history = (historyRead.data ?? null) as { days?: { date: string; cost: number | string }[] } | null;
+    const days = (history?.days ?? []).map((day) => ({ date: String(day.date), cost: Number(day.cost) || 0 }));
+    const costs = rows.map((row) => Number(row.total_cost) || 0);
+
+    return {
+      username: profile.username,
+      githubUsername: profile.github_username || undefined,
+      githubName: profile.github_name || undefined,
+      avatar: profile.avatar || rows.find((row) => row.github_avatar)?.github_avatar || undefined,
+      totalCost: costs.reduce((sum, cost) => sum + cost, 0),
+      totalTokens: rows.reduce((sum, row) => sum + (Number(row.total_tokens) || 0), 0),
+      daysActive: days.length,
+      bestCost: costs.length > 0 ? Math.max(...costs) : 0,
+      tools: Array.from(new Set(rows.flatMap((row) => row.tools ?? []))).sort(),
+      spark: sparkSeries(days),
     };
   }
 

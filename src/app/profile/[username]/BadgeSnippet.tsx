@@ -21,13 +21,13 @@ export default function BadgeSnippet({ username }: { username: string }) {
   };
 
   return (
-    <div className="bg-surface-1 border border-border rounded-lg p-4">
+    <div className="bg-panel border border-line rounded-[14px] p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <p className="micro-label">README badge</p>
+        <p className="font-mono text-xs text-ink-3">README badge</p>
         <button
           type="button"
           onClick={copy}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-border hover:border-accent hover:text-accent transition-colors"
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-border hover:border-line-2 hover:text-ink transition-colors"
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? "Copied" : "Copy markdown"}
@@ -49,8 +49,8 @@ export default function BadgeSnippet({ username }: { username: string }) {
       </code>
 
       <p className="text-xs text-muted mt-2">
-        Also <code className="text-accent">?metric=cost</code> and{" "}
-        <code className="text-accent">?metric=tokens</code>.
+        Also <code className="text-ink">?metric=cost</code> and{" "}
+        <code className="text-ink">?metric=tokens</code>.
       </p>
     </div>
   );
