@@ -72,6 +72,14 @@ export async function getServerDataLayer(): Promise<DataLayer> {
   return supabaseServerDataLayer;
 }
 
+/**
+ * The v2 weekly service (boards, standings, recaps, Wrapped) on the server
+ * data layer. Server-only: it may store frozen weeks with the service key.
+ */
+export async function getWeeklyService(): Promise<DataLayer["weekly"]> {
+  return (await getServerDataLayer()).weekly;
+}
+
 // ============================================================================
 // RE-EXPORTS
 // ============================================================================

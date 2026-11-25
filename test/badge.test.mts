@@ -83,4 +83,51 @@ const check = (label: string) => { passed++; console.log(`✓ ${label}`); };
   check("each metric has a label");
 }
 
+{
+  // #198: rolling-window badges.
+  const { isBadgeRange, badgeSortFrom, badgeRangeWindow, rankInWindow } = await import("../src/lib/badge.ts");
+  for (const range of ["7d", "30d", "week"]) assert.equal(isBadgeRange(range), true, range);
+  for (const bad of ["", "1y", "WEEK", null]) assert.equal(isBadgeRange(bad as string), false, `must reject ${bad}`);
+  assert.equal(badgeSortFrom("tokens"), "tokens");
+  for (const other of ["cost", "efficiency", "", null]) assert.equal(badgeSortFrom(other as string), "cost");
+  check("only known ranges are accepted; unknown sorts fall back to cost");
+}
+
+{
+  const { badgeRangeWindow } = await import("../src/lib/badge.ts");
+  const wednesday = new Date("2026-11-25T23:30:00Z");
+  assert.deepEqual(badgeRangeWindow("7d", wednesday), { from: "2026-11-19", to: "2026-11-25" });
+  assert.deepEqual(badgeRangeWindow("30d", wednesday), { from: "2026-10-27", to: "2026-11-25" });
+  assert.deepEqual(badgeRangeWindow("week", wednesday), { from: "2026-11-23", to: "2026-11-25" });
+  // Monday's week is just Monday; Sunday's reaches back six days.
+  assert.deepEqual(badgeRangeWindow("week", new Date("2026-11-23T00:00:00Z")), { from: "2026-11-23", to: "2026-11-23" });
+  assert.deepEqual(badgeRangeWindow("week", new Date("2026-11-29T12:00:00Z")), { from: "2026-11-23", to: "2026-11-29" });
+  check("ranges are inclusive UTC windows ending today");
+}
+
+{
+  const { rankInWindow } = await import("../src/lib/badge.ts");
+  const rows = [
+    { userKey: "alice", username: "Alice", cost: 900, tokens: 1_000_000_000 },
+    { userKey: "bob", username: "bob-gh", cost: 1_200, tokens: 400_000_000 },
+    { userKey: "carol", username: "carol", cost: 300, tokens: 3_000_000_000 },
+    { userKey: "idle", username: "idle", cost: 0, tokens: 0 },
+  ];
+  assert.deepEqual(rankInWindow(rows, "bob", "cost"), { rank: 1, of: 3, cost: 1_200, tokens: 400_000_000 });
+  assert.equal(rankInWindow(rows, "carol", "tokens")?.rank, 1, "tokens sort ranks the heavy-cache user first");
+  assert.equal(rankInWindow(rows, "carol", "cost")?.rank, 3);
+  assert.equal(rankInWindow(rows, "ALICE", "cost")?.rank, 2, "handles match case-insensitively");
+  assert.equal(rankInWindow(rows, "bob-gh", "cost")?.rank, 1, "the GitHub login matches too");
+  assert.equal(rankInWindow(rows, "idle", "cost"), null, "no usage in the window is no rank");
+  assert.equal(rankInWindow(rows, "nobody", "cost"), null);
+  check("rank in a window follows the sort and skips empty rows");
+}
+
+{
+  assert.equal(badgeLabelFor("rank", "30d"), "viberank 30d");
+  assert.equal(badgeLabelFor("tokens", "week"), "tokens this week");
+  assert.equal(badgeLabelFor("cost", "7d"), "ai spend 7d");
+  check("range badges name their window");
+}
+
 console.log(`\n${passed} passed, 0 failed`);

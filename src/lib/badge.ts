@@ -97,6 +97,70 @@ export function badgeCost(cost: number): string {
 /** Compact tokens: 940M, 26.1B, 1.2T. The same formatter the share cards use. */
 export const badgeTokens = formatTokensCompact;
 
-export function badgeLabelFor(metric: BadgeMetric): string {
-  return metric === "rank" ? "viberank" : metric === "cost" ? "ai spend" : "tokens";
+export function badgeLabelFor(metric: BadgeMetric, range?: BadgeRange): string {
+  const base = metric === "rank" ? "viberank" : metric === "cost" ? "ai spend" : "tokens";
+  if (!range) return base;
+  return `${base} ${range === "week" ? "this week" : range}`;
+}
+
+// ----------------------------------------------------------------------------
+// Rolling-window badges (#198): ?range=7d|30d|week&sort=tokens|cost
+// ----------------------------------------------------------------------------
+
+/** 7d / 30d: the last 7 or 30 days, today included. week: Monday (UTC) to today. */
+export type BadgeRange = "7d" | "30d" | "week";
+export type BadgeSort = "cost" | "tokens";
+
+export const BADGE_RANGES: BadgeRange[] = ["7d", "30d", "week"];
+
+export function isBadgeRange(value: string | null): value is BadgeRange {
+  return value !== null && (BADGE_RANGES as string[]).includes(value);
+}
+
+/** Unknown or missing sorts fall back to cost, the board's default. */
+export function badgeSortFrom(value: string | null): BadgeSort {
+  return value === "tokens" ? "tokens" : "cost";
+}
+
+const DAY_MS = 86_400_000;
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** Inclusive YYYY-MM-DD bounds of a range, in UTC like the board's dates. */
+export function badgeRangeWindow(range: BadgeRange, now: Date): { from: string; to: string } {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  if (range === "week") {
+    const sinceMonday = (new Date(today).getUTCDay() + 6) % 7;
+    return { from: isoDay(today - sinceMonday * DAY_MS), to: isoDay(today) };
+  }
+  const days = range === "7d" ? 7 : 30;
+  return { from: isoDay(today - (days - 1) * DAY_MS), to: isoDay(today) };
+}
+
+export interface WindowRankRow {
+  userKey: string;
+  username: string;
+  cost: number;
+  tokens: number;
+}
+
+/**
+ * A developer's position on a window board: every developer with usage in
+ * the window, ordered by `sort` (ties by the other metric, then handle).
+ * Matches the handle on either the merged username or the GitHub login.
+ */
+export function rankInWindow(
+  rows: WindowRankRow[],
+  handle: string,
+  sort: BadgeSort
+): { rank: number; of: number; cost: number; tokens: number } | null {
+  const wanted = handle.toLowerCase();
+  const primary = (row: WindowRankRow) => (sort === "tokens" ? row.tokens : row.cost);
+  const secondary = (row: WindowRankRow) => (sort === "tokens" ? row.cost : row.tokens);
+  const ordered = rows
+    .filter((row) => row.cost > 0 || row.tokens > 0)
+    .sort((a, b) => primary(b) - primary(a) || secondary(b) - secondary(a) || a.userKey.localeCompare(b.userKey));
+  const index = ordered.findIndex((row) => row.userKey === wanted || row.username.toLowerCase() === wanted);
+  if (index < 0) return null;
+  const row = ordered[index];
+  return { rank: index + 1, of: ordered.length, cost: row.cost, tokens: row.tokens };
 }
