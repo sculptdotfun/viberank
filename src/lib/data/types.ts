@@ -487,6 +487,8 @@ export interface DataLayer {
   profiles: ProfilesService;
   stats: StatsService;
   leagues: LeaguesService;
+  /** v2: weekly boards, standings, recaps and Wrapped (src/lib/v2/contract.ts). */
+  weekly: import("@/lib/v2/service").WeeklyDataService;
 }
 
 // ============================================================================
