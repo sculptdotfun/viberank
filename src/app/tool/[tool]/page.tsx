@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck } from "lucide-react";
-import { getServerDataLayer } from "@/lib/data";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
-import TierBadge from "@/components/TierBadge";
-import { formatNumber, formatCurrency, toolLabel, toolBlurb, FEATURED_TOOLS } from "@/lib/utils";
+import PageHead from "@/components/v2/PageHead";
+import BoardWithMe from "@/components/v2/board/BoardWithMe";
+import { loadBoard } from "@/components/v2/board/load";
+import { toolLabel, toolBlurb, FEATURED_TOOLS } from "@/lib/utils";
 import { COMPARE_MATCHUPS, matchupTitle } from "@/lib/compare";
+import type { BoardSort } from "@/lib/v2/contract";
 
 interface ToolParams {
   params: Promise<{ tool: string }>;
+  searchParams?: Promise<{ sort?: string }>;
 }
+
+const SORTS: BoardSort[] = ["cost", "tokens", "efficiency"];
 
 const SITE = "https://www.viberank.app";
 
@@ -96,19 +100,16 @@ export async function generateMetadata({ params }: ToolParams): Promise<Metadata
   };
 }
 
-export default async function ToolPage({ params }: ToolParams) {
+export default async function ToolPage({ params, searchParams }: ToolParams) {
   const { tool: raw } = await params;
   const tool = decodeURIComponent(raw).toLowerCase();
   const label = toolLabel(tool);
 
-  let items: Awaited<ReturnType<Awaited<ReturnType<typeof getServerDataLayer>>["submissions"]["getLeaderboard"]>>["items"] = [];
-  try {
-    const dataLayer = await getServerDataLayer();
-    const lb = await dataLayer.submissions.getLeaderboard({ sortBy: "cost", page: 0, pageSize: 50, tool });
-    items = lb.items;
-  } catch {
-    // render empty state
-  }
+  // The sort comes from the URL (#200), so /tool/opencode?sort=efficiency is
+  // a shareable, server-rendered view of the cheap-but-heavy cohort.
+  const requested = (await searchParams)?.sort as BoardSort | undefined;
+  const sort: BoardSort = requested && SORTS.includes(requested) ? requested : "cost";
+  const { board, failed } = await loadBoard({ window: "all", cls: "ranked", sort, tool, limit: 50 });
 
   const faqs = [
     {
@@ -178,145 +179,86 @@ export default async function ToolPage({ params }: ToolParams) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="vr">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([breadcrumbLd, howToLd, faqLd]) }} />
 
       <NavBar />
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <Link href="/" className="inline-flex items-center gap-1.5 micro-label hover:text-foreground transition-colors mb-6">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Leaderboard
-        </Link>
-
-        <p className="micro-label mb-3">Per-tool leaderboard</p>
-        <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight mb-2">{label} Usage Leaderboard</h1>
-        <p className="text-muted mb-6 max-w-2xl">
-          Developers ranked by their {label} usage ({toolBlurb(tool)}) — by cost and tokens, from real{" "}
-          <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ccusage</a>{" "}
-          data. Submit yours with <code className="font-mono text-accent">npx viberank-cli</code>.
-        </p>
+      <main className="vr-in">
+        <PageHead eyebrow={<Link href="/records" className="vr-ul">← All-time records</Link>} title={`${label} Usage Leaderboard`}>
+          Developers ranked by their {label} usage ({toolBlurb(tool)}), by spend, tokens or tokens per dollar, from real{" "}
+          <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer" className="vr-ul">ccusage</a>{" "}
+          data. Put yours on it with <code className="vr-code">npx viberank-cli</code>.
+        </PageHead>
 
         {/* Answer-first: the "how do I check my usage" query family lands here
-            before it lands on the guide, so answer it above the table. */}
-        <section className="rounded-lg border border-border bg-surface-1 p-5 mb-8">
-          <h2 className="font-mono text-base font-semibold tracking-tight mb-3">
-            How to check your {label} usage
-          </h2>
-          <ol className="space-y-3 text-sm text-muted">
+            before it lands on the guide, so answer it above the board. */}
+        <section className="vr-howto" aria-labelledby="howto-h">
+          <h2 id="howto-h">How to check your {label} usage</h2>
+          <ol>
             {usage?.builtin && (
               <li>
-                <span className="text-foreground font-medium">Limits</span> — type{" "}
-                <code className="font-mono text-accent">{usage.builtin}</code> inside a {label} session. It{" "}
-                {usage.builtinNote}.
+                <b>Limits</b>
+                <span>
+                  Type <code className="vr-code">{usage.builtin}</code> inside a {label} session. It {usage.builtinNote}.
+                </span>
               </li>
             )}
             <li>
-              <span className="text-foreground font-medium">Tokens and cost</span> — run{" "}
-              <code className="font-mono text-accent">npx ccusage@latest daily</code>. It reads {label}&apos;s local
-              logs into per-day token counts and API-equivalent USD cost. No account or API key needed.
-              {usage?.note && <span className="block mt-1 text-xs">{usage.note}</span>}
+              <b>Tokens and cost</b>
+              <span>
+                Run <code className="vr-code">npx ccusage@latest daily</code>. It reads {label}&apos;s local logs into per-day
+                token counts and API-equivalent USD cost. No account or API key needed.
+                {usage?.note && <em>{usage.note}</em>}
+              </span>
             </li>
             <li>
-              <span className="text-foreground font-medium">Rank</span> — run{" "}
-              <code className="font-mono text-accent">npx viberank-cli</code> to put those totals on the board below.
-              Only aggregate numbers are submitted, never code or prompts.
+              <b>Rank</b>
+              <span>
+                Run <code className="vr-code">npx viberank-cli</code> to put those totals on the board below. Only aggregate
+                numbers are submitted, never code or prompts.
+              </span>
             </li>
           </ol>
-          {TOOL_GUIDES[tool] && (
-            <Link href={TOOL_GUIDES[tool].href} className="inline-block mt-4 text-sm text-accent hover:underline">
-              {TOOL_GUIDES[tool].label} — full guide →
-            </Link>
-          )}
-          {TOOL_PRICING[tool] && (
-            <Link href={TOOL_PRICING[tool].href} className="block mt-2 text-sm text-accent hover:underline">
-              {TOOL_PRICING[tool].label} →
-            </Link>
+          {(TOOL_GUIDES[tool] || TOOL_PRICING[tool]) && (
+            <div className="vr-howto-links">
+              {TOOL_GUIDES[tool] && <Link href={TOOL_GUIDES[tool].href} className="vr-ul">{TOOL_GUIDES[tool].label}</Link>}
+              {TOOL_PRICING[tool] && <Link href={TOOL_PRICING[tool].href} className="vr-ul">{TOOL_PRICING[tool].label}</Link>}
+            </div>
           )}
         </section>
 
-        {/* Browse other tools */}
-        <div className="flex flex-wrap items-center gap-2 mb-8 text-sm">
-          <span className="micro-label">Browse</span>
+        <nav className="vr-chips" aria-label="Other tools">
+          <span className="k">Browse</span>
           {FEATURED_TOOLS.map((t) => (
-            <Link
-              key={t.key}
-              href={`/tool/${t.key}`}
-              className={`px-2.5 py-1 rounded-md border transition-colors ${
-                t.key === tool ? "bg-accent text-white border-accent" : "bg-surface-1 border-border text-muted hover:text-foreground"
-              }`}
-            >
-              {toolLabel(t.key)}
+            <Link key={t.key} href={`/tool/${t.key}`} aria-current={t.key === tool ? "page" : undefined}>
+              {t.key === "claude" ? "Claude Code" : toolLabel(t.key)}
             </Link>
           ))}
-        </div>
-
-        {/* Head-to-head comparisons involving this tool */}
-        <div className="flex flex-wrap items-center gap-2 -mt-4 mb-8 text-sm">
-          <span className="micro-label">Compare</span>
-          {COMPARE_MATCHUPS.filter((m) => m.a === tool || m.b === tool).map((m) => (
-            <Link
-              key={m.slug}
-              href={`/compare/${m.slug}`}
-              className="px-2.5 py-1 rounded-md border bg-surface-1 border-border text-muted hover:text-foreground transition-colors"
-            >
-              {matchupTitle(m)}
-            </Link>
-          ))}
-        </div>
-
-        {items.length > 0 ? (
-          <div className="rounded-lg border border-border overflow-hidden mb-12">
-            <div className="flex items-center gap-3 px-4 py-2.5 micro-label bg-surface-1 border-b border-border">
-              <div className="w-8 text-center">#</div>
-              <div className="flex-1">User</div>
-              <div className="hidden sm:block w-24">Tier</div>
-              <div className="w-28 text-right">Cost</div>
-              <div className="w-24 text-right hidden sm:block">Tokens</div>
-            </div>
-            <div className="divide-y divide-border-subtle">
-              {items.map((s, i) => (
-                <Link
-                  key={s.id}
-                  href={`/profile/${encodeURIComponent(s.githubUsername || s.username)}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors group"
-                >
-                  <div className={`w-8 text-center text-sm font-mono ${i === 0 ? "text-[#f5b008] font-bold" : i === 1 ? "text-[#b8bcc4] font-bold" : i === 2 ? "text-[#c2703f] font-bold" : "text-muted"}`}>{i + 1}</div>
-                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-sm font-medium truncate group-hover:text-accent transition-colors">
-                      {s.githubUsername || s.username}
-                    </span>
-                    {s.verified && <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />}
-                  </div>
-                  <div className="hidden sm:block w-24 flex-shrink-0">
-                    <TierBadge totalCost={s.totalCost} size="xs" bare />
-                  </div>
-                  <div className="w-28 text-right text-sm font-mono font-semibold text-accent">${formatCurrency(s.totalCost)}</div>
-                  <div className="w-24 text-right text-sm font-mono text-muted hidden sm:block">{formatNumber(s.totalTokens)}</div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border p-10 text-center mb-12">
-            <p className="font-medium mb-1">No {label} submissions yet</p>
-            <p className="text-sm text-muted">Be the first — run <code className="font-mono text-accent">npx viberank-cli</code></p>
-          </div>
+        </nav>
+        {COMPARE_MATCHUPS.some((m) => m.a === tool || m.b === tool) && (
+          <nav className="vr-chips" aria-label="Comparisons">
+            <span className="k">Compare</span>
+            {COMPARE_MATCHUPS.filter((m) => m.a === tool || m.b === tool).map((m) => (
+              <Link key={m.slug} href={`/compare/${m.slug}`}>{matchupTitle(m)}</Link>
+            ))}
+          </nav>
         )}
 
-        {/* FAQ */}
-        <section>
-          <h2 className="font-mono text-xl font-bold tracking-tight mb-4">{label} leaderboard FAQ</h2>
-          <div className="space-y-3">
+        <BoardWithMe initial={board} failed={failed} lockedTool={tool} syncUrl anchorId="board" />
+
+        <section className="vr-sec" aria-labelledby="faq-h">
+          <h2 className="vr-h2" id="faq-h">{label} leaderboard FAQ</h2>
+          <div className="vr-faq">
             {faqs.map((f) => (
-              <div key={f.q} className="rounded-lg border border-border bg-surface-1 p-4">
-                <h3 className="font-medium mb-1.5">{f.q}</h3>
-                <p className="text-sm text-muted">{f.a}</p>
+              <div key={f.q}>
+                <h3>{f.q}</h3>
+                <p>{f.a}</p>
               </div>
             ))}
           </div>
         </section>
-      </div>
+      </main>
       <Footer />
     </div>
   );
