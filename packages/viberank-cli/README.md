@@ -13,7 +13,37 @@ npx viberank-cli
 This will:
 1. Generate your usage data with `ccusage@20 daily --json` (aggregated across **all** AI coding tools detected on your machine), saved to `~/.viberank/cc.json` rather than your current folder
 2. Submit it to the viberank leaderboard
-3. Give you a link to your profile
+3. Show your week: rank of N on your board, movement since last week, spend this week, and the gap to the person above
+4. Give you your week's recap link and your profile
+
+```
+  Week 48 · day 3 of 7 · 4d 9h left
+  #41 of 126 Ranked   ▲6 since last week
+  $835 this week · 1.1B tokens · ≈ 0.6 plans
+  $27 behind @palewave · 4-week streak
+
+  Recap:   https://www.viberank.app/recap/2026-W48/you
+  Profile: https://www.viberank.app/profile/you?me=you
+```
+
+### Verify with GitHub, from the terminal
+
+The Ranked board lists GitHub-verified people only. On a first run in a terminal, after reading your usage, the CLI asks **"Verify with GitHub to join the Ranked board? (Y/n)"**. Say yes and it shows a short code and opens your browser:
+
+```
+  Verify with GitHub
+
+  Your code   HXKT-4Q2M
+  Approve at  https://www.viberank.app/link?code=HXKT-4Q2M
+```
+
+Check the code matches, sign in with GitHub and click **Approve**. The terminal picks it up within seconds, saves a token, and asks one last question: submit and keep it current daily (autosubmit), submit once, or cancel. Your earlier unverified submissions under that GitHub name become yours. No token to copy.
+
+`npx viberank-cli login` runs the same sign-in on its own (add `--no-browser` to just print the link). In an agent's shell or CI the CLI never asks; it prints one line pointing at `npx viberank-cli login`.
+
+Weeks run Monday to Sunday, UTC. Only GitHub-verified, human-scale entries are on the Ranked board; anything else shows its board (Open or Fleets) and why. Against a server without weekly standings, the CLI prints the lifetime rank as before.
+
+Each submit also saves `~/.viberank/standing.json`, which `status --format` and the Claude Code plugin's status line read without touching the network.
 
 If ccusage finds no usage at all, nothing is submitted, and the CLI says where ccusage looked and the usual reasons it came back empty (a different machine, WSL versus Windows, a custom config folder).
 
@@ -37,11 +67,13 @@ Claude Code deletes session transcripts older than `cleanupPeriodDays` — **30 
 A one-off submission also freezes your rank on the day you ran it. Two commands fix both:
 
 ```bash
-npx viberank-cli login       # paste a token from viberank.app/settings/tokens
+npx viberank-cli login       # approve in the browser with GitHub
 npx viberank-cli autosubmit  # submit once a day, in the background
 ```
 
-Most people run these once and never think about it again.
+Most people run these once and never think about it again. After a submit in a terminal, the CLI offers this in one line with a yes/no question; it never asks in an agent's shell, CI or `--quiet`.
+
+**Using Claude Code?** The [viberank plugin](../viberank-claude-plugin) syncs when sessions start and end (at most hourly) and puts your rank in the status line, with no scheduler job.
 
 To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `~/.claude/settings.json`.
 
@@ -49,7 +81,17 @@ To stop the deletion at the source as well, add `"cleanupPeriodDays": 3650` to `
 
 It runs at the hour you choose (9 by default) and at a minute fixed per machine, so not everyone submits at once. Without a saved token it walks you through `login` first; a scheduled job cannot see `VIBERANK_TOKEN`, so it needs the saved one. If the scheduler refuses the job, nothing is left half-installed and you see the scheduler's own error. Every scheduled run writes one dated line to `~/.viberank/autosubmit.log` (kept to the last 200).
 
-`npx viberank-cli status` tells you whether it is working: whose token it is, or that it was revoked; the schedule and the scheduler's last exit code; the last successful submission and how long ago, with a warning after 48 hours without one; and the recent log lines.
+`npx viberank-cli status` tells you whether it is working: whose token it is, or that it was revoked; the schedule and the scheduler's last exit code; the last successful submission and how long ago, with a warning after 48 hours without one; your saved standing for the week; and the recent log lines.
+
+## Status line
+
+`npx viberank-cli status --format short` prints one line from the saved standing, and never touches the network:
+
+```
+vr #41/126 ▲6 · $27 to @palewave
+```
+
+Formats: `short` (default), `compact` (`#41 ▲6`), `long` (`viberank wk48 d3 · #41/126 Ranked ▲6 · $835 · $27 to @palewave · 4w streak`), `json`, or a template such as `"{rank}/{of} {move}"` (keys: rank, of, move, gap, above, week, day, cost, tokens, plans, class, streak, user, status). Without a terminal on stdout (inside a status line), plain `status` prints the short line too. For a status line, `node ~/.viberank/statusline.mjs` (installed by the Claude Code plugin) starts faster than npx.
 
 > **Turned autosubmit on before 1.13?** Run `npx viberank-cli autosubmit` once. Older jobs started without a PATH, so they could not find node and never submitted, and a job that cannot start cannot update itself.
 
@@ -58,11 +100,12 @@ It runs at the hour you choose (9 by default) and at a minute fixed per machine,
 | Command | What it does |
 |---|---|
 | `npx viberank-cli` | Submit now (interactively when there is a terminal) |
-| `npx viberank-cli login` | Save an API token: paste it, or pass `--token vbr_…` |
+| `npx viberank-cli login` | Verify with GitHub in the browser and save a token (or pass `--token vbr_…`) |
 | `npx viberank-cli logout` | Forget the saved token, and turn autosubmit off |
 | `npx viberank-cli autosubmit` | Submit once a day in the background |
 | `npx viberank-cli autosubmit off` | Stop submitting automatically |
-| `npx viberank-cli status` | Token, schedule, last submission and recent runs |
+| `npx viberank-cli status` | Token, schedule, last submission, this week and recent runs |
+| `npx viberank-cli status --format short` | One line of weekly standing for a status line (offline) |
 | `npx viberank-cli --help` | Every command and option |
 
 | Option | What it does |
@@ -70,7 +113,11 @@ It runs at the hour you choose (9 by default) and at a minute fixed per machine,
 | `--user <handle>` | GitHub handle to submit as, when there is no token |
 | `-y`, `--yes` | Submit without asking for confirmation |
 | `--token <token>` | With `login`: the token to save, without a prompt |
+| `--no-browser` | With `login`: print the link instead of opening a browser |
+| `--paste` | With `login`: paste a token from the site instead of approving in the browser |
 | `--quiet` | Scheduled mode: no prompts, one line per run in the log |
+| `--every <hours>` | With `--quiet`: skip if a submission landed within this many hours (default 20) |
+| `--format <format>` | With `status`: `short`, `compact`, `long`, `json` or a template |
 | `-v`, `--version` | Print the version |
 
 ### Global install (optional)
@@ -88,7 +135,7 @@ viberank
 
 ## Tokens
 
-Mint one at **[viberank.app/settings/tokens](https://www.viberank.app/settings/tokens)**. A token both authenticates a background run and marks the submission **verified**, so it earns a blue check without a browser sign-in.
+`npx viberank-cli login` gets you one without leaving the terminal (it shows up on the tokens page as "CLI (linked <date>)"), or mint one by hand at **[viberank.app/settings/tokens](https://www.viberank.app/settings/tokens)**. A token both authenticates a background run and marks the submission **verified**, so it earns a blue check without a browser sign-in.
 
 `login` writes it to `~/.viberank/config.json` at mode `0600`. `VIBERANK_TOKEN` takes precedence, so CI and containers never need a file on disk:
 

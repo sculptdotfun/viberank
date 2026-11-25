@@ -165,19 +165,19 @@ export default function Post() {
           <BarRow label="p99 day" value={708} max={708} display="$708" dim />
         </div>
         <p>
-          <strong>11% of all tracked days exceeded $200</strong> — an entire Claude Max monthly subscription's worth
-          of compute, consumed in one day. The single biggest day we've recorded: <strong>$3,820</strong>. And the
+          <strong>11% of all tracked days exceeded $200</strong> — an entire Claude Max monthly subscription’s worth
+          of compute, consumed in one day. The single biggest day we’ve recorded: <strong>$3,820</strong>. And the
           median submitter is active 26 days per submission window — this is daily-driver usage, not weekend
           tinkering.
         </p>
 
         <h2>Power users have outgrown their subscription price 5–10×</h2>
         <p>
-          Normalizing each developer's usage to a monthly rate: roughly <strong>half run at $1,000+/month</strong> in
+          Normalizing each developer’s usage to a monthly rate: roughly <strong>half run at $1,000+/month</strong> in
           API-equivalent value, and ~73% run above $400/month. Most of them pay $100–200/month flat for Claude Max.
           The arbitrage is stark — the median heavy user extracts <strong>5–10× the sticker price</strong> of their
           plan in raw compute. Flat-rate pricing made always-on agentic coding economically rational, and the usage
-          curves show developers responded exactly as you'd expect.
+          curves show developers responded exactly as you’d expect.
         </p>
 
         <h2>AI coding is 95% rereading, 0.2% writing</h2>
@@ -199,13 +199,13 @@ export default function Post() {
         <p>
           Seven developers have logged <strong>200+ active days</strong>, and the longest consecutive-day streak on
           the board is <strong>238 days straight</strong> — eight months without missing a single day. The top of the
-          leaderboard isn't people who type fast; it's people who've turned agents into infrastructure that runs
-          whether they're at the keyboard or not.
+          leaderboard isn’t people who type fast; it’s people who’ve turned agents into infrastructure that runs
+          whether they’re at the keyboard or not.
         </p>
         <p>
           Weekends barely slow anyone down: Saturdays and Sundays are 24% of active days (a uniform week would be
           28.6%), and a weekend day burns the same <strong>~$82–84</strong> as a Tuesday. When your agent does the
-          typing, "logging off" is a softer concept.
+          typing, “logging off” is a softer concept.
         </p>
 
         <h2>Model mix: Opus is the workhorse, not the treat</h2>
@@ -216,7 +216,7 @@ export default function Post() {
         </div>
         <p>
           Nine in ten developers run Opus — the most expensive tier is now the default for serious work, not a
-          special occasion. Haiku's 64% tells the quieter story: cheap models doing subagent and utility passes
+          special occasion. Haiku’s 64% tells the quieter story: cheap models doing subagent and utility passes
           inside bigger workflows.
         </p>
 
@@ -227,7 +227,7 @@ export default function Post() {
           overwhelmingly Claude Code, and the cross-tool numbers should be read as early signal, not market share.
         </p>
         <p>
-          That said: about 9% of the board already reports usage from more than one coding agent, and they're heavily
+          That said: about 9% of the board already reports usage from more than one coding agent, and they’re heavily
           over-represented at the very top — several top-10 spenders run three or more agents in parallel. If you
           want a preview of the median 2027 workflow, look at the current multi-tool tail — see our{" "}
           <Link href="/blog/codex-vs-claude-code-vs-gemini-cli">Codex vs Claude Code vs Gemini CLI comparison</Link>.
@@ -246,7 +246,7 @@ export default function Post() {
         />
         <p>
           After the launch spike (Jul–Aug 2025) and an autumn lull, tracked usage has climbed for six straight
-          months. Spring 2026 is running at launch-hype levels — except now it's steady-state behavior, not novelty.
+          months. Spring 2026 is running at launch-hype levels — except now it’s steady-state behavior, not novelty.
         </p>
 
         <h2>Who these developers are</h2>
@@ -262,9 +262,9 @@ export default function Post() {
         <h2>Methodology & honest caveats</h2>
         <ul>
           <li><strong>Source:</strong> developers run ccusage locally against their own agent logs and submit the result. GitHub-OAuth submissions are verified (blue check); CLI submissions are self-reported.</li>
-          <li><strong>"Spend" means API-equivalent value</strong> — what the tokens would cost at list API prices. Most users actually pay a flat subscription, so real out-of-pocket cost is usually far lower.</li>
+          <li><strong>“Spend” means API-equivalent value</strong> — what the tokens would cost at list API prices. Most users actually pay a flat subscription, so real out-of-pocket cost is usually far lower.</li>
           <li><strong>Selection bias is real:</strong> people who submit to a usage leaderboard skew heavy. Read these numbers as benchmarks for serious users, not population averages.</li>
-          <li>Stats use each developer's largest submission to avoid double-counting overlapping date ranges.</li>
+          <li>Stats use each developer’s largest submission to avoid double-counting overlapping date ranges.</li>
           <li><strong>Coverage skews Claude Code:</strong> multi-tool submissions only opened recently, so other agents are underrepresented relative to their real-world usage.</li>
         </ul>
 

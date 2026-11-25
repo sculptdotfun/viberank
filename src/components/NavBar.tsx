@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Github, Sparkles, Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, Sparkles } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -10,37 +9,46 @@ import dynamic from "next/dynamic";
 import Avatar from "./Avatar";
 import UserMenu, { accountLinks } from "./UserMenu";
 import { takeSubmitParam } from "@/lib/submit-modal";
+import { isAdmin as checkIsAdmin } from "@/lib/admin";
+import { currentWeek } from "./v2/week";
+import { useBoardHref } from "./HomeVariant";
+import { weekNumber } from "./v2/format";
 
 // Modals only matter on interaction — split them out of the shell bundle
 // (SubmitModal drags in react-dropzone via FileUpload).
 const SubmitModal = dynamic(() => import("./SubmitModal"), { ssr: false });
 const UpdatesModal = dynamic(() => import("./UpdatesModal"), { ssr: false });
-import { isAdmin as checkIsAdmin } from "@/lib/admin";
 
-function Wordmark({ size = 20 }: { size?: number }) {
+const GITHUB = "https://github.com/sculptdotfun/viberank";
+
+export function Logo() {
   return (
-    <>
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="text-accent">
-        <rect x="3" y="14" width="5" height="7" rx="1" fill="currentColor" opacity="0.5" />
-        <rect x="9.5" y="8" width="5" height="13" rx="1" fill="currentColor" opacity="0.75" />
-        <rect x="16" y="3" width="5" height="18" rx="1" fill="currentColor" />
-      </svg>
-      <span className="font-mono font-semibold tracking-tight">viberank</span>
-    </>
+    <Link href="/" className="vr-logo" aria-label="viberank home">
+      <span className="bars" aria-hidden><i /><i /><i /></span>
+      viberank
+    </Link>
   );
 }
 
-// Site-wide nav. Owns the submit + updates modals so any page can mount it
-// with no props.
+function isActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  // "/week" must not light up on "/weeks", so match whole path segments.
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+// Site-wide nav, restyled for v2. Owns the submit + updates modals so any
+// page can mount it with no props. "Join week NN" goes to /start, every way
+// in; the submit modal still reopens after GitHub sign-in (?submit=1).
 export default function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
   const { data: session } = useSession();
-  const pathname = usePathname();
-
-  const isAdmin = checkIsAdmin(session?.user?.username);
+  const pathname = usePathname() ?? "/";
   const login = session?.user?.username;
+  const week = weekNumber(currentWeek());
+  // The weekly board is "/" once VIBERANK_HOME=v2, and "/week" until then.
+  const board = useBoardHref();
 
   // Back from "Sign in with GitHub to upload": reopen the modal they were in.
   // Read once from the URL rather than useSearchParams, which would opt
@@ -50,195 +58,85 @@ export default function NavBar() {
   }, []);
 
   const navItems = [
-    { name: "Stats", href: "/stats" },
-    { name: "Leagues", href: "/leagues" },
-    { name: "Calculator", href: "/calculator" },
-    { name: "Blog", href: "/blog" },
-    { name: "Hire", href: "/hire" },
-    ...(isAdmin ? [{ name: "Admin", href: "/admin" }] : []),
+    { name: "Board", href: board },
+    { name: "Records", href: "/records" },
+    { name: "Fleets", href: "/fleets" },
+    { name: "Wrapped 2026", href: "/wrapped/2026" },
+    { name: "Data", href: "/data" },
+    ...(checkIsAdmin(login) ? [{ name: "Admin", href: "/admin" }] : []),
   ];
+
+  const join = (
+    <Link href="/start" className="vr-btn" style={{ color: "var(--btn-ink)" }} suppressHydrationWarning>
+      Join week {week}
+    </Link>
+  );
 
   return (
     <>
-      {/* Desktop Nav */}
-      <header className="sticky top-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border hidden md:flex items-center">
-        <div className="w-full max-w-6xl mx-auto px-6 flex items-center justify-between">
-          {/* Left: Logo + Nav Items */}
-          <div className="flex items-center gap-5">
-            <Link href="/" className="flex items-center gap-2 text-lg hover:opacity-80 transition-opacity">
-              <Wordmark />
-            </Link>
-
-            <div className="flex items-center gap-0.5">
-              {navItems.map((item) => {
-                const isActive = pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={`px-3 h-8 inline-flex items-center text-sm rounded-md transition-colors ${
-                      isActive ? "text-foreground bg-surface-2" : "text-muted hover:text-foreground hover:bg-surface-2"
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowUpdates(true)}
-              aria-label="What's new"
-              className="relative h-9 w-9 inline-flex items-center justify-center text-muted hover:text-foreground hover:bg-surface-2 rounded-md transition-colors"
-            >
-              <Sparkles className="w-[18px] h-[18px]" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-accent rounded-full" />
-            </button>
-
-            <a
-              href="https://github.com/sculptdotfun/viberank"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub repository"
-              className="h-9 w-9 inline-flex items-center justify-center text-muted hover:text-foreground hover:bg-surface-2 rounded-md transition-colors"
-            >
-              <Github className="w-[18px] h-[18px]" />
-            </a>
-
+      <header className="vr-navwrap">
+        <div className="vr-in vr-nav">
+          <Logo />
+          <nav className="vr-links" aria-label="Main">
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href} aria-current={isActive(pathname, item.href) ? "page" : undefined}>
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+          <div className="vr-nav-r">
+            <a className="vr-hide-sm" href={GITHUB} target="_blank" rel="noopener noreferrer">GitHub</a>
             {session ? (
-              <UserMenu login={login} name={session.user?.name} image={session.user?.image} />
+              <span className="vr-hide-sm"><UserMenu login={login} name={session.user?.name} image={session.user?.image} /></span>
             ) : (
-              <button
-                onClick={() => signIn("github")}
-                className="h-9 inline-flex items-center gap-2 px-3.5 text-sm font-medium border border-border rounded-md hover:bg-surface-2 transition-colors"
-              >
-                <Github className="w-4 h-4" />
-                Sign in
-              </button>
+              <button type="button" className="vr-linkbtn vr-hide-sm" onClick={() => signIn("github")}>Sign in</button>
             )}
-
+            {join}
             <button
-              onClick={() => setShowSubmit(true)}
-              className="h-9 inline-flex items-center gap-2 px-3.5 bg-accent text-white text-sm rounded-md font-medium hover:bg-accent-hover transition-colors btn-glow"
-            >
-              <Upload className="w-4 h-4" />
-              Submit
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile Nav */}
-      <header className="md:hidden sticky top-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border">
-        <div className="h-full px-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Wordmark size={18} />
-          </Link>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowSubmit(true)}
-              className="h-8 inline-flex items-center gap-1.5 px-3 bg-accent text-white text-sm rounded-md font-medium"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Submit
-            </button>
-            <button
+              type="button"
+              className="vr-menu"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Menu"
               aria-expanded={mobileMenuOpen}
-              className="h-8 w-8 inline-flex items-center justify-center text-muted hover:text-foreground rounded-md"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-background border-b border-border"
-            >
-              <div className="px-4 py-3 space-y-1">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-sm rounded-md hover:bg-surface-2"
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-                <button
-                  onClick={() => { setShowUpdates(true); setMobileMenuOpen(false); }}
-                  className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
-                >
-                  <Sparkles className="w-4 h-4 text-muted" />
-                  What&apos;s new
-                </button>
-                <a
-                  href="https://github.com/sculptdotfun/viberank"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
-                >
-                  <Github className="w-4 h-4 text-muted" />
-                  GitHub
-                </a>
-
-                <div className="pt-2 border-t border-border">
-                  {session ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted">
-                        <Avatar
-                          src={session.user?.image}
-                          name={session.user?.name || login}
-                          size="sm"
-                          showRing={false}
-                          className="w-5 h-5"
-                        />
-                        <span className="truncate">{login ? `@${login}` : session.user?.name}</span>
-                      </div>
-                      {accountLinks(login).map(({ href, label, icon: Icon }) => (
-                        <Link
-                          key={href}
-                          href={href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
-                        >
-                          <Icon className="w-4 h-4 text-muted" />
-                          {label}
-                        </Link>
-                      ))}
-                      <button
-                        onClick={() => { signOut(); setMobileMenuOpen(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-surface-2"
-                      >
-                        <LogOut className="w-4 h-4 text-muted" />
-                        Sign out
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => { signIn("github"); setMobileMenuOpen(false); }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-border rounded-md hover:bg-surface-2"
-                    >
-                      <Github className="w-4 h-4" />
-                      Sign in with GitHub
+        {mobileMenuOpen && (
+          <div className="vr-sheet">
+            <div className="vr-in">
+              {navItems.map((item) => (
+                <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>{item.name}</Link>
+              ))}
+              <button type="button" onClick={() => { setShowUpdates(true); setMobileMenuOpen(false); }}>
+                <Sparkles className="w-4 h-4" /> What&apos;s new
+              </button>
+              <a href={GITHUB} target="_blank" rel="noopener noreferrer">GitHub</a>
+              <div className="vr-sheet-acct">
+                {session ? (
+                  <>
+                    <span className="who">
+                      <Avatar src={session.user?.image} name={session.user?.name || login} size="sm" showRing={false} className="w-5 h-5" />
+                      {login ? `@${login}` : session.user?.name}
+                    </span>
+                    {accountLinks(login).map(({ href, label, icon: Icon }) => (
+                      <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)}>
+                        <Icon className="w-4 h-4" /> {label}
+                      </Link>
+                    ))}
+                    <button type="button" onClick={() => { signOut(); setMobileMenuOpen(false); }}>
+                      <LogOut className="w-4 h-4" /> Sign out
                     </button>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => { signIn("github"); setMobileMenuOpen(false); }}>Sign in with GitHub</button>
+                )}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        )}
       </header>
 
       {showSubmit && <SubmitModal open onClose={() => setShowSubmit(false)} />}

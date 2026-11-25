@@ -10,11 +10,12 @@
 /** Every command, in the order help lists them. */
 export const COMMANDS = [
   ['submit', 'Submit your usage now (the default)'],
-  ['login', 'Save an API token: paste it, or pass --token'],
+  ['login', 'Verify with GitHub in your browser and save a token (or pass --token)'],
   ['logout', 'Forget the saved token, and turn autosubmit off'],
   ['autosubmit', 'Submit once a day in the background'],
   ['autosubmit off', 'Stop submitting automatically'],
   ['status', 'Token, schedule, last submission and recent runs'],
+  ['status --format', 'One line of weekly standing for a status line (offline)'],
   ['help', 'Show this help'],
 ];
 
@@ -23,7 +24,11 @@ export const OPTIONS = [
   { names: ['--user'], value: '<handle>', key: 'user', help: 'GitHub handle to submit as, when there is no token' },
   { names: ['-y', '--yes'], key: 'yes', help: 'Submit without asking for confirmation' },
   { names: ['--token'], value: '<token>', key: 'token', help: 'With login: the token to save, without a prompt' },
+  { names: ['--no-browser'], key: 'noBrowser', help: 'With login: print the link instead of opening a browser' },
+  { names: ['--paste'], key: 'paste', help: 'With login: paste a token from the site instead of approving in the browser' },
   { names: ['--quiet'], key: 'quiet', help: 'Scheduled mode: no prompts, one line per run in ~/.viberank/autosubmit.log' },
+  { names: ['--every'], value: '<hours>', key: 'every', help: 'With --quiet: skip if a submission landed within this many hours (default 20)' },
+  { names: ['--format'], value: '<format>', key: 'format', help: 'With status: short, compact, long, json, or a template like "{rank}/{of} {move}"' },
   { names: ['-h', '--help'], key: 'help', help: 'Show this help' },
   { names: ['-v', '--version'], key: 'version', help: 'Print the version' },
 ];
@@ -31,13 +36,14 @@ export const OPTIONS = [
 /**
  * @param {string[]} argv process.argv.slice(2)
  * @returns {{ command: string | undefined, arg: string | undefined,
- *   flags: { user: string | null, yes: boolean, token: string | null, quiet: boolean, help: boolean, version: boolean },
+ *   flags: { user: string | null, yes: boolean, token: string | null, quiet: boolean, every: string | null,
+ *     format: string | null, noBrowser: boolean, paste: boolean, help: boolean, version: boolean },
  *   unknown: string[], missing: string[] }}
  *   `unknown` holds options nobody defined; `missing` holds options that take
  *   a value but were given none.
  */
 export function parseArgs(argv) {
-  const flags = { user: null, yes: false, token: null, quiet: false, help: false, version: false };
+  const flags = { user: null, yes: false, token: null, quiet: false, every: null, format: null, noBrowser: false, paste: false, help: false, version: false };
   const positional = [];
   const unknown = [];
   const missing = [];
@@ -105,6 +111,39 @@ export function submitMode({ quiet, interactive, hasToken, user, yes }) {
   return 'blocked';
 }
 
+/**
+ * How long a scheduled run waits after a success before it submits again.
+ * The daily job keeps the 20-hour default (its catch-up triggers fire on every
+ * boot); the Claude Code plugin passes --every 1 so a session's usage lands
+ * within the hour. Anything that is not a positive number keeps the default.
+ */
+export function skipWithinMs(every, defaultHours = 20) {
+  const hours = Number(every);
+  return (Number.isFinite(hours) && hours > 0 ? hours : defaultHours) * 60 * 60 * 1000;
+}
+
+/**
+ * Whether `status` prints the one-line standing instead of the full report:
+ * when a format is asked for, or when nobody is reading a terminal (a status
+ * line runs it with stdout piped). The one-liner never touches the network.
+ */
+export function wantsStatusLine({ format, stdoutIsTTY }) {
+  return format !== null && format !== undefined ? true : !stdoutIsTTY;
+}
+
+/**
+ * Whether a submit offers to verify with GitHub (1.14 first run).
+ *
+ *   'ask'   a person at a terminal, no token, and no --yes: ask once
+ *   'hint'  nobody to ask (an agent's shell, CI): print one line, never prompt
+ *   'none'  a token already, or a scheduled run
+ */
+export function linkOffer({ quiet, interactive, hasToken, yes }) {
+  if (quiet || hasToken) return 'none';
+  if (interactive && !yes) return 'ask';
+  return 'hint';
+}
+
 /** What to print in 'blocked' mode. Plain lines; the caller styles them. */
 export function blockedMessage() {
   return [
@@ -112,8 +151,8 @@ export function blockedMessage() {
     'Any one of these works:',
     '  - Run `npx viberank-cli` in your own terminal.',
     '  - Pass `--user <github-handle> --yes` to submit unverified, without questions.',
-    '  - Save a token with `npx viberank-cli login --token <token>`, or set VIBERANK_TOKEN.',
-    '    Tokens are at https://www.viberank.app/settings/tokens',
+    '  - Run `npx viberank-cli login` once: approve in the browser, no token to copy.',
+    '  - Or save a token with `npx viberank-cli login --token <token>`, or set VIBERANK_TOKEN.',
   ];
 }
 

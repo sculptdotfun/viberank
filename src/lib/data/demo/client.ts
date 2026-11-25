@@ -1,4 +1,14 @@
 import { efficiencyScore } from "@/lib/efficiency";
+import {
+  createWeeklyService,
+  type WeeklyDataService,
+  type UserDay,
+  type UserHistory,
+  type WeeklySource,
+  type WindowEntry,
+  type WindowQuery,
+} from "@/lib/v2/service";
+import { addDays, isoDate, weekIdOf, weekStart } from "@/lib/v2/week";
 import type {
   ClaimResult,
   ClaimStatus,
@@ -17,7 +27,6 @@ import type {
   PatternSearchOptions,
   ProfileWithSubmissions,
   Submission,
-  SubmitData,
 } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -349,7 +358,7 @@ export function createDemoDataLayer(): DataLayer {
         // Demo data is read-only.
         return false;
       },
-      async submit(_data: SubmitData): Promise<string> {
+      async submit(): Promise<string> {
         throw new Error("Demo data is read-only");
       },
       async getLeaderboard(params: LeaderboardParams): Promise<LeaderboardResult> {
@@ -417,7 +426,7 @@ export function createDemoDataLayer(): DataLayer {
       },
     },
     profiles: {
-      async getProfile(username: string, _submissionLimit?: number): Promise<ProfileWithSubmissions | null> {
+      async getProfile(username: string): Promise<ProfileWithSubmissions | null> {
         const submission = findSubmission(username);
         return submission ? profileFromSubmission(submission) : null;
       },
@@ -477,8 +486,25 @@ export function createDemoDataLayer(): DataLayer {
       async joinByCode(): Promise<never> {
         throw new Error("Leagues need the live backend.");
       },
-      async getBySlug() {
-        return null;
+      // One read-only league so the league page can be seen without the live
+      // backend: known demo handles plus one member who never synced.
+      async getBySlug(slug: string) {
+        if (slug !== DEMO_LEAGUE_SLUG) return null;
+        const members = [...DEMO_KNOWN_HANDLES.slice(0, 7), "not-synced-yet"].map((username) => {
+          const submission = findSubmission(username);
+          return {
+            username,
+            joinedAt: "2026-10-01T00:00:00Z",
+            totalCost: submission?.totalCost ?? 0,
+            totalTokens: submission?.totalTokens ?? 0,
+            verified: Boolean(submission?.verified),
+          };
+        });
+        members.sort((a, b) => b.totalCost - a.totalCost);
+        return {
+          league: { id: "demo", slug: DEMO_LEAGUE_SLUG, name: "Demo Team", createdBy: DEMO_KNOWN_HANDLES[0], createdAt: "2026-10-01T00:00:00Z" },
+          members,
+        };
       },
       async getInviteCode() {
         return null;
@@ -532,5 +558,215 @@ export function createDemoDataLayer(): DataLayer {
         };
       },
     },
+    weekly: createDemoWeeklyService(),
   };
+}
+
+// ============================================================================
+// v2 WEEKLY DEMO DATA
+// ============================================================================
+// A deterministic population of ~170 developers with daily usage for the last
+// twenty weeks plus this week up to today, so the weekly board renders with
+// realistic Ranked / Open / Fleets splits, movement and streaks. The same
+// WeeklyService the Supabase backend uses runs over it (src/lib/v2/service.ts).
+
+const DEMO_HISTORY_WEEKS = 20;
+const DEMO_POPULATION = 170;
+
+const DEMO_LEAGUE_SLUG = "demo-team";
+const DEMO_KNOWN_HANDLES = [
+  "nikshepsvn", "iabdulwasey", "B-EtterDigital", "azamara", "tokenmaxed", "StartupBros",
+  "dprvda", "sigridjineth", "sahir2k", "trac3rOO",
+];
+const DEMO_FIRST = [
+  "quiet", "rapid", "lunar", "amber", "cobalt", "steady", "brisk", "cedar", "delta", "ember",
+  "frost", "gamma", "harbor", "indigo", "jade", "kilo", "lumen", "maple", "nova", "onyx",
+  "pixel", "quartz", "river", "sable", "tidal", "umbra", "vector", "willow", "xeno", "zephyr",
+];
+const DEMO_SECOND = [
+  "fox", "dev", "byte", "loop", "stack", "forge", "shell", "cache", "node", "lambda",
+  "kernel", "patch", "merge", "build", "agent", "prompt", "token", "commit", "ship", "query",
+];
+const DEMO_TOOLSETS: { tools: string[]; models: string[] }[] = [
+  { tools: ["claude"], models: ["claude-opus-4-8", "claude-sonnet-4-6"] },
+  { tools: ["claude", "codex"], models: ["claude-opus-4-8", "gpt-5.5"] },
+  { tools: ["codex"], models: ["gpt-5.5", "gpt-5.5-mini"] },
+  { tools: ["opencode"], models: ["glm-5.3", "deepseek-v4.1"] },
+  { tools: ["claude", "gemini"], models: ["claude-sonnet-4-6", "gemini-3-pro"] },
+  { tools: ["gemini"], models: ["gemini-3-pro", "gemini-3-flash"] },
+  { tools: ["claude", "opencode", "codex"], models: ["claude-opus-4-8", "gpt-5.5", "kimi-k3"] },
+];
+
+type DemoKind = "ranked" | "unverified" | "review" | "fleet";
+
+/** mulberry32: small, fast, deterministic. */
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Log-uniform between lo and hi: most people spend little, a few spend a lot. */
+function logUniform(random: () => number, lo: number, hi: number): number {
+  return Math.exp(Math.log(lo) + random() * (Math.log(hi) - Math.log(lo)));
+}
+
+function demoHandles(random: () => number, count: number): string[] {
+  const handles = new Set(DEMO_KNOWN_HANDLES);
+  while (handles.size < count) {
+    const first = DEMO_FIRST[Math.floor(random() * DEMO_FIRST.length)];
+    const second = DEMO_SECOND[Math.floor(random() * DEMO_SECOND.length)];
+    const suffix = random() < 0.35 ? String(Math.floor(random() * 99)) : "";
+    handles.add(`${first}${second}${suffix}`);
+  }
+  return [...handles];
+}
+
+function demoKind(index: number): DemoKind {
+  if (index % 37 === 5) return "fleet";
+  if (index % 41 === 7) return "review";
+  if (index % 7 === 3) return "unverified";
+  return "ranked";
+}
+
+/** One week of days for a developer: weekends lighter, nothing after today. */
+function demoWeekDays(
+  random: () => number,
+  monday: string,
+  weekCost: number,
+  tokensPerDollar: number,
+  toolset: (typeof DEMO_TOOLSETS)[number],
+  lastDate: string
+): UserDay[] {
+  const weights = [1, 1.1, 1.15, 1.05, 0.95, 0.35, 0.25].map((w) => (random() < 0.12 ? 0 : w * (0.6 + random() * 0.8)));
+  const total = weights.reduce((sum, w) => sum + w, 0) || 1;
+  const days: UserDay[] = [];
+  weights.forEach((weight, index) => {
+    const date = addDays(monday, index);
+    if (date > lastDate || weight === 0) return;
+    const cost = Math.round(((weekCost * weight) / total) * 100) / 100;
+    if (cost <= 0) return;
+    const split = 0.55 + random() * 0.35;
+    const [primary, secondary] = toolset.models;
+    days.push({
+      date,
+      cost,
+      tokens: Math.round(cost * tokensPerDollar),
+      agents: toolset.tools,
+      models: [
+        { model: primary, cost: Math.round(cost * split * 100) / 100 },
+        { model: secondary ?? primary, cost: Math.round(cost * (1 - split) * 100) / 100 },
+      ],
+    });
+  });
+  return days;
+}
+
+function demoDeveloper(handle: string, index: number, today: string, currentMonday: string): UserHistory {
+  const random = seededRandom(index * 7919 + 17);
+  const kind = demoKind(index);
+  const weeklyBase =
+    kind === "fleet" ? logUniform(random, 40_000, 140_000) : logUniform(random, 120, kind === "ranked" ? 9_000 : 6_000);
+  const tokensPerDollar = logUniform(random, 600_000, 3_200_000);
+  const toolset = DEMO_TOOLSETS[index % DEMO_TOOLSETS.length];
+  // Some joined recently, some skip weeks: that is what makes streaks vary.
+  const joinedWeeksAgo = Math.floor(random() * (DEMO_HISTORY_WEEKS + 1));
+  const skipChance = random() < 0.5 ? 0.05 : 0.25;
+  const activeThisWeek = random() < 0.9;
+
+  const days: UserDay[] = [];
+  let level = weeklyBase;
+  for (let weeksAgo = joinedWeeksAgo; weeksAgo >= 0; weeksAgo--) {
+    // A random walk around the base, so ranks move week to week.
+    level = Math.min(weeklyBase * 1.6, Math.max(weeklyBase * 0.4, level * (0.75 + random() * 0.5)));
+    const isCurrent = weeksAgo === 0;
+    if (isCurrent ? !activeThisWeek : random() < skipChance) continue;
+    const monday = addDays(currentMonday, -7 * weeksAgo);
+    days.push(...demoWeekDays(random, monday, level, tokensPerDollar, toolset, today));
+  }
+
+  return {
+    userKey: handle.toLowerCase(),
+    username: handle,
+    avatarUrl: `https://github.com/identicons/${encodeURIComponent(handle)}.png`,
+    verified: kind !== "unverified",
+    source: kind === "unverified" ? "cli" : index % 3 === 0 ? "oauth" : "cli",
+    reviewReasons:
+      kind === "review"
+        ? [`${addDays(today, -1)}: $31,240 in one day, over 20× this profile's median day ($840)`]
+        : [],
+    days,
+  };
+}
+
+export function buildDemoDevelopers(now: Date): UserHistory[] {
+  const today = isoDate(now);
+  const currentMonday = weekStart(weekIdOf(now));
+  const handles = demoHandles(seededRandom(48), DEMO_POPULATION);
+  return handles.map((handle, index) => demoDeveloper(handle, index, today, currentMonday));
+}
+
+function demoWindowEntry(developer: UserHistory, query: WindowQuery): WindowEntry | null {
+  const inWindow = (date: string) => (!query.from || date >= query.from) && (!query.to || date <= query.to);
+  const days = developer.days.filter((day) => inWindow(day.date) && (!query.tool || day.agents.includes(query.tool)));
+  if (days.length === 0) return null;
+  const historyFrom = query.historyFrom;
+  const activeWeeks = historyFrom
+    ? [
+        ...new Set(
+          developer.days
+            .filter((day) => day.date >= historyFrom && (!query.to || day.date <= query.to))
+            .map((day) => weekStart(weekIdOf(day.date)))
+        ),
+      ].sort()
+    : undefined;
+  return {
+    userKey: developer.userKey,
+    username: developer.username,
+    avatarUrl: developer.avatarUrl,
+    verified: developer.verified,
+    source: developer.source,
+    reviewReasons: developer.reviewReasons,
+    tools: [...new Set(days.flatMap((day) => day.agents))].sort(),
+    cost: Math.round(days.reduce((sum, day) => sum + day.cost, 0) * 100) / 100,
+    tokens: days.reduce((sum, day) => sum + day.tokens, 0),
+    activeDays: days.length,
+    firstDate: days[0].date,
+    lastDate: days[days.length - 1].date,
+    ...(query.withDays ? { days: days.map(({ date, cost, tokens }) => ({ date, cost, tokens })) } : {}),
+    ...(activeWeeks ? { activeWeeks } : {}),
+  };
+}
+
+/** The demo WeeklySource: generated developers, nothing frozen, nothing stored. */
+export function createDemoWeeklySource(now: Date): WeeklySource {
+  const developers = buildDemoDevelopers(now);
+  return {
+    async windowEntries(query) {
+      return developers
+        .map((developer) => demoWindowEntry(developer, query))
+        .filter((entry): entry is WindowEntry => entry !== null);
+    },
+    async userHistory(username, from, to) {
+      const wanted = username.toLowerCase();
+      const developer = developers.find((candidate) => candidate.userKey === wanted);
+      if (!developer) return null;
+      return {
+        ...developer,
+        days: developer.days.filter((day) => (!from || day.date >= from) && (!to || day.date <= to)),
+      };
+    },
+    async frozenWeek() {
+      return null;
+    },
+  };
+}
+
+export function createDemoWeeklyService(now: () => Date = () => new Date()): WeeklyDataService {
+  return createWeeklyService(createDemoWeeklySource(now()), { now, cacheMs: 30_000 });
 }

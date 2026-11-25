@@ -177,8 +177,8 @@ export default function CursorVsClaudeCodeVsCopilot() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Cursor is a VS Code fork rebuilt from the ground up for AI-first development. It's the tool
-            Andrej Karpathy used when he coined "vibe coding," and it's become the go-to choice for
+            Cursor is a VS Code fork rebuilt from the ground up for AI-first development. It’s the tool
+            Andrej Karpathy used when he coined “vibe coding,” and it’s become the go-to choice for
             developers who want AI deeply integrated into their editing experience.
           </p>
 
@@ -226,17 +226,17 @@ export default function CursorVsClaudeCodeVsCopilot() {
             <div className="bg-red-900/20 border border-red-400/30 rounded-lg p-6">
               <h3 className="text-red-400 font-semibold text-lg mb-3">Limitations</h3>
               <ul className="text-foreground space-y-2 m-0">
-                <li>• Locked into Cursor's IDE</li>
+                <li>• Locked into Cursor’s IDE</li>
                 <li>• Limited external integrations</li>
                 <li>• Higher cost at $20/month</li>
-                <li>• Can't use your own API keys (Pro)</li>
+                <li>• Can’t use your own API keys (Pro)</li>
               </ul>
             </div>
           </div>
 
           <p className="text-foreground text-lg leading-relaxed">
             <strong className="text-accent">Best for:</strong> Developers who want the most polished
-            IDE experience and don't mind switching from VS Code. Ideal for frontend development,
+            IDE experience and don’t mind switching from VS Code. Ideal for frontend development,
             rapid prototyping, and teams standardizing on one tool.
           </p>
         </section>
@@ -248,7 +248,7 @@ export default function CursorVsClaudeCodeVsCopilot() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Claude Code takes a radically different approach—it's a CLI tool that runs in your terminal
+            Claude Code takes a radically different approach—it’s a CLI tool that runs in your terminal
             alongside any editor. Built by Anthropic, it treats coding as an agentic task where Claude
             autonomously navigates codebases, runs commands, and implements features.
           </p>
@@ -393,8 +393,8 @@ export default function CursorVsClaudeCodeVsCopilot() {
             <div className="bg-card p-6 rounded-lg border border-border">
               <h3 className="text-accent font-semibold text-lg mb-2">Choose Cursor if...</h3>
               <p className="text-foreground m-0">
-                You want the most polished AI-native IDE experience. You're comfortable switching from VS Code
-                and want powerful multi-file editing with visual diffs. You value a beautiful UI and don't need
+                You want the most polished AI-native IDE experience. You’re comfortable switching from VS Code
+                and want powerful multi-file editing with visual diffs. You value a beautiful UI and don’t need
                 extensive external integrations. Live numbers are on the{" "}
                 <Link href="/compare/claude-vs-cursor">Cursor vs Claude Code comparison</Link>.
               </p>
@@ -403,9 +403,9 @@ export default function CursorVsClaudeCodeVsCopilot() {
             <div className="bg-card p-6 rounded-lg border border-border">
               <h3 className="text-accent font-semibold text-lg mb-2">Choose Claude Code if...</h3>
               <p className="text-foreground m-0">
-                You're a terminal power user who wants AI as a command-line agent. You need to integrate with
+                You’re a terminal power user who wants AI as a command-line agent. You need to integrate with
                 external services through MCP servers. You want to automate AI workflows in scripts and CI/CD.
-                It's also the tool driving the most spend on the{" "}
+                It’s also the tool driving the most spend on the{" "}
                 <Link href="/tool/claude">Claude Code leaderboard</Link> — by a wide margin.
               </p>
             </div>
@@ -413,7 +413,7 @@ export default function CursorVsClaudeCodeVsCopilot() {
             <div className="bg-card p-6 rounded-lg border border-border">
               <h3 className="text-accent font-semibold text-lg mb-2">Choose GitHub Copilot if...</h3>
               <p className="text-foreground m-0">
-                You want reliable autocomplete in your existing IDE without workflow changes. You're on a budget
+                You want reliable autocomplete in your existing IDE without workflow changes. You’re on a budget
                 and $10/month fits better than $20+. Your enterprise requires compliance features and admin controls.
                 In 2026 its agent mode is genuinely capable — see how its usage stacks up on the{" "}
                 <Link href="/compare/claude-vs-copilot">GitHub Copilot vs Claude Code comparison</Link>.
@@ -425,7 +425,7 @@ export default function CursorVsClaudeCodeVsCopilot() {
             <h3 className="text-2xl font-semibold text-accent mb-4">Pro Tip: Use Multiple Tools</h3>
             <p className="text-foreground m-0">
               Many developers use Copilot for inline completions while running Claude Code in a separate terminal
-              for complex tasks. Cursor users often keep Claude Code for its MCP integrations. There's no rule
+              for complex tasks. Cursor users often keep Claude Code for its MCP integrations. There’s no rule
               that says you can only use one tool—find the combination that works for your workflow.
             </p>
           </div>
@@ -458,7 +458,7 @@ export default function CursorVsClaudeCodeVsCopilot() {
           <p className="text-foreground mb-6">
             All three tools will make you more productive—the differences are in how they fit your workflow.
             Cursor is the polished IDE experience, Claude Code is the powerful terminal agent, and Copilot
-            is the reliable autocomplete companion. Try them, find what clicks, and don't be afraid to combine them.
+            is the reliable autocomplete companion. Try them, find what clicks, and don’t be afraid to combine them.
           </p>
           <p className="text-stone-500 text-sm">
             Updated August 2026. Pricing and features may change—check official sites for current information.

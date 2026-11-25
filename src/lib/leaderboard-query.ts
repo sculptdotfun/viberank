@@ -65,6 +65,22 @@ export function leaderboardQuery(filters: BoardFilters, page: number): BoardQuer
   };
 }
 
+const SORTS: SortBy[] = ["cost", "tokens", "efficiency"];
+
+/** A sort from a URL (?sort=), or cost when it is missing or unknown. */
+export function parseSortBy(value: string | null | undefined): SortBy {
+  return SORTS.includes(value as SortBy) ? (value as SortBy) : "cost";
+}
+
+/**
+ * The per-tool board's query (#200). The page used to hardcode cost; the
+ * efficiency board (volume-weighted score, $100 floor) and the tokens board
+ * work per tool exactly as they do on the home board.
+ */
+export function toolBoardParams(tool: string, sort?: string | null, pageSize = 50): LeaderboardParams {
+  return { sortBy: parseSortBy(sort), page: 0, pageSize, tool };
+}
+
 /** Identity of the board's query with the page left out: what a reset keys on. */
 export function boardQueryKey(filters: BoardFilters): string {
   return JSON.stringify(leaderboardQuery(filters, 0));

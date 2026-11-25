@@ -73,7 +73,7 @@ export default function VibeCodingRevolution() {
         
         <header className="mb-12">
           <h1 className="text-5xl font-bold text-foreground mb-4 leading-tight">
-            Vibe Coding Explained: What Karpathy's Viral Term Really Means
+            Vibe Coding Explained: What Karpathy’s Viral Term Really Means
           </h1>
           
           <div className="flex items-center gap-6 text-sm text-muted mb-8">
@@ -90,9 +90,9 @@ export default function VibeCodingRevolution() {
           <div className="p-6 bg-card border border-border rounded-lg">
             <p className="text-lg text-foreground m-0">
               Almost a year ago, <span className="font-semibold text-accent">Andrej Karpathy</span> tweeted about 
-              a "new kind of coding" that would change everything. He called it <span className="font-semibold text-accent">vibe coding</span>—where 
-              you "fully give in to the vibes, embrace exponentials, and forget that the code even exists." 
-              What started as a tweet has become a movement that's redefining how we build software.
+              a “new kind of coding” that would change everything. He called it <span className="font-semibold text-accent">vibe coding</span>—where 
+              you “fully give in to the vibes, embrace exponentials, and forget that the code even exists.” 
+              What started as a tweet has become a movement that’s redefining how we build software.
             </p>
           </div>
         </header>
@@ -105,9 +105,9 @@ export default function VibeCodingRevolution() {
           
           <div className="bg-card border-l-4 border-accent p-6 my-8">
             <p className="text-stone-200 italic m-0 mb-4">
-              "There's a new kind of coding I call 'vibe coding', where you fully give in to the vibes, 
-              embrace exponentials, and forget that the code even exists. It's possible because the LLMs 
-              (e.g. Cursor Composer w Sonnet) are getting too good."
+              “There’s a new kind of coding I call ‘vibe coding’, where you fully give in to the vibes, 
+              embrace exponentials, and forget that the code even exists. It’s possible because the LLMs 
+              (e.g. Cursor Composer w Sonnet) are getting too good.”
             </p>
             <p className="text-muted text-sm m-0">
               — Andrej Karpathy, February 6, 2024
@@ -115,21 +115,21 @@ export default function VibeCodingRevolution() {
           </div>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Karpathy wasn't just coining a catchy term. The former Tesla AI director and OpenAI co-founder 
+            Karpathy wasn’t just coining a catchy term. The former Tesla AI director and OpenAI co-founder 
             was describing his actual workflow: using voice input with SuperWhisper, barely touching the keyboard, 
             accepting all AI suggestions without reading the diffs, and letting code grow beyond his usual comprehension.
           </p>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            When something breaks? Just copy-paste the error message with no comment. Can't fix a bug? 
-            Work around it or ask for random changes. This wasn't careful, methodical programming—it was 
+            When something breaks? Just copy-paste the error message with no comment. Can’t fix a bug? 
+            Work around it or ask for random changes. This wasn’t careful, methodical programming—it was 
             vibing with the machine.
           </p>
 
           <p className="text-foreground text-lg leading-relaxed">
-            Within a month, "vibe coding" was trending in the Merriam-Webster Dictionary. The New York Times, 
+            Within a month, “vibe coding” was trending in the Merriam-Webster Dictionary. The New York Times, 
             Guardian, and tech blogs everywhere were discussing what this meant for the future of programming. 
-            But here's the thing: not everyone was using the term the same way.
+            But here’s the thing: not everyone was using the term the same way.
           </p>
         </section>
 
@@ -153,13 +153,13 @@ export default function VibeCodingRevolution() {
                 <h3 className="text-xl font-semibold text-foreground m-0">Cursor: The Editor That Started It All</h3>
               </div>
               <p className="text-foreground mb-4">
-                Cursor's Composer mode (hit Cmd+I) was Karpathy's tool of choice. It doesn't ask permission—it 
+                Cursor’s Composer mode (hit Cmd+I) was Karpathy’s tool of choice. It doesn’t ask permission—it 
                 just implements your ideas across multiple files. The December 2024 Agent mode update took it further: 
                 no need to specify context files, automatic shell command generation, and the ability to understand 
                 entire projects at once.
               </p>
               <p className="text-muted text-sm">
-                <strong>The vibe:</strong> "Make this thing work" → watches as files appear and code flows across your screen
+                <strong>The vibe:</strong> “Make this thing work” → watches as files appear and code flows across your screen
               </p>
             </div>
             
@@ -171,7 +171,7 @@ export default function VibeCodingRevolution() {
                 <h3 className="text-xl font-semibold text-foreground m-0">Claude Code: The Terminal Companion</h3>
               </div>
               <p className="text-foreground mb-4">
-                Anthropic's CLI tool lives in your terminal. Install with <code className="bg-stone-800 px-2 py-1 rounded text-accent">npm install -g @anthropic-ai/claude-code</code>, 
+                Anthropic’s CLI tool lives in your terminal. Install with <code className="bg-stone-800 px-2 py-1 rounded text-accent">npm install -g @anthropic-ai/claude-code</code>, 
                 and it becomes an agentic platform that understands your entire codebase. Through MCP (Model Context Protocol), 
                 it connects to GitHub, databases, and APIs without leaving your terminal.
               </p>
@@ -193,7 +193,7 @@ export default function VibeCodingRevolution() {
                 backend while another updates the frontend and a third writes tests—all simultaneously.
               </p>
               <p className="text-muted text-sm">
-                <strong>The vibe:</strong> You're the conductor, AI agents are your orchestra
+                <strong>The vibe:</strong> You’re the conductor, AI agents are your orchestra
               </p>
             </div>
           </div>
@@ -206,8 +206,8 @@ export default function VibeCodingRevolution() {
           </h2>
           
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Let's be real about what vibe coding means in practice. Simon Willison, creator of Datasette, 
-            puts it bluntly: it's "building software with an LLM without reviewing the code it writes."
+            Let’s be real about what vibe coding means in practice. Simon Willison, creator of Datasette, 
+            puts it bluntly: it’s “building software with an LLM without reviewing the code it writes.”
           </p>
 
           <div className="bg-gradient-to-r from-orange-900/20 to-stone-900/20 p-8 rounded-lg border border-accent/30 my-8">
@@ -217,14 +217,14 @@ export default function VibeCodingRevolution() {
                 <span className="text-accent font-bold mt-0.5">1.</span>
                 <div>
                   <strong>Voice your intent:</strong> Use tools like SuperWhisper to describe what you want. 
-                  "I need a dashboard that shows user activity over time with filterable date ranges."
+                  “I need a dashboard that shows user activity over time with filterable date ranges.”
                 </div>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-accent font-bold mt-0.5">2.</span>
                 <div>
                   <strong>Accept the flow:</strong> Watch as AI generates components, APIs, database schemas. 
-                  Don't read the diffs. Trust the process.
+                  Don’t read the diffs. Trust the process.
                 </div>
               </li>
               <li className="flex items-start gap-3">
@@ -237,7 +237,7 @@ export default function VibeCodingRevolution() {
               <li className="flex items-start gap-3">
                 <span className="text-accent font-bold mt-0.5">4.</span>
                 <div>
-                  <strong>Iterate by feel:</strong> "Make it more responsive." "Add a dark mode." "This feels slow." 
+                  <strong>Iterate by feel:</strong> “Make it more responsive.” “Add a dark mode.” “This feels slow.” 
                   Guide by vibes, not specifications.
                 </div>
               </li>
@@ -245,14 +245,14 @@ export default function VibeCodingRevolution() {
           </div>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            This approach horrifies traditional developers—and for good reason. You're deliberately choosing 
-            not to understand the code you're shipping. But Karpathy's point was about prototyping, about 
+            This approach horrifies traditional developers—and for good reason. You’re deliberately choosing 
+            not to understand the code you’re shipping. But Karpathy’s point was about prototyping, about 
             weekend projects, about exploring ideas at the speed of thought.
           </p>
 
           <p className="text-foreground text-lg leading-relaxed">
-            The magic happens when you combine vibe coding with tools like Conductor. Now you're not just 
-            vibing with one AI—you're conducting an entire symphony of agents, each handling different aspects 
+            The magic happens when you combine vibe coding with tools like Conductor. Now you’re not just 
+            vibing with one AI—you’re conducting an entire symphony of agents, each handling different aspects 
             of your vision while you maintain the high-level direction.
           </p>
         </section>
@@ -264,8 +264,8 @@ export default function VibeCodingRevolution() {
           </h2>
           
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Here's what the evangelists won't tell you: vibe coding isn't replacing traditional development. 
-            It's creating a new tier of software—prototypes that actually work, MVPs that ship in hours 
+            Here’s what the evangelists won’t tell you: vibe coding isn’t replacing traditional development. 
+            It’s creating a new tier of software—prototypes that actually work, MVPs that ship in hours 
             instead of weeks, and experiments that would never have been worth the time investment before.
           </p>
 
@@ -294,7 +294,7 @@ export default function VibeCodingRevolution() {
           </div>
 
           <p className="text-foreground text-lg leading-relaxed">
-            The professionals using AI coding tools aren't really vibe coding—they're AI-assisted coding. 
+            The professionals using AI coding tools aren’t really vibe coding—they’re AI-assisted coding. 
             They review diffs, understand the architecture, and maintain quality standards. They use Claude Code 
             and Cursor as incredibly powerful assistants, not as black boxes.
           </p>
@@ -314,21 +314,21 @@ export default function VibeCodingRevolution() {
           </p>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            This isn't about replacing developers—it's about expanding who can create software. Just like 
-            WordPress didn't eliminate web developers but created millions of websites that wouldn't have 
+            This isn’t about replacing developers—it’s about expanding who can create software. Just like 
+            WordPress didn’t eliminate web developers but created millions of websites that wouldn’t have 
             existed otherwise, vibe coding is expanding the universe of what gets built.
           </p>
 
           <div className="bg-card border-l-4 border-accent p-6 my-8">
             <p className="text-stone-200 italic m-0">
-              "The hottest new programming language is English."
+              “The hottest new programming language is English.”
             </p>
             <p className="text-muted text-sm mt-3 m-0">— Andrej Karpathy, 2023</p>
           </div>
 
           <p className="text-foreground text-lg leading-relaxed">
             Karpathy saw this coming. His 2023 prediction that English would become a programming language 
-            wasn't hyperbole—it was a roadmap. Vibe coding is just the first step toward a world where 
+            wasn’t hyperbole—it was a roadmap. Vibe coding is just the first step toward a world where 
             technical implementation is no longer the bottleneck for innovation.
           </p>
         </section>
@@ -340,7 +340,7 @@ export default function VibeCodingRevolution() {
           </h2>
           
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            If you're discovering vibe coding for the first time, here's what you need to know:
+            If you’re discovering vibe coding for the first time, here’s what you need to know:
           </p>
 
           <div className="space-y-6 mb-8">
@@ -348,14 +348,14 @@ export default function VibeCodingRevolution() {
               <h3 className="text-accent font-semibold text-lg mb-2">For Non-Developers</h3>
               <p className="text-foreground m-0">
                 You can now build things. Real, working software. Start with Cursor and a weekend project. 
-                Don't worry about understanding every line—focus on making something that solves a problem you have.
+                Don’t worry about understanding every line—focus on making something that solves a problem you have.
               </p>
             </div>
             
             <div className="bg-card p-6 rounded-lg border border-border">
               <h3 className="text-accent font-semibold text-lg mb-2">For Developers</h3>
               <p className="text-foreground m-0">
-                Your expertise is more valuable than ever. You're the one who knows when to vibe and when 
+                Your expertise is more valuable than ever. You’re the one who knows when to vibe and when 
                 to be meticulous. You can guide AI to build production-quality code, architect systems that 
                 scale, and review what the machines produce. Tools like Conductor multiply your effectiveness—you 
                 can now manage multiple development streams simultaneously.
@@ -373,8 +373,8 @@ export default function VibeCodingRevolution() {
           </div>
 
           <p className="text-foreground text-lg leading-relaxed">
-            The tools are evolving rapidly. Cursor's Agent mode, Claude Code's MCP integrations, Conductor's 
-            parallel workspaces—these are just the beginning. The question isn't whether to adopt AI coding 
+            The tools are evolving rapidly. Cursor’s Agent mode, Claude Code’s MCP integrations, Conductor’s 
+            parallel workspaces—these are just the beginning. The question isn’t whether to adopt AI coding 
             tools, but how to use them effectively for your specific needs.
           </p>
         </section>
@@ -383,7 +383,7 @@ export default function VibeCodingRevolution() {
           <h2 className="text-3xl font-bold text-foreground mb-6">Track Your Vibe with Viberank</h2>
           
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Whether you're fully vibing or carefully reviewing every diff, Viberank helps you understand 
+            Whether you’re fully vibing or carefully reviewing every diff, Viberank helps you understand 
             your AI coding journey. Upload your <code className="bg-stone-800 px-2 py-1 rounded text-accent">cc.json</code> file 
             from Claude Code to see detailed analytics about your usage patterns, token consumption, and 
             development velocity.
@@ -410,12 +410,12 @@ export default function VibeCodingRevolution() {
         <footer className="mt-16 pt-8 border-t border-border">
           <h3 className="text-xl font-semibold text-foreground mb-4">The Bottom Line</h3>
           <p className="text-foreground mb-6">
-            Vibe coding isn't about abandoning software engineering principles—it's about recognizing that 
+            Vibe coding isn’t about abandoning software engineering principles—it’s about recognizing that 
             different problems require different approaches. Sometimes you need to carefully craft every line. 
             Sometimes you need to ship something today. And sometimes, you just need to vibe.
           </p>
           <p className="text-muted italic mb-6">
-            The revolution isn't that AI can write code. It's that coding is becoming accessible to everyone 
+            The revolution isn’t that AI can write code. It’s that coding is becoming accessible to everyone 
             who has ideas worth building. Welcome to the vibe.
           </p>
           <p className="text-stone-500 text-sm">

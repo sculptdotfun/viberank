@@ -53,6 +53,8 @@ import {
   type MachineContribution,
 } from "@/lib/ccusage";
 import { reviewReasonsFor, mergeReviewReasons } from "@/lib/review";
+import { createWeeklyService, type WeeklyDataService } from "@/lib/v2/service";
+import { createSupabaseWeeklySource, fetchWindowTotals } from "./weekly";
 
 // ============================================================================
 // DATABASE TYPES (matching Supabase schema)
@@ -1230,114 +1232,56 @@ export class SupabaseSubmissionsService implements SubmissionsService {
     params: DateRangeLeaderboardParams
   ): Promise<DateRangeLeaderboardResult> {
     const limit = Math.min(params.limit || 50, 100);
-    const includeFlagged = params.includeFlagged || false;
     const sortBy = params.sortBy || "cost";
 
-    // Date-range totals can't be derived from `submissions.total_cost` (which
-    // covers a submission's full range, not the requested window) so we have
-    // to aggregate `daily_breakdowns`. Push the range filter down to the DB:
-    // only fetch submissions whose date_range overlaps the requested window.
-    // A `.limit(5000)` here was silently served as 1000 by db-max-rows, so
-    // submissions past the first thousand were never considered at all. Page it.
-    const submissions = await fetchAllPages<DbSubmission>((from, to) => {
-      let query = this.client
-        .from("submissions")
-        .select("*")
-        .lte("date_range_start", params.dateTo)
-        .gte("date_range_end", params.dateFrom);
-
-      if (!includeFlagged) {
-        query = query.or("flagged_for_review.is.null,flagged_for_review.eq.false");
-      }
-
-      if (params.tool) {
-        query = query.contains("tools", [params.tool]);
-      }
-
-      if (params.verifiedOnly) {
-        query = query.eq("verified", true);
-      }
-
-      return query.order("id", { ascending: true }).range(from, to);
-    }, "submissions for date range");
-
-    if (submissions.length === 0) {
-      return { items: [], hasMore: false };
-    }
-
-    const submissionIds = submissions.map((s) => s.id);
-
-    // The previous `.limit(50000)` was silently capped at `db-max-rows`, and
-    // because the loop below skips any submission with zero rows in range, the
-    // users past the cut vanished from the board rather than showing a partial
-    // total. With no ORDER BY it was also arbitrary which ones survived.
-    //
-    // The id list also has to be chunked: past ~350 ids the `.in()` filter
-    // builds a URL the server rejects, which failed the whole query and
-    // emptied the board for any wide range.
-    const allDailyBreakdowns = await fetchAllByIds<DbDailyBreakdown>(
-      submissionIds,
-      (chunk, from, to) =>
-        this.client
-          .from("daily_breakdowns")
-          .select(DAILY_PUBLIC_COLUMNS)
-          .in("submission_id", chunk)
-          .gte("date", params.dateFrom)
-          .lte("date", params.dateTo)
-          .order("submission_id", { ascending: true })
-          .order("date", { ascending: true })
-          .range(from, to),
-      "daily breakdowns for date range"
-    );
-
-    const dailyBySubmission = new Map<string, DbDailyBreakdown[]>();
-    allDailyBreakdowns.forEach((db) => {
-      const existing = dailyBySubmission.get(db.submission_id) || [];
-      existing.push(db);
-      dailyBySubmission.set(db.submission_id, existing);
+    // Aggregated per developer in the database (v2_window_totals, migration
+    // 024): one row per developer with overlapping submissions deduplicated,
+    // instead of paging every submission and its days into the browser and
+    // summing here. Flagged rows are always left out by the function, so
+    // includeFlagged has no effect on this board.
+    const result = await fetchWindowTotals(this.client, {
+      from: params.dateFrom,
+      to: params.dateTo,
+      tool: params.tool,
+      sort: sortBy,
+      withDays: true,
+      limit: limit + 1,
+      offset: 0,
+      verifiedOnly: params.verifiedOnly,
     });
 
-    const processedItems: Submission[] = [];
-
-    for (const submission of submissions) {
-      const filteredDaily = dailyBySubmission.get(submission.id) || [];
-      if (filteredDaily.length === 0) continue;
-
-      const totals = filteredDaily.reduce(
-        (acc, day) => ({
-          totalCost: acc.totalCost + Number(day.total_cost),
-          totalTokens: acc.totalTokens + day.total_tokens,
-          inputTokens: acc.inputTokens + day.input_tokens,
-          outputTokens: acc.outputTokens + day.output_tokens,
-          cacheCreationTokens: acc.cacheCreationTokens + day.cache_creation_tokens,
-          cacheReadTokens: acc.cacheReadTokens + day.cache_read_tokens,
-        }),
-        {
-          totalCost: 0,
-          totalTokens: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheCreationTokens: 0,
-          cacheReadTokens: 0,
-        }
-      );
-
-      const converted = convertDbSubmissionToSubmission(submission, filteredDaily);
-      processedItems.push({
-        ...converted,
-        ...totals,
-      });
-    }
-
-    processedItems.sort((a, b) =>
-      sortBy === "cost" ? b.totalCost - a.totalCost : b.totalTokens - a.totalTokens
-    );
-
-    const hasMore = processedItems.length > limit;
+    const items: Submission[] = result.rows.slice(0, limit).map((row) => ({
+      id: row.submissionId ?? row.userKey,
+      username: row.username,
+      githubAvatar: row.avatarUrl,
+      totalTokens: row.tokens,
+      totalCost: row.cost,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      cacheCreationTokens: row.cacheCreationTokens,
+      cacheReadTokens: row.cacheReadTokens,
+      dateRange: { start: row.firstDate ?? params.dateFrom, end: row.lastDate ?? params.dateTo },
+      modelsUsed: [],
+      tools: row.tools,
+      dailyBreakdown: (row.dayDetail ?? []).map((day) => ({
+        date: day.date,
+        inputTokens: day.inputTokens,
+        outputTokens: day.outputTokens,
+        cacheCreationTokens: day.cacheCreationTokens,
+        cacheReadTokens: day.cacheReadTokens,
+        totalTokens: day.tokens,
+        totalCost: day.cost,
+        modelsUsed: [],
+      })),
+      submittedAt: row.submittedAt ? Date.parse(row.submittedAt) : 0,
+      verified: row.verified,
+      source: row.source === "cli" || row.source === "oauth" ? row.source : undefined,
+      reviewReasons: row.reviewReasons.length ? row.reviewReasons : undefined,
+    }));
 
     return {
-      items: processedItems.slice(0, limit),
-      hasMore,
+      items,
+      hasMore: result.total > limit,
       needsMoreData: false,
     };
   }
@@ -1409,7 +1353,7 @@ export class SupabaseSubmissionsService implements SubmissionsService {
       .eq("id", id)
       .single();
 
-    const updates: any = {
+    const updates: { flagged_for_review: boolean; flag_reasons?: string[] | null } = {
       flagged_for_review: flagged,
     };
 
@@ -2533,7 +2477,7 @@ class SupabaseLeaguesService implements LeaguesService {
 
     // Best submission per member; the whole set is small (≤100 members), so
     // dedupe client-side rather than grow the query surface.
-    let best = new Map<string, { totalCost: number; totalTokens: number; verified: boolean }>();
+    const best = new Map<string, { totalCost: number; totalTokens: number; verified: boolean }>();
     if (usernames.length > 0) {
       const { data: subs } = await this.client
         .from("submissions")
@@ -2620,6 +2564,7 @@ class SupabaseDataLayer implements DataLayer {
   profiles: ProfilesService;
   stats: StatsService;
   leagues: LeaguesService;
+  weekly: WeeklyDataService;
 
   constructor(client: SupabaseClient, serverRead = false) {
     this.tokens = new SupabaseTokensService(client);
@@ -2627,6 +2572,12 @@ class SupabaseDataLayer implements DataLayer {
     this.profiles = new SupabaseProfilesService(client, serverRead);
     this.stats = new SupabaseStatsService(client);
     this.leagues = new SupabaseLeaguesService(client);
+    // Only the service-role client may store frozen weeks; a server instance
+    // also memoises window reads for a minute, since one page render asks for
+    // the board, the standing and the previous week together.
+    this.weekly = createWeeklyService(createSupabaseWeeklySource(client, serverRead), {
+      cacheMs: serverRead ? 60_000 : 0,
+    });
   }
 }
 

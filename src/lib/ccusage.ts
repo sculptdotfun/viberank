@@ -81,7 +81,7 @@ interface RawDailyEntry {
   agents?: unknown;
 }
 
-interface RawCcData {
+export interface RawCcData {
   totals: Record<string, number>;
   daily: RawDailyEntry[];
 }
@@ -910,10 +910,24 @@ const MAX_COST_PER_TOKEN = 0.1; // sanity ceiling on cost/token
 const CHEAP_MODEL_PATTERN = /deepseek|mimo|minimax|big-pickle|muse-spark/i;
 const CHEAP_MODEL_MIN_COST_PER_TOKEN = 0.000000001;
 
-function minCostPerTokenForModel(modelName: string): number {
-  return CHEAP_MODEL_PATTERN.test(modelName)
-    ? CHEAP_MODEL_MIN_COST_PER_TOKEN
-    : MIN_COST_PER_TOKEN;
+/**
+ * Model families whose published cache-read price sits below the default
+ * floor but not as far as the families above (#199): GLM/Z.ai Flash ($0.03/M
+ * cached), Reflection Beam ($0.04/M), LongCat ($0.01/M) and Nemotron
+ * Lightning. An honest, cache-heavy day on them lands between 1.5e-8 and
+ * 6e-8 per token. OpenCode's free-tier proxies end in "-free" (glm-5.3-flash-
+ * free, space-bunny-free); ccusage leaves them unpriced or the user prices
+ * them at the paid twin's list price, which puts them in the same band.
+ * An intermediate floor rather than the 1e-9 one: 1e-8 still rejects tokens
+ * inflated 10x past those prices.
+ */
+const LOW_CACHE_MODEL_PATTERN = /glm[\w.-]*flash|zai[/-]|\bbeam\b|beam-|reflection|longcat|nemotron[\w.-]*lightning|-free\b/i;
+const LOW_CACHE_MODEL_MIN_COST_PER_TOKEN = 0.00000001;
+
+export function minCostPerTokenForModel(modelName: string): number {
+  if (CHEAP_MODEL_PATTERN.test(modelName)) return CHEAP_MODEL_MIN_COST_PER_TOKEN;
+  if (LOW_CACHE_MODEL_PATTERN.test(modelName)) return LOW_CACHE_MODEL_MIN_COST_PER_TOKEN;
+  return MIN_COST_PER_TOKEN;
 }
 
 /**

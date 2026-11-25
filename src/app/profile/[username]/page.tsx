@@ -7,13 +7,9 @@ import {
   ExternalLink,
   Activity,
   Github,
-  DollarSign,
   CalendarDays,
-  Trophy,
   Cpu,
   Wrench,
-  Flame,
-  Award,
   BarChart3,
   Gauge,
 } from "lucide-react";
@@ -36,6 +32,20 @@ import OpenToWorkToggle from "@/components/OpenToWorkToggle";
 import CliCta from "@/components/CliCta";
 import { isGithubHandle } from "@/lib/profile-index";
 import ProfileShare from "./ProfileShare";
+import ThisWeek from "@/components/v2/share/ThisWeek";
+import { loadStanding } from "@/components/v2/share/load";
+import type { Standing } from "@/lib/v2/contract";
+
+// The week block is additive: a failed standing read shows the block's empty
+// state and is logged, rather than taking the whole profile down.
+async function standingFor(username: string): Promise<Standing | null> {
+  try {
+    return await loadStanding(username);
+  } catch (e: unknown) {
+    console.error(`profile: standing for ${username} failed`, e);
+    return null;
+  }
+}
 
 // ISR the full profile page too — direct loads and sheet "view full profile"
 // both get cached HTML; data is at most 2 minutes stale.
@@ -94,9 +104,10 @@ export default async function ProfilePage({ params }: ProfileParams) {
   // Both are independent reads and were awaited one after the other, on the
   // path that decides how long an uncached profile takes to start rendering.
   // Rank is a nice-to-have; render without it on failure.
-  const [workBaselines, globalRank] = await Promise.all([
+  const [workBaselines, globalRank, standing] = await Promise.all([
     uniqueDaily.length >= 3 ? getWorkInsightBaselinesCached().catch(() => null) : null,
     Number.isFinite(bestCost) && bestCost > 0 ? getGlobalRankCached(bestCost).catch(() => null) : null,
+    standingFor(profileData.username),
   ]);
   const comparison = (metric: ComparableMetric) => {
     const values = workBaselines?.values[metric];
@@ -244,37 +255,32 @@ export default async function ProfilePage({ params }: ProfileParams) {
 
         {/* Profile header */}
         <div className="mb-8">
-          <div className="flex items-start gap-5 mb-6">
+          <div className="flex items-start gap-4 sm:gap-5 mb-6">
             {profileData.avatar && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={sizedAvatarUrl(profileData.avatar, 128)}
                 alt={displayName}
-                width={64}
-                height={64}
+                width={56}
+                height={56}
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="w-16 h-16 rounded-full ring-2 ring-border/40"
+                className="w-14 h-14 rounded-[12px] border border-line-2 bg-raised flex-none"
               />
             )}
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2.5 mb-2">
-                <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
+              <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
+                <h1 className="text-[28px] sm:text-[34px] font-medium leading-none tracking-[-0.04em] text-ink">{displayName}</h1>
                 <TierBadge totalCost={bestCost} size="md" />
                 <ReviewBadge reasons={submissions.flatMap((sub) => sub.reviewReasons ?? [])} size="md" />
-                {globalRank && (
-                  <span className="font-mono text-xs font-semibold px-2 py-1 rounded bg-accent/12 text-accent leading-none">
-                    #{globalRank}
-                  </span>
-                )}
                 <OpenToWorkToggle
                   profileGithubUsername={profileData.githubUsername}
                   initialOpen={profileData.openToWork ?? false}
                   initialEmail={profileData.openToWork ? profileData.openToWorkEmail : undefined}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[12.5px] text-ink-3">
                 {/* Legacy handles like "Kevin Foster" came from git config,
                     not GitHub, and their GitHub link is a 404. */}
                 {isGithubHandle(handle) ? (
@@ -282,81 +288,85 @@ export default async function ProfilePage({ params }: ProfileParams) {
                     href={`https://github.com/${handle}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 hover:text-accent transition-colors"
+                    className="inline-flex items-center gap-1 hover:text-ink transition-colors"
                   >
-                    <Github className="w-4 h-4" />@{handle}
+                    <Github className="w-3.5 h-3.5" />@{handle}
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 ) : (
-                  <span className="flex items-center gap-1">@{handle}</span>
+                  <span>@{handle}</span>
                 )}
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  Joined {new Date(profileData.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              {tools.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                  {tools.map((t) => (
-                    <span
-                      key={t}
-                      className="text-xs font-medium px-2 py-1 rounded-md bg-surface-2 text-foreground/80 border border-border"
-                    >
-                      {toolLabel(t)}
+                <span aria-hidden>·</span>
+                <span>joined {new Date(profileData.createdAt).toLocaleDateString("en", { month: "short", year: "numeric" })}</span>
+                {globalRank && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>
+                      <span className="text-ink">#{globalRank}</span> all-time
                     </span>
-                  ))}
-                </div>
-              )}
-              {submissions.length > 0 && (
-                <div className="mt-3">
-                  <ProfileShare
-                    username={profileData.username}
-                    handle={handle}
-                    rank={globalRank}
-                    totalCost={totalCost}
-                    totalTokens={totalTokens}
-                  />
-                </div>
-              )}
+                  </>
+                )}
+                {tools.length > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{tools.map(toolLabel).join(", ")}</span>
+                  </>
+                )}
+              </div>
             </div>
+            {submissions.length > 0 && (
+              <div className="hidden sm:block flex-none">
+                <ProfileShare
+                  username={profileData.username}
+                  handle={handle}
+                  rank={globalRank}
+                  totalCost={totalCost}
+                  totalTokens={totalTokens}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Key stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div
-              className="bg-surface-1 border border-border rounded-lg p-4"
-              title="API-equivalent: what these tokens would cost at list API prices, as estimated by ccusage. Not what was paid."
-            >
-              <p className="flex items-center gap-1.5 micro-label mb-1"><DollarSign className="w-3.5 h-3.5" />API-equivalent</p>
-              <p className="text-xl font-bold font-mono text-accent">${formatNumber(totalCost)}</p>
-              <p className="text-xs text-muted mt-1">${formatCurrency(avgDailyCost)}/day avg</p>
-            </div>
-            <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><Zap className="w-3.5 h-3.5" />Total tokens</p>
-              <p className="text-xl font-bold font-mono">{formatNumber(totalTokens)}</p>
-              <p className="text-xs text-muted mt-1">{formatNumber(Math.round(totalTokens / daysActive))}/day</p>
-            </div>
-            <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><CalendarDays className="w-3.5 h-3.5" />Days active</p>
-              <p className="text-xl font-bold">{daysActive}</p>
-              <p className="text-xs text-muted mt-1">{profileData.totalSubmissions} submission{profileData.totalSubmissions === 1 ? "" : "s"}</p>
-            </div>
-            <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><Trophy className="w-3.5 h-3.5" />Global rank</p>
-              <p className="text-xl font-bold">{globalRank ? `#${globalRank}` : "—"}</p>
-              <p className="text-xs text-muted mt-1 truncate">{tools.length ? `${tools.map(toolLabel).slice(0, 2).join(", ")}${tools.length > 2 ? " +" + (tools.length - 2) : ""}` : "by cost"}</p>
-            </div>
-            <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><Flame className="w-3.5 h-3.5" />Streak</p>
-              <p className="text-xl font-bold font-mono">{streaks.current}<span className="text-sm text-muted font-sans">d</span></p>
-              <p className="text-xs text-muted mt-1">{streaks.current > 0 ? "active now" : "start one today"}</p>
-            </div>
-            <div className="bg-surface-1 border border-border rounded-lg p-4">
-              <p className="flex items-center gap-1.5 micro-label mb-1"><Award className="w-3.5 h-3.5" />Longest streak</p>
-              <p className="text-xl font-bold font-mono">{streaks.longest}<span className="text-sm text-muted font-sans">d</span></p>
-              <p className="text-xs text-muted mt-1">consecutive days</p>
-            </div>
+          <ThisWeek username={profileData.username} standing={standing} />
+
+          {/* All-time key stats */}
+          <p className="font-mono text-[12.5px] text-ink-3 mt-8 mb-3">All-time</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 border border-line rounded-[14px] bg-panel overflow-hidden">
+            {[
+              {
+                label: "API-equivalent",
+                value: `$${formatNumber(totalCost)}`,
+                sub: `$${formatCurrency(avgDailyCost)}/day avg`,
+                title: "API-equivalent: what these tokens would cost at list API prices, as estimated by ccusage. Not what was paid.",
+              },
+              { label: "tokens", value: formatNumber(totalTokens), sub: `${formatNumber(Math.round(totalTokens / daysActive))}/day` },
+              {
+                label: "days active",
+                value: String(daysActive),
+                sub: `${profileData.totalSubmissions} submission${profileData.totalSubmissions === 1 ? "" : "s"}`,
+              },
+              { label: "all-time rank", value: globalRank ? `#${globalRank}` : "—", sub: "by best submission" },
+              { label: "day streak", value: `${streaks.current}d`, sub: streaks.current > 0 ? "active now" : "start one today" },
+              { label: "longest streak", value: `${streaks.longest}d`, sub: "consecutive days" },
+            ].map((t) => (
+              <div key={t.label} title={t.title} className="p-4 border-line border-r border-b -mr-px -mb-px min-w-0">
+                <p className="font-mono text-xs text-ink-3 m-0">{t.label}</p>
+                <p className="font-mono text-xl font-medium tracking-[-0.03em] text-ink mt-1.5 mb-0">{t.value}</p>
+                <p className="font-mono text-[11.5px] text-ink-3 mt-1 mb-0 truncate">{t.sub}</p>
+              </div>
+            ))}
           </div>
+          {submissions.length > 0 && (
+            <div className="sm:hidden mt-3">
+              <ProfileShare
+                username={profileData.username}
+                handle={handle}
+                rank={globalRank}
+                totalCost={totalCost}
+                totalTokens={totalTokens}
+              />
+            </div>
+          )}
 
           {/* Most visitors arrive from a shared link and aren't on the board
               yet; this is their way on, placed before the long Workflow
@@ -630,31 +640,7 @@ export default async function ProfilePage({ params }: ProfileParams) {
         )}
       </div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10 space-y-6">
-        {/* Personal monthly recap — the share loop's entry point. */}
-        <div className="rounded-lg border border-accent/40 bg-surface-1 p-5">
-          <p className="font-medium mb-1">Monthly Wrapped</p>
-          <p className="text-sm text-muted mb-3">
-            A shareable recap of a month on the board — spend, tokens, streak, and rank among that month&apos;s
-            active developers.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {[0, 1].map((back) => {
-              const d = new Date();
-              d.setUTCMonth(d.getUTCMonth() - back);
-              const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-              const label = back === 0 ? "This month" : "Last month";
-              return (
-                <Link
-                  key={m}
-                  href={`/wrapped/${m}/${encodeURIComponent(profileData.username)}`}
-                  className="px-3 py-1.5 rounded-md border bg-surface-2 border-border text-sm text-foreground hover:text-accent transition-colors"
-                >
-                  {label} →
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        {/* Monthly Wrapped links moved into the This week block at the top. */}
         <BadgeSnippet username={profileData.username} />
       </div>
       <Footer />

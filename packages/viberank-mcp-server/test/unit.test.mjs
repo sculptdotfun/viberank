@@ -9,7 +9,7 @@ import { readToken } from '../dist/config.js';
 import { resolveSubmitIdentity } from '../dist/identity.js';
 import { loadUsage, parseUsageReport, resolveNpxArgv, runCcusageDaily } from '../dist/ccusage.js';
 import { requestJson } from '../dist/api.js';
-import { leaderboardResult, profileResult, submitResult } from '../dist/results.js';
+import { leaderboardResult, profileResult, standingResult, submitResult } from '../dist/results.js';
 
 const TOKEN = `vbr_${'a'.repeat(43)}`;
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -273,4 +273,30 @@ test('the leaderboard and profile contracts come back as data; a missing profile
   const undeployed = parse(profileResult({ kind: 'no_route', status: 404 }, 'octocat'));
   assert.equal(undeployed.isError, true);
   assert.match(undeployed.body.error, /does not serve \/api\/profile yet/);
+});
+
+test('get_standing passes the weekly standing through with the gap above and the recap link', () => {
+  const standing = {
+    username: 'octocat',
+    week: { id: '2026-W48', start: '2026-11-23', end: '2026-11-29', day: 3, closesAt: '2026-11-30T00:00:00Z', closed: false },
+    cls: 'ranked', rank: 41, of: 126, cost: 835.4, tokens: 1, planEq: 0.64, movement: 6,
+    above: { username: 'palewave', cost: 861.6 }, below: null, bracket: [], streakWeeks: 4, bestWeek: null, days: [], trust: 'verified',
+  };
+  const ok = parse(standingResult({ kind: 'ok', status: 200, body: standing }, 'octocat'));
+  assert.equal(ok.isError, false);
+  assert.deepEqual(ok.body.standing, standing);
+  assert.equal(ok.body.gapToAbove, 27);
+  assert.equal(ok.body.recapUrl, 'https://www.viberank.app/recap/2026-W48/octocat');
+  assert.equal(ok.body.boardUrl, 'https://www.viberank.app/?me=octocat');
+
+  const top = parse(standingResult({ kind: 'ok', status: 200, body: { ...standing, rank: 1, above: null } }, 'octocat'));
+  assert.equal(top.body.gapToAbove, null);
+
+  const missing = parse(standingResult({ kind: 'rejected', status: 404, error: 'Not found', body: { error: 'Not found' } }, 'nobody'));
+  assert.equal(missing.isError, false);
+  assert.equal(missing.body.found, false);
+
+  const undeployed = parse(standingResult({ kind: 'no_route', status: 404 }, 'octocat'));
+  assert.equal(undeployed.isError, true);
+  assert.match(undeployed.body.error, /does not serve \/api\/v2\/standing yet/);
 });

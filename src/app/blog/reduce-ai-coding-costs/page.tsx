@@ -67,7 +67,7 @@ export default function Post() {
 
         <h2>1. Route models by task</h2>
         <p>
-          The single biggest lever. Don't run everything on the most expensive model. Use a lighter model (Sonnet, Haiku, Gemini
+          The single biggest lever. Don’t run everything on the most expensive model. Use a lighter model (Sonnet, Haiku, Gemini
           Flash, smaller GPT) for routine edits, scaffolding, and Q&A; reserve the top model (Opus, GPT-5) for hard reasoning.
           This alone can halve a heavy bill.
         </p>
@@ -86,14 +86,14 @@ export default function Post() {
 
         <h2>4. Start fresh sessions</h2>
         <p>
-          Long-running sessions re-send accumulated context repeatedly. When you switch tasks, start a new session so you're not
+          Long-running sessions re-send accumulated context repeatedly. When you switch tasks, start a new session so you’re not
           paying to drag along an irrelevant history.
         </p>
 
         <h2>5. Watch reasoning tokens</h2>
         <p>
-          Reasoning ("thinking") models on Gemini and Codex generate extra tokens you pay for. They're worth it for genuinely
-          hard problems — but don't default to maximum reasoning for trivial edits.
+          Reasoning (“thinking”) models on Gemini and Codex generate extra tokens you pay for. They’re worth it for genuinely
+          hard problems — but don’t default to maximum reasoning for trivial edits.
         </p>
 
         <h2>6. Batch related work</h2>
@@ -104,7 +104,7 @@ export default function Post() {
 
         <h2>7. Measure before you optimize</h2>
         <p>
-          You can't cut what you can't see. <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer">ccusage</a>{" "}
+          You can’t cut what you can’t see. <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer">ccusage</a>{" "}
           breaks down your spend by day and model so you know exactly where the money goes:
         </p>
         <pre><code>npx viberank-cli</code></pre>
@@ -120,7 +120,7 @@ export default function Post() {
         <h2>9. Set a benchmark and track it</h2>
         <p>
           Put yourself on the leaderboard and watch your daily average over time — it turns an invisible bill into a number you
-          actively manage. Curious what "normal" looks like? See{" "}
+          actively manage. Curious what “normal” looks like? See{" "}
           <Link href="/blog/how-much-does-claude-code-cost">how much Claude Code costs for 800+ developers</Link>.
         </p>
 

@@ -1,5 +1,46 @@
 # Changelog
 
+## v2: the weekly league (November 2026)
+
+viberank now runs in weeks. Launch post: [/blog/viberank-v2-weekly-league](https://www.viberank.app/blog/viberank-v2-weekly-league).
+
+### Changed
+- **The home page is this week.** A new week starts every Monday 00:00 UTC and only usage dated inside it counts. The lifetime board moved to **`/records`**.
+- **Three boards instead of one.** **Ranked**: GitHub-verified, nothing under review, at most 10 plan-equivalents a week (one plan-equivalent is $1,300 of API-equivalent usage a week, #195). **Open**: everyone else below that line, with the reason on the row. **Fleets**: above 10 plan-equivalents a week.
+- **"Under review" now holds an entry.** It keeps its profile and sits on Open until a maintainer clears it. Before, the badge was shown and the rank kept (#183).
+- **Closed weeks are frozen** 12 hours after they close. Late days update the profile and `/records`, never a finished week (migration 024; a Monday cron snapshots the week).
+- Weekly boards are aggregated in SQL instead of in app memory.
+
+### Added
+- **Your row pinned** on the board, with the gap to the person above and your bracket.
+- **A Monday recap card** for every closed week, and **weekly archive pages** such as `/week/2026-W48`.
+- **Head to head:** `/vs/{a}/{b}` challenge links.
+- **`/start`**: every way to join on one page.
+- **Private team leagues** on the weekly board.
+- **Wrapped 2026**, opening December 10.
+- **README badge with weekly rank:** `/api/badge/{user}?style=v2&range=week` (also `7d` and `30d`, #198).
+- **Public read API:** `/api/v2/board`, `/api/v2/standing/{user}`, `/api/v2/recap/{user}/{week}`, `/api/v2/wrapped/{user}/{year}`. See the README.
+- **CLI 1.14, MCP 1.3 and the Claude Code plugin**: weekly standing after every submit, `status` for status lines, `get_standing`, and sync at session end. Details in the [entry below](#cli-1140-mcp-130-and-a-claude-code-plugin--the-week-in-your-terminal-november-2026).
+- **New post:** `/blog/viberank-v2-weekly-league`. `/blog/how-viberank-checks-submissions` now explains Ranked, Open, Fleets and the weekly freeze.
+
+## CLI 1.14.0, MCP 1.3.0 and a Claude Code plugin — the week, in your terminal (November 2026)
+
+### Added
+- **One-step verification from the terminal.** `npx viberank-cli login` shows a short code (`HXKT-4Q2M`), opens `viberank.app/link?code=…`, and waits; you sign in with GitHub and click Approve, and the CLI saves a token labelled "CLI (linked <date>)". No token to copy. Approval also claims your earlier unverified CLI submissions.
+  - First run in a terminal without a token: after reading usage the CLI asks "Verify with GitHub to join the Ranked board? (Y/n)", then one question covers the submit and autosubmit (daily, once, or cancel). Declining submits unverified as before.
+  - In an agent's shell or CI it never asks; it prints one line pointing at `npx viberank-cli login`. `login --no-browser` prints the link only; `login --paste` keeps the old paste flow; `logout` removes the token.
+  - Server: `POST /api/v2/link/start` (rate-limited per IP), `/poll` (pending, slow_down, expired, or the token exactly once) and `/approve` (GitHub session), on migration 025 `cli_link_codes`. Codes expire after 10 minutes; only a hash of the device secret is stored, and the token is minted in the poll that collects it, so its plaintext is never stored.
+- **Server: CLIs older than 1.14 are told the weekly league is live** after a submit, with the command for the latest CLI.
+- **CLI: the week comes first after a submit.** Week and day, rank of N on your board (Ranked, Open or Fleets, with the reason when held), movement since last week, spend, tokens and plan-equivalents this week, the gap to the person above (`$27 behind @palewave`) and the streak, from `GET /api/v2/standing/{username}`. Then the week's recap link and the profile with `?me=`. A server without the route gets the 1.13 output, silently.
+- **CLI: `~/.viberank/standing.json`** is written after every successful submit and scheduled sync, and the scheduled log line carries the standing.
+- **CLI: `status --format short|compact|long|json|<template>`** prints one line (`vr #41/126 ▲6 · $27 to @palewave`) from that file, without the network. Plain `status` does the same when stdout is not a terminal (a status line); in a terminal it shows the full report, now with the week.
+- **CLI: `--every <hours>`** sets how long a `--quiet` run skips after a success (default 20).
+- **Claude Code plugin** (`packages/viberank-claude-plugin`): SessionStart and SessionEnd hooks start `npx -y viberank-cli@latest submit --quiet --every 1` detached, at most hourly, only with a saved token, and print nothing into the session. A status-line script and `/viberank` read the standing file.
+- **MCP 1.3.0: `get_standing`**: the week's `Standing`, plus `gapToAbove` and `recapUrl`. Without a username, uses the saved token's owner.
+
+### Changed
+- **CLI: the autosubmit offer is one line and a yes/no question**, still only with a person at a terminal.
+
 ## CLI 1.13.0, MCP 1.2.0 and the site — submissions that keep arriving (October 2026)
 
 ### Fixed

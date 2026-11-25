@@ -91,7 +91,7 @@ export default function ClaudeCodeCompleteGuide() {
 
           <div className="p-6 bg-card border border-border rounded-lg">
             <p className="text-lg text-foreground m-0">
-              <span className="font-semibold text-accent">Claude Code</span> is Anthropic's official CLI tool that brings
+              <span className="font-semibold text-accent">Claude Code</span> is Anthropic’s official CLI tool that brings
               AI-powered development directly into your terminal. This comprehensive guide covers everything from installation
               to advanced workflows, helping you become a power user in 2026.
             </p>
@@ -127,7 +127,7 @@ export default function ClaudeCodeCompleteGuide() {
           </div>
 
           <p className="text-foreground text-lg leading-relaxed">
-            What sets Claude Code apart is its agentic nature—it doesn't just suggest code, it actively implements
+            What sets Claude Code apart is its agentic nature—it doesn’t just suggest code, it actively implements
             changes, runs tests, commits code, and even creates pull requests. Combined with MCP (Model Context Protocol),
             it can connect to external services like GitHub, databases, and APIs.
           </p>
@@ -140,7 +140,7 @@ export default function ClaudeCodeCompleteGuide() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Getting started with Claude Code takes less than a minute. Here's how to install and configure it:
+            Getting started with Claude Code takes less than a minute. Here’s how to install and configure it:
           </p>
 
           <div className="bg-card rounded-lg p-6 border border-border my-8">
@@ -188,7 +188,7 @@ export default function ClaudeCodeCompleteGuide() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Claude Code comes with powerful slash commands for common workflows. Here are the ones you'll use daily:
+            Claude Code comes with powerful slash commands for common workflows. Here are the ones you’ll use daily:
           </p>
 
           <div className="space-y-4 my-8">
@@ -326,11 +326,11 @@ export default function ClaudeCodeCompleteGuide() {
         <section className="mb-12">
           <h2 className="text-3xl font-bold text-foreground mb-6 flex items-center gap-3">
             <Bot className="w-8 h-8 text-accent" />
-            Hooks: Customize Claude's Behavior
+            Hooks: Customize Claude’s Behavior
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            Hooks let you run custom scripts before or after Claude performs actions. They're powerful for
+            Hooks let you run custom scripts before or after Claude performs actions. They’re powerful for
             enforcing coding standards, running tests automatically, or integrating with your workflow.
           </p>
 
@@ -352,7 +352,7 @@ export default function ClaudeCodeCompleteGuide() {
             <div className="bg-card p-6 rounded-lg border border-border">
               <h3 className="text-accent font-semibold text-lg mb-3">Post-edit Hook</h3>
               <p className="text-foreground mb-4">
-                Automatically run tests after Claude modifies files. Ensures changes don't break existing functionality.
+                Automatically run tests after Claude modifies files. Ensures changes don’t break existing functionality.
               </p>
               <pre className="bg-background rounded-lg p-3 text-xs overflow-x-auto">
                 <code className="text-muted">{`{
@@ -372,7 +372,7 @@ export default function ClaudeCodeCompleteGuide() {
           </h2>
 
           <p className="text-foreground text-lg leading-relaxed mb-6">
-            The CLAUDE.md file is your project's instruction manual for Claude. It contains context, conventions,
+            The CLAUDE.md file is your project’s instruction manual for Claude. It contains context, conventions,
             and guidelines that help Claude understand your codebase and write better code.
           </p>
 
@@ -421,7 +421,7 @@ export default function ClaudeCodeCompleteGuide() {
             <div className="bg-card p-6 rounded-lg border border-border">
               <h3 className="text-accent font-semibold text-lg mb-2">1. Use Headless Mode for Automation</h3>
               <p className="text-foreground m-0">
-                Run <code className="bg-stone-800 px-2 py-1 rounded text-accent">claude -p "your prompt"</code> for
+                Run <code className="bg-stone-800 px-2 py-1 rounded text-accent">claude -p &quot;your prompt&quot;</code> for
                 one-off commands in scripts and CI/CD pipelines. Great for automated code reviews and refactoring.
               </p>
             </div>
@@ -488,7 +488,7 @@ export default function ClaudeCodeCompleteGuide() {
         <footer className="mt-16 pt-8 border-t border-border">
           <h3 className="text-xl font-semibold text-foreground mb-4">Start Building Today</h3>
           <p className="text-foreground mb-6">
-            Claude Code is transforming how developers work. Whether you're debugging complex issues,
+            Claude Code is transforming how developers work. Whether you’re debugging complex issues,
             refactoring legacy code, or building new features, having an AI agent in your terminal
             accelerates everything. Install it, configure your CLAUDE.md, and start experiencing
             the future of development.

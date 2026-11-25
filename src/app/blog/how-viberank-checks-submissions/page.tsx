@@ -9,6 +9,7 @@ const URL = "https://www.viberank.app/blog/how-viberank-checks-submissions";
 const OG =
   "/api/og?title=How%20Viberank%20Checks%20Submissions&description=The%20fake%20%231%2C%20and%20the%20checks%20that%20stop%20it";
 const PUBLISHED = "2026-10-13T00:00:00.000Z";
+const MODIFIED = "2026-11-26T00:00:00.000Z";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -42,7 +43,7 @@ export default function Post() {
     description: DESC,
     image: "https://www.viberank.app" + OG,
     datePublished: PUBLISHED,
-    dateModified: PUBLISHED,
+    dateModified: MODIFIED,
     author: { "@type": "Organization", name: "Viberank", url: "https://www.viberank.app" },
     publisher: {
       "@type": "Organization",
@@ -67,7 +68,9 @@ export default function Post() {
         <div className="flex items-center gap-3 text-sm text-muted not-prose mb-8">
           <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />October 13, 2026</span>
           <span>·</span>
-          <span className="flex items-center gap-1"><Clock className="w-4 h-4" />6 min read</span>
+          <span className="flex items-center gap-1"><Clock className="w-4 h-4" />7 min read</span>
+          <span>·</span>
+          <span>Updated November 26, 2026</span>
         </div>
 
         <p>
@@ -140,9 +143,37 @@ export default function Post() {
         <h2>What a verified badge means</h2>
         <p>
           A profile is <strong>verified</strong> when its submissions are signed with a token from{" "}
-          <code>npx viberank-cli login</code>, which proves the GitHub account owner sent them. Unverified
-          submissions can&apos;t write to a verified profile. Use the <Link href="/">Verified</Link> toggle on the
-          board to see only those.
+          <code>npx viberank-cli login</code>, or uploaded while signed in with GitHub. Either way it proves the
+          GitHub account owner sent them. Unverified submissions can&apos;t write to a verified profile.
+        </p>
+
+        <h2>Ranked, Open and Fleets</h2>
+        <p>
+          Since <Link href="/blog/viberank-v2-weekly-league">viberank v2</Link> (November 2026), the home board is
+          the current week, and every entry sits on one of three boards with the reason shown:
+        </p>
+        <ul>
+          <li>
+            <strong>Ranked</strong>: GitHub-verified, nothing under review, and at most 10 plan-equivalents in
+            the week. A plan-equivalent is $1,300 of API-equivalent usage a week, about one top-tier plan used to
+            its limit (<a href="https://github.com/sculptdotfun/viberank/issues/195">#195</a>).
+          </li>
+          <li>
+            <strong>Open</strong>: everyone else below that line. An unverified submission lands here, and so
+            does an entry marked &quot;under review&quot;. The mark used to be a badge on a row that kept its
+            rank. Now the entry keeps its profile and its place on Open, and moves to Ranked only after a
+            maintainer clears it.
+          </li>
+          <li>
+            <strong>Fleets</strong>: anything above 10 plan-equivalents a week, verified or not. Teams under one
+            handle, relays and agent farms are measured here instead of ranked against one person.
+          </li>
+        </ul>
+        <p>
+          A week closes Monday 00:00 UTC and is <strong>frozen 12 hours later</strong>. After that, its result
+          is a snapshot. Days that arrive late still count on your profile and on{" "}
+          <Link href="/records">/records</Link>, the lifetime board, but they can&apos;t change a finished week.
+          So a bulk upload can&apos;t rewrite past weeks.
         </p>
 
         <h2>What no usage leaderboard can prove</h2>

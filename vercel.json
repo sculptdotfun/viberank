@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "turbo run build"
+  "buildCommand": "turbo run build",
+  "crons": [
+    { "path": "/api/v2/board?window=week&cls=ranked", "schedule": "5 12 * * 1" }
+  ]
 }

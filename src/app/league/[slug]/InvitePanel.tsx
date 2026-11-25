@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, KeyRound } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { leagueInviteCopied } from "@/lib/analytics";
 
 // Fetches the invite code client-side so it never lands in the (cached,
@@ -28,26 +28,23 @@ export default function InvitePanel({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="rounded-lg border border-accent/40 bg-surface-1 p-5">
-      <p className="font-medium mb-1 flex items-center gap-2">
-        <KeyRound className="w-4 h-4 text-accent" />
-        Invite people
-      </p>
-      <p className="text-sm text-muted mb-3">Only members can see this. Share either one:</p>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={() => copy("code")}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-surface-2 font-mono text-sm text-accent hover:bg-surface-1 transition-colors"
-        >
-          {copied === "code" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-          {code}
-        </button>
+    <div className="border border-line-2 rounded-[14px] bg-panel p-5">
+      <p className="font-mono text-[12px] text-ink-3 m-0">invite · only members see this</p>
+      <p className="text-ink font-medium mt-1 mb-3">Bring your team in</p>
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => copy("link")}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-surface-2 text-sm text-foreground hover:bg-surface-1 transition-colors"
+          className="inline-flex items-center gap-2 h-9 px-3.5 rounded-md bg-btn text-btn-ink text-[13px] font-medium hover:opacity-90"
         >
-          {copied === "link" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-          Copy join link
+          {copied === "link" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied === "link" ? "Copied" : "Copy join link"}
+        </button>
+        <button
+          onClick={() => copy("code")}
+          className="inline-flex items-center gap-2 h-9 px-3.5 rounded-md border border-line-2 font-mono text-[13px] text-ink hover:bg-raised"
+        >
+          {copied === "code" ? <Check className="w-3.5 h-3.5 text-up" /> : <Copy className="w-3.5 h-3.5" />}
+          {code}
         </button>
       </div>
     </div>

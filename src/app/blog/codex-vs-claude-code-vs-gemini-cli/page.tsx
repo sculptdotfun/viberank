@@ -60,7 +60,7 @@ export default function Post() {
         </div>
 
         <p>
-          Three command-line coding agents now dominate most developers' terminals: <strong>Claude Code</strong> (Anthropic),
+          Three command-line coding agents now dominate most developers’ terminals: <strong>Claude Code</strong> (Anthropic),
           <strong> Codex</strong> (OpenAI), and <strong>Gemini CLI</strong> (Google). They all do the same core job — drive an LLM
           against your codebase from the terminal — but they differ in pricing model, token accounting, and how teams actually
           spend on them. This post compares all three using <strong>real usage data</strong> from the{" "}
@@ -71,20 +71,20 @@ export default function Post() {
         <ul>
           <li><strong>Claude Code</strong> — the most-used tool on Viberank by a wide margin, and the heaviest spenders use it. Strong agentic workflows, cache-heavy token usage.</li>
           <li><strong>Codex</strong> — fast-growing; GPT-class models with reasoning tokens. See the <Link href="/tool/codex">Codex leaderboard</Link>.</li>
-          <li><strong>Gemini CLI</strong> — competitive token pricing and a large free-ish tier for many models; reasoning ("thinking") tokens inflate totals. See the <Link href="/tool/gemini">Gemini leaderboard</Link>.</li>
+          <li><strong>Gemini CLI</strong> — competitive token pricing and a large free-ish tier for many models; reasoning (“thinking”) tokens inflate totals. See the <Link href="/tool/gemini">Gemini leaderboard</Link>.</li>
         </ul>
 
         <h2>How we compare them fairly</h2>
         <p>
-          You can't eyeball costs across tools — pricing differs per model and changes often. The honest way is to measure{" "}
-          <strong>actual tokens and actual USD</strong> from each tool's own logs. That's what{" "}
+          You can’t eyeball costs across tools — pricing differs per model and changes often. The honest way is to measure{" "}
+          <strong>actual tokens and actual USD</strong> from each tool’s own logs. That’s what{" "}
           <a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener noreferrer">ccusage</a> does: it reads the
           local logs Claude Code, Codex, and Gemini CLI each write, then computes cost from model pricing. Viberank aggregates
           that per developer, so the comparison is apples-to-apples: dollars spent and tokens used, not marketing numbers.
         </p>
         <p>
-          One important nuance: <strong>reasoning/thinking tokens</strong>. Gemini and Codex reasoning models count "thinking"
-          tokens in their totals that aren't part of the usual input/output/cache split. So raw token counts skew higher for
+          One important nuance: <strong>reasoning/thinking tokens</strong>. Gemini and Codex reasoning models count “thinking”
+          tokens in their totals that aren’t part of the usual input/output/cache split. So raw token counts skew higher for
           reasoning-heavy tools — which is exactly why <strong>cost (USD)</strong> is the fairer cross-tool ranking metric.
         </p>
 
@@ -116,7 +116,7 @@ export default function Post() {
 
         <h2>Which should you use?</h2>
         <p>
-          Most serious users don't pick one — they route work to whichever tool fits the task and let ccusage track all of it.
+          Most serious users don’t pick one — they route work to whichever tool fits the task and let ccusage track all of it.
           If you want to see where you land (and what a realistic monthly bill looks like), see{" "}
           <Link href="/blog/how-much-does-claude-code-cost">how much Claude Code actually costs</Link> and{" "}
           <Link href="/blog/reduce-ai-coding-costs">how to cut your AI coding bill</Link>.

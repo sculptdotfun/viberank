@@ -77,3 +77,17 @@ export function autosubmitPitch(ccData, today = new Date()) {
 export function keepLocalHistoryHint() {
   return `Tip: add "cleanupPeriodDays": 3650 to ~/.claude/settings.json to stop Claude Code deleting it locally too.`;
 }
+
+/**
+ * The offer as one line, which is what 1.14 prints above the yes/no prompt.
+ * The week is the unit of play now, so the live rank leads, and the backup
+ * (the reason that holds up after the novelty wears off) follows, with the
+ * user's own reach when the report shows history aging out.
+ */
+export function autosubmitOneLine(ccData, today = new Date()) {
+  const w = historyWindow(ccData, today);
+  const backup = w && looksTruncated(w)
+    ? `your history reaches back ${w.reachDays} days and Claude Code deletes it after ${DEFAULT_CLEANUP_DAYS}`
+    : `Claude Code deletes history after ${DEFAULT_CLEANUP_DAYS} days, what you send is kept`;
+  return `Sync once a day in the background so your weekly rank stays live (${backup}).`;
+}

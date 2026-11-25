@@ -53,6 +53,40 @@ export interface BadgeInput {
   color?: string;
 }
 
+export type BadgeStyle = "classic" | "v2";
+
+/** ?style=v2 picks the v2 look; anything else keeps the classic shields style. */
+export function badgeStyleFrom(value: string | null): BadgeStyle {
+  return value === "v2" ? "v2" : "classic";
+}
+
+/** v2 palette: warm near-black ground, ink text, heat for the rank. */
+export const V2_BADGE = { ground: "#0b0a09", ink: "#f3f0eb", heat: "#ff6b1a", rule: "#2a2622" } as const;
+
+/**
+ * The v2 badge: one flat warm-black pill, the label in muted ink and the
+ * value in ink, or in heat when `heat` is set (the rank). No gradient or
+ * text shadow, unlike the shields look.
+ */
+export function renderBadgeV2({ label, value, heat = false }: { label: string; value: string; heat?: boolean }): string {
+  const safeLabel = escapeXml(label);
+  const safeValue = escapeXml(value);
+  const padding = 10;
+  const labelWidth = textWidth(label) + padding * 2;
+  const valueWidth = textWidth(value) + padding * 2;
+  const total = labelWidth + valueWidth;
+  const valueColor = heat ? V2_BADGE.heat : V2_BADGE.ink;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="20" role="img" aria-label="${safeLabel}: ${safeValue}">
+  <title>${safeLabel}: ${safeValue}</title>
+  <rect width="${total}" height="20" rx="4" fill="${V2_BADGE.ground}"/>
+  <rect x="${labelWidth}" y="5" width="1" height="10" fill="${V2_BADGE.rule}"/>
+  <g text-anchor="middle" font-family="Geist,Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11">
+    <text x="${labelWidth / 2}" y="14" fill="${V2_BADGE.ink}" fill-opacity=".62" textLength="${labelWidth - padding * 2}">${safeLabel}</text>
+    <text x="${labelWidth + valueWidth / 2}" y="14" fill="${valueColor}" font-weight="600" textLength="${valueWidth - padding * 2}">${safeValue}</text>
+  </g>
+</svg>`;
+}
+
 export function renderBadge({ label, value, color = "#f97316" }: BadgeInput): string {
   const safeLabel = escapeXml(label);
   const safeValue = escapeXml(value);
@@ -97,6 +131,70 @@ export function badgeCost(cost: number): string {
 /** Compact tokens: 940M, 26.1B, 1.2T. The same formatter the share cards use. */
 export const badgeTokens = formatTokensCompact;
 
-export function badgeLabelFor(metric: BadgeMetric): string {
-  return metric === "rank" ? "viberank" : metric === "cost" ? "ai spend" : "tokens";
+export function badgeLabelFor(metric: BadgeMetric, range?: BadgeRange): string {
+  const base = metric === "rank" ? "viberank" : metric === "cost" ? "ai spend" : "tokens";
+  if (!range) return base;
+  return `${base} ${range === "week" ? "this week" : range}`;
+}
+
+// ----------------------------------------------------------------------------
+// Rolling-window badges (#198): ?range=7d|30d|week&sort=tokens|cost
+// ----------------------------------------------------------------------------
+
+/** 7d / 30d: the last 7 or 30 days, today included. week: Monday (UTC) to today. */
+export type BadgeRange = "7d" | "30d" | "week";
+export type BadgeSort = "cost" | "tokens";
+
+export const BADGE_RANGES: BadgeRange[] = ["7d", "30d", "week"];
+
+export function isBadgeRange(value: string | null): value is BadgeRange {
+  return value !== null && (BADGE_RANGES as string[]).includes(value);
+}
+
+/** Unknown or missing sorts fall back to cost, the board's default. */
+export function badgeSortFrom(value: string | null): BadgeSort {
+  return value === "tokens" ? "tokens" : "cost";
+}
+
+const DAY_MS = 86_400_000;
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** Inclusive YYYY-MM-DD bounds of a range, in UTC like the board's dates. */
+export function badgeRangeWindow(range: BadgeRange, now: Date): { from: string; to: string } {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  if (range === "week") {
+    const sinceMonday = (new Date(today).getUTCDay() + 6) % 7;
+    return { from: isoDay(today - sinceMonday * DAY_MS), to: isoDay(today) };
+  }
+  const days = range === "7d" ? 7 : 30;
+  return { from: isoDay(today - (days - 1) * DAY_MS), to: isoDay(today) };
+}
+
+export interface WindowRankRow {
+  userKey: string;
+  username: string;
+  cost: number;
+  tokens: number;
+}
+
+/**
+ * A developer's position on a window board: every developer with usage in
+ * the window, ordered by `sort` (ties by the other metric, then handle).
+ * Matches the handle on either the merged username or the GitHub login.
+ */
+export function rankInWindow(
+  rows: WindowRankRow[],
+  handle: string,
+  sort: BadgeSort
+): { rank: number; of: number; cost: number; tokens: number } | null {
+  const wanted = handle.toLowerCase();
+  const primary = (row: WindowRankRow) => (sort === "tokens" ? row.tokens : row.cost);
+  const secondary = (row: WindowRankRow) => (sort === "tokens" ? row.cost : row.tokens);
+  const ordered = rows
+    .filter((row) => row.cost > 0 || row.tokens > 0)
+    .sort((a, b) => primary(b) - primary(a) || secondary(b) - secondary(a) || a.userKey.localeCompare(b.userKey));
+  const index = ordered.findIndex((row) => row.userKey === wanted || row.username.toLowerCase() === wanted);
+  if (index < 0) return null;
+  const row = ordered[index];
+  return { rank: index + 1, of: ordered.length, cost: row.cost, tokens: row.tokens };
 }

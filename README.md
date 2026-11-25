@@ -1,69 +1,85 @@
 # viberank
 
-A community-driven leaderboard for AI coding usage — [Claude Code](https://claude.com/claude-code), [Codex](https://ccusage.com/guide/codex/), Gemini CLI and every other tool [`ccusage`](https://github.com/ryoppippi/ccusage) tracks. Submit your stats and see how you rank.
+**The weekly league for AI coding.** Every Monday 00:00 UTC a new week starts. Your Claude Code, Codex, Gemini CLI and OpenCode usage (anything [`ccusage`](https://github.com/ryoppippi/ccusage) reads) is ranked against people at your scale, verified with GitHub, and frozen when the week is done.
 
-![viberank — a global multi-tool AI coding leaderboard. Submit your ccusage stats from Claude Code, Codex, Gemini and more, and see how you rank by cost, tokens, and days active.](public/hero.gif)
+![viberank: the weekly league for AI coding. Sync your ccusage stats from Claude Code, Codex, Gemini and more, and see where you stand this week.](public/hero.gif)
 
-![viberank](https://img.shields.io/badge/viberank-Track%20Your%20AI%20Coding%20Usage-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 
-Live at **[viberank.app](https://www.viberank.app)**.
+Live at **[viberank.app](https://www.viberank.app)**. What changed in v2 and why: [the launch post](https://www.viberank.app/blog/viberank-v2-weekly-league) and the [CHANGELOG](./CHANGELOG.md#v2-the-weekly-league-november-2026).
 
-> **v2 — multi-tool support.** viberank started as a Claude Code leaderboard. As `ccusage` grew to track Codex, Gemini CLI, Copilot, OpenCode and more, viberank evolved with it: submissions from any supported tool are now accepted, recorded per tool, and filterable on the leaderboard. Claude Code remains a first-class citizen — you can now just see how it stacks up against the rest of your stack. Full details in the [CHANGELOG](./CHANGELOG.md).
+## Join in 30 seconds
 
-## Features
-
-- 🏆 **Global leaderboard** — top-3 podium + full table, sorted by cost or tokens, with 7d / 30d / custom date filters
-- 🧰 **Multi-tool** — usage from Claude Code, Codex, Gemini CLI, Copilot, OpenCode and other `ccusage`-supported agents; every row shows **tool chips** and the board filters per tool
-- 🎯 **Per-tool boards** — dedicated leaderboards at [`/tool/claude`](https://www.viberank.app/tool/claude), [`/tool/codex`](https://www.viberank.app/tool/codex), [`/tool/gemini`](https://www.viberank.app/tool/gemini), [`/tool/copilot`](https://www.viberank.app/tool/copilot), [`/tool/opencode`](https://www.viberank.app/tool/opencode)
-- 📊 **Profile pages** at `viberank.app/profile/{username}` — global rank, daily charts, token breakdown, tools used
-- ⚡ **Server-rendered** — homepage, profiles, and tool boards are SSR'd with structured data (FAQPage, ProfilePage, BreadcrumbList) for fast paint and full crawlability
-- 🚀 **Four ways to submit**: `npx viberank-cli`, plain `curl`, signed-in web upload, or MCP
-- ♾️ **Autosubmit** — `viberank login` once, `viberank autosubmit` once, and your usage keeps arriving daily; `viberank status` says whether it is working. Claude Code deletes session transcripts after 30 days by default, so this is the difference between a permanent record and whatever survived the last cleanup
-- 🔐 **GitHub OAuth + API tokens** — OAuth and token submissions show a blue check; header-only CLI submissions show a `cli` pill
-- 🖥️ **Multi-machine** — a laptop and a desktop sum into one profile instead of overwriting each other
-- 📈 **[`/stats`](https://www.viberank.app/stats)** — site-wide spend curve, monthly trend, and where your burn lands against everyone else
-- 🧮 **[`/calculator`](https://www.viberank.app/calculator)** — which subscription tier your actual usage justifies, based on your real `ccusage` numbers rather than a guess
-- ⚔️ **[Head-to-head comparisons](https://www.viberank.app/compare)** — `/compare/claude-vs-codex` and every other tool matchup, with live adoption numbers from the board
-- 🎖️ **README badges** — `https://www.viberank.app/api/badge/{username}` for rank, cost, or tokens
-- 🛡️ **Input validation** — one-sided token math (reasoning-token aware), a per-model cost floor, date sanity, realistic-range ceilings
-- 🔄 **One row per developer** — every submission lands in your single profile row; history is never deleted, only added to or held at its high-water mark
-- ✍️ **Blog** — data-backed posts on AI coding costs at [viberank.app/blog](https://www.viberank.app/blog) ([RSS](https://www.viberank.app/feed.xml)); [`llms.txt`](https://www.viberank.app/llms.txt) for AI search engines
-
-## Submitting your usage data
-
-### Option 1: `npx viberank-cli` (recommended)
+**CLI** (Node 18+):
 
 ```bash
 npx viberank-cli
 ```
 
-It needs Node.js 18 or newer.
+It reads your usage with ccusage, verifies you with GitHub, submits, and prints your standing this week: rank, movement, the gap to the person above, plan-equivalents. Say yes to autosubmit and it keeps itself up to date.
 
-This runs `ccusage@20 daily --json` (the aggregate report across **all** your detected tools), writes the report to `~/.viberank/cc.json` rather than your current folder, and POSTs it to `/api/submit`. It reads your GitHub username from your git remote and asks you to confirm it. If there is no GitHub remote it shows what `git config user.name` says but makes you type the handle yourself — that value is usually a display name, and accepting it silently created profiles belonging to nobody (#141). If ccusage finds no usage at all, nothing is submitted and the CLI says where ccusage looked.
+**Claude Code plugin**: syncs when a session starts or ends and puts your rank in the status line (`vr #41/126 ▲6 · $27 to @palewave`). Run `npx viberank-cli` once first so a token is saved, then inside Claude Code:
 
-**Without a terminal** (an agent's shell, CI), the CLI never prompts. It submits when it has a token (`npx viberank-cli login --token vbr_…`, or `VIBERANK_TOKEN`), or with `npx viberank-cli --user <github-handle> --yes` as an unverified submission; otherwise it says which of those to use. `npx viberank-cli --help` lists every command and option.
-
-**Set it and forget it.** A one-off submission captures only what survives on disk today, and freezes your rank there. Mint a token at [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), then:
-
-```bash
-npx viberank-cli login       # paste the token once (or: login --token vbr_…)
-npx viberank-cli autosubmit  # daily background submission
+```
+/plugin marketplace add sculptdotfun/viberank
+/plugin install viberank@viberank
 ```
 
-`autosubmit` without a saved token walks you through `login` first. A scheduled job cannot see `VIBERANK_TOKEN`, so it needs the saved one.
+The status-line setup is in the [plugin README](./packages/viberank-claude-plugin#readme).
 
-Claude Code deletes session transcripts older than `cleanupPeriodDays` — 30 by default — on startup, with no warning. Every tool that reads `~/.claude/projects` loses that history at the same moment; what has already been submitted here does not. Submitting daily is what makes the record outlive the local files. (Raising `cleanupPeriodDays` in `~/.claude/settings.json` stops the deletion at the source.)
+**Ask your agent**: paste this into Claude Code, Codex or any agent with a shell:
 
-`autosubmit` registers with your platform's own scheduler — launchd, systemd user timers, or Task Scheduler — rather than running a daemon of its own, so it survives reboots and catches up after a missed run. It runs at the hour you pick (9 by default) and a minute fixed per machine, so submissions spread across the hour. If the scheduler refuses the job (WSL without systemd, say), nothing is left half-installed and you see the scheduler's own error. Every run writes one dated line to `~/.viberank/autosubmit.log`.
+```
+Put my AI coding usage on viberank. Run `npx viberank-cli login` and help me finish the GitHub sign-in, then run `npx viberank-cli` and tell me my rank this week and the gap to the person above me.
+```
 
-`npx viberank-cli status` shows whose token it is (or that it was revoked), the schedule and the scheduler's last exit code, the last successful submission and how long ago, a warning after 48 hours without one, and the recent log lines. `autosubmit off` removes the job, and `logout` removes it along with the token. Token submissions are verified, so they carry a blue check without a browser sign-in.
+**README badge** with your weekly rank:
 
-> **Turned autosubmit on before 1.13?** Run `npx viberank-cli autosubmit` once. Older jobs started without a PATH, could not find node, and never submitted; a job that cannot start cannot update itself either.
+```markdown
+[![viberank](https://www.viberank.app/api/badge/YOUR_GITHUB_HANDLE?style=v2&range=week)](https://www.viberank.app/profile/YOUR_GITHUB_HANDLE)
+```
 
-### Option 2: curl
+Every way to join, with copy buttons: [viberank.app/start](https://www.viberank.app/start).
+
+Only daily totals leave your machine: tokens, models, tools and API-equivalent cost. No prompts, code or file contents ([privacy](https://www.viberank.app/privacy)).
+
+## How ranking works
+
+- **The week is the unit.** Monday 00:00 UTC to the next Monday 00:00 UTC. Only usage dated inside those seven days counts toward it. The home page is this week; [`/week/2026-W48`](https://www.viberank.app/week/2026-W48) and friends keep every closed week.
+- **Three boards, reason always shown.**
+  - **Ranked**: GitHub-verified (a signed CLI token or a signed-in upload), nothing under review, and at most **10 plan-equivalents** in the week. One plan-equivalent is $1,300 of API-equivalent usage a week, about one top-tier plan used to its limit ([#195](https://github.com/sculptdotfun/viberank/issues/195)).
+  - **Open**: everyone else below the line, such as unverified submissions and entries under review. Public, with the reason on the row.
+  - **Fleets**: above 10 plan-equivalents a week. Teams under one handle, relays and agent farms are measured here, not ranked against one person.
+- **Under review means held.** An unusual entry keeps its profile but sits on Open until a maintainer clears it.
+- **Weeks freeze.** A closed week is snapshotted 12 hours after Monday 00:00 UTC. Late days still update your profile and [`/records`](https://www.viberank.app/records) (the lifetime board), never a finished week.
+- **Your row is pinned** with the gap to the person above and the bracket of people around you. Every Monday there is a recap card to share.
+- **Head to head**: `/vs/alice/bob` compares two people for the week. **Private leagues** for a team or friends sit on the same weekly board.
+- **Wrapped 2026** opens December 10.
+
+Dollar figures are **API-equivalent**: what the tokens would cost at list API prices, not what anyone paid. Logs on your own machine can be forged. The rules make faking slow, bounded and visible, not impossible. More in [How viberank checks submissions](https://www.viberank.app/blog/how-viberank-checks-submissions) and [VALIDATION.md](./VALIDATION.md).
+
+## CLI reference
+
+| Command | What it does |
+|---|---|
+| `npx viberank-cli` | Submit and print this week's standing |
+| `npx viberank-cli login` / `login --token vbr_…` | Save a token so submissions are verified (tokens: [settings/tokens](https://www.viberank.app/settings/tokens)) |
+| `npx viberank-cli autosubmit` / `autosubmit off` | Daily background submission through launchd, systemd or Task Scheduler |
+| `npx viberank-cli status` | Token owner, schedule, last submission, recent log lines |
+| `npx viberank-cli status --format short\|compact\|long\|json\|<template>` | One line for a status bar, read from `~/.viberank/standing.json` with no network call |
+| `npx viberank-cli --help` | Everything else |
+
+Without a terminal (an agent's shell, CI) the CLI never prompts. It submits with a token (`VIBERANK_TOKEN` or a saved one), or with `--user <github-handle> --yes` as an unverified submission.
+
+Claude Code deletes session transcripts older than `cleanupPeriodDays` (30 by default) on startup. What you already submitted stays here, so autosubmit or the plugin is what makes your record outlive the local files.
+
+> **Turned autosubmit on before 1.13?** Run `npx viberank-cli autosubmit` once. Older jobs started without a PATH and never submitted.
+
+### Other ways to submit
+
+**curl**:
 
 ```bash
 npx ccusage@latest daily --json > cc.json
@@ -73,87 +89,44 @@ curl -X POST https://www.viberank.app/api/submit \
   -d @cc.json
 ```
 
-> Put your **GitHub username** in that header, not `$(git config user.name)` — that is usually a display name, and submitting under it creates a second profile nobody owns.
+Use your GitHub username in the header, not `git config user.name`. A header-only submission is unverified, lands on Open, and is refused once the username is verified. Add `--by-agent` to the ccusage command for a per-tool split.
 
-> Add `--by-agent` to the `ccusage` command to include a per-tool split, so a Claude Code cleanup can be applied to Claude's numbers alone.
+**Web upload**: sign in with GitHub, then **Submit Stats** → **Upload cc.json**. Uploads are verified.
 
-> `ccusage` v20 keys daily entries by `period` and reports an `agent` per day; viberank normalizes this server-side, so either the new or older `ccusage` output works.
-
-### Option 3: Web upload
-
-1. Sign in to [viberank.app](https://www.viberank.app) with GitHub
-2. Click **Submit Stats** → **Upload cc.json**
-3. Drop your `cc.json` file
-
-Web uploads come back with a verified badge automatically. CLI submissions are verified when the CLI has a token (`npx viberank-cli login`); without one they're an unverified claim to the username. Once a username is verified, unverified submissions to it are refused with a pointer to `login`, so nobody else can write to your profile.
-
-### Option 4: MCP server
-
-[`viberank-mcp`](https://www.npmjs.com/package/viberank-mcp) ([source](./packages/viberank-mcp-server)) lets your agent read your usage, submit it, and look up the leaderboard, profiles and site stats. In Claude Code:
-
-```bash
-claude mcp add --scope user viberank -- npx -y viberank-mcp
-```
-
-With an API token from [viberank.app/settings/tokens](https://www.viberank.app/settings/tokens), submissions are verified and filed under the token's account, with no username to confirm:
+**MCP server** ([`viberank-mcp`](https://www.npmjs.com/package/viberank-mcp), [source](./packages/viberank-mcp-server)): your agent can submit, read the boards, and call `get_standing` for your week.
 
 ```bash
 claude mcp add --scope user viberank --env VIBERANK_TOKEN=vbr_… -- npx -y viberank-mcp
 ```
 
-Without a token, the agent has to confirm your GitHub username with you before it submits. On native Windows, use `-- cmd /c npx -y viberank-mcp`. For Claude Desktop, add this to `claude_desktop_config.json` (on Windows, `"command": "cmd"` with `"args": ["/c", "npx", "-y", "viberank-mcp"]`):
+Without a token the agent must confirm your GitHub username with you before it submits. On native Windows use `-- cmd /c npx -y viberank-mcp`. Claude Desktop and other clients: see the [package README](./packages/viberank-mcp-server#readme).
 
-```json
-{
-  "mcpServers": {
-    "viberank": {
-      "command": "npx",
-      "args": ["-y", "viberank-mcp"],
-      "env": { "VIBERANK_TOKEN": "vbr_…" }
-    }
-  }
-}
-```
+## Public API
 
-Other MCP clients can run `npx -y viberank-mcp` as a stdio server. The [package README](./packages/viberank-mcp-server#readme) lists the tools.
+Read-only, unauthenticated JSON. Weeks are ISO week ids like `2026-W48`.
+
+| Route | Returns |
+|---|---|
+| `GET /api/v2/board?window=week\|month\|all&cls=ranked\|open\|fleets&sort=&tool=&week=&limit=&offset=` | One board, with each row's class, held reason and plan-equivalents |
+| `GET /api/v2/standing/{username}?week=` | Your standing: rank of N, board, movement, gap to the person above, streak (404 when unknown) |
+| `GET /api/v2/recap/{username}/{weekId}` | The Monday recap for one closed week |
+| `GET /api/v2/wrapped/{username}/{year}` | A year in review (Wrapped 2026) |
+| `GET /api/badge/{username}` | SVG badge. `style=v2`, `range=week\|7d\|30d`, `metric=rank\|cost\|tokens`, `sort=cost\|tokens` |
+| `GET /api/leaderboard?limit=&tool=`, `GET /api/profile/{username}` | Older read routes, still served |
+| `GET /api/health` | Backend status |
+
+Write routes:
+
+- `POST /api/submit`: body is `cc.json` (`ccusage daily --json`). Auth, in order: `Authorization: Bearer vbr_…` (verified), a NextAuth session cookie (verified), or `X-GitHub-User` (unverified). Rate limited per machine, with `Retry-After` on 429.
+- `POST /api/claim`: signed in; merges your rows into one verified row without dropping any day.
+- `GET|POST /api/tokens`, `DELETE /api/tokens/{id}`: signed in; list, mint and revoke API tokens. Only a SHA-256 of each token is stored.
+- `POST /api/admin/flag`, `POST /api/admin/review`: admins only (allowlist in `src/lib/admin.ts`).
 
 ## Data validation
 
-Submissions are checked at the API level. Anything that fails these rules is rejected:
+Every submission is checked before it is stored: one-sided token math (reasoning tokens may exceed the parts), a per-model cost floor and ceiling, no single day over $150,000, big days must carry a per-model breakdown that adds up, valid dates no later than tomorrow UTC, and no negative values. Re-submits never double count: each machine's day is stored once and only replaced by a larger reading of the same machine, and a laptop and a desktop add up instead of overwriting each other ([#43](https://github.com/sculptdotfun/viberank/issues/43)). The full rules are in [VALIDATION.md](./VALIDATION.md).
 
-- **Token math** — `total >= input + output + cache_creation + cache_read`. The total may legitimately *exceed* the four components because reasoning/thinking tokens (Gemini, Codex, Claude extended thinking) are counted in `totalTokens` but not broken out by `ccusage`. We only reject a total that is *less* than its known parts.
-- **Cost floor, per model** — every model's tokens have to be paid for at that model's own floor (`1e-9`/token for DeepSeek, MiMo, MiniMax and big-pickle, whose cache reads cost ~2% of a miss, and for Muse Spark; `1e-7` for everything else), plus a `0.1`/token ceiling. This is the primary guard against inflated token counts now that the token-sum check is one-sided
-- **No negative values** anywhere in totals or daily breakdowns
-- **Valid date format** — `YYYY-MM-DD`
-- **Not too far in the future** — dates after tomorrow-UTC are rejected (covers users at any global timezone offset)
-- **Realistic ranges** — total cost can't exceed `$5,000 × 365 days`
-
-Submissions can also be flagged for review by an admin via `/admin`; flagged rows are hidden from the leaderboard by default.
-
-See [VALIDATION.md](./VALIDATION.md) for the full ruleset.
-
-## Merging multiple submissions
-
-Every submission from a user goes to the same row, so new duplicates don't form. Older profiles can still have more than one row; signing in with the matching GitHub account shows a banner offering to verify or merge them. That hits an authenticated `/api/claim` endpoint which:
-
-1. Finds all submissions under your GitHub username
-2. Combines each day's per-machine slices across the rows: the same machine seen twice keeps its larger figure, different machines add up
-3. Writes the result onto one row, recomputes totals, sets `verified: true`, and removes the now-empty duplicates
-
-Nothing any row held is dropped: the merged total is always at least your largest row and at most the sum of your rows.
-
-## Submitting from more than one machine
-
-Supported — a laptop and a desktop sum into one profile rather than overwriting each other ([#43](https://github.com/sculptdotfun/viberank/issues/43)).
-
-Each machine generates an anonymous random UUID on first run, stored at `~/.viberank/machine-id`. The server keeps usage as a **per-machine slice** and re-sums them, so re-submitting from one machine replaces only that machine's contribution and leaves the others intact. No hardware or identifying information is involved.
-
-Uploads with no machine ID (web uploads, cURL, very old CLIs) are kept as an unattributed slice next to the per-machine ones. Because it may be the same machine's data, it's never added on top: a day shows whichever is larger, the unattributed slice or the sum of the machine slices.
-
-Two consequences worth knowing:
-
-- **A machine's totals never silently decrease.** If a re-submission reports *less* than that machine previously contributed — a pruned `~/.claude/projects`, a fresh install, a partial export — the higher prior figure is retained instead. Deleting local transcripts doesn't erase your rank.
-- **Genuine deletion is still recorded.** The CLI reports per-month file and byte counts of your transcript corpus, and the server classifies a shrink as *deleted* vs *rewritten* rather than guessing ([#112](https://github.com/sculptdotfun/viberank/issues/112)). Counts only — no transcript content ever leaves your machine. Counts are compared only against earlier counts of the same folder (a hash of its path is sent, never the path), so a second submitter on the same machine that counts a different folder can't pass for a deletion.
+Each machine gets an anonymous random id in `~/.viberank/machine-id`. The CLI also sends per-month file and byte counts of your transcript folder (never contents) so the server can tell deleted history from rewritten history ([#112](https://github.com/sculptdotfun/viberank/issues/112)).
 
 ## Development
 
@@ -186,10 +159,20 @@ GITHUB_ID=<github-oauth-client-id>
 GITHUB_SECRET=<github-oauth-client-secret>
 ```
 
+Optional:
+
+```env
+# Which home "/" serves: "legacy" (the pre-v2 all-time board, the default when
+# unset) or "v2" (the weekly league). The v2 board is always live at /week,
+# and closed weeks at /week/<YYYY-Www> and /weeks, whichever home is set.
+# Read on the server when a page renders; redeploy after changing it.
+VIBERANK_HOME=legacy
+```
+
 Apply the schema:
 
 ```bash
-# Run the SQL in supabase/migrations/ in order against your project,
+# Run the SQL in supabase/migrations/ in numeric order against your project,
 # either via the Supabase SQL editor or the supabase CLI:
 #   001_initial_schema.sql
 #   002_multi_tool.sql          # submissions.tools[] + daily_breakdowns.agents[]
@@ -202,16 +185,24 @@ Apply the schema:
 #   009_open_to_work_email.sql
 #   010_api_tokens.sql          # hashed CLI tokens
 #   011_efficiency.sql          # cost-per-token, generated column
-#   020_efficiency_score.sql    # volume-weighted efficiency ranking
 #   012_corpus_observations.sql # per-month corpus counts for drift (#112)
-#   019_corpus_scope.sql        # compare corpus counts per counted folder
 #   013_month_stats.sql         # per-month aggregates for /stats/monthly
 #   014_reload_schema_cache.sql # refresh PostgREST's cached schema
+#   015_wrapped_and_leagues.sql # monthly Wrapped stats + friend leagues
+#   016_profile_emails.sql
+#   017_private_machine_ids.sql # see the note below before running
+#   018_estimated_days.sql      # mark reconstructed days (#138)
+#   019_corpus_scope.sql        # compare corpus counts per counted folder
+#   020_efficiency_score.sql    # volume-weighted efficiency ranking
+#   021_tier_ladder.sql
+#   022_profiles_username_lower_unique.sql
+#   023_review_reasons.sql      # "under review" marks (#183)
+#   024_v2_weekly.sql           # v2: weekly boards in SQL + frozen weeks
 ```
 
-> **Applying migrations to an existing instance:** apply the SQL **before** deploying the app code. Migrations are additive — new columns default to empty and new tables are created `IF NOT EXISTS` — so each is safe to run ahead of its deploy, **except `017_private_machine_ids.sql`**, which revokes a column from the anon role: deploy the app code that names its `daily_breakdowns` columns first, then run 017. A new `daily_breakdowns` column is not readable by the browser until it is added to 017's grant and to `DAILY_PUBLIC_COLUMNS`.
+> **Applying migrations to an existing instance:** apply the SQL **before** deploying the app code. Migrations are additive (new columns default to empty and new tables are created `IF NOT EXISTS`), so each is safe to run ahead of its deploy, **except `017_private_machine_ids.sql`**, which revokes a column from the anon role: deploy the app code that names its `daily_breakdowns` columns first, then run 017. A new `daily_breakdowns` column is not readable by the browser until it is added to 017's grant and to `DAILY_PUBLIC_COLUMNS`.
 >
-> Run `014_reload_schema_cache.sql` last, and again after any future migration that adds a column. PostgREST serves a cached copy of the schema, so a newly added column is invisible to the API until that cache is reloaded — writes to it fail with `PGRST204: Could not find the '<column>' column of '<table>' in the schema cache` even though the column exists.
+> Run `014_reload_schema_cache.sql` last, and again after any future migration that adds a column. PostgREST serves a cached copy of the schema, so a newly added column is invisible to the API until that cache is reloaded: writes to it fail with `PGRST204: Could not find the '<column>' column of '<table>' in the schema cache` even though the column exists.
 
 Run the dev server:
 
@@ -237,86 +228,33 @@ Demo data is read-only and only intended to render realistic leaderboard, profil
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | Run `next lint` |
-| `pnpm test` | Run every `test/*.test.mts` suite — ccusage parsing, data layer, submissions, tokens, badges, corpus scanning, drift classification, plan comparison. Exits on the first failure. `node --import tsx test/ccusage.test.mts <path-to-cc.json>` additionally tests against real data |
+| `pnpm test` | Run every `test/*.test.mts` suite. Exits on the first failure. `node --import tsx test/ccusage.test.mts <path-to-cc.json>` additionally tests against real data |
 | `pnpm exec tsc --noEmit` | Type-check without emitting |
 
-## Tech stack
+### Repo layout
 
-- **Frontend**: Next.js 16, React 19, TypeScript 5, Tailwind CSS 4
-- **Backend**: Next.js API routes + Supabase (Postgres)
-- **Auth**: NextAuth.js v4 with GitHub OAuth
-- **Charts**: Recharts
-- **Animation**: Framer Motion
-- **Hosting**: Vercel
+| Path | What |
+|---|---|
+| `src/app` | Next.js pages and API routes |
+| `src/lib/v2` | The weekly league: week math, trust classes, board queries, the shared contract |
+| `packages/viberank-cli` | `npx viberank-cli` |
+| `packages/viberank-mcp-server` | `viberank-mcp` |
+| `packages/viberank-claude-plugin` | The Claude Code plugin (marketplace at `.claude-plugin/marketplace.json`) |
+| `supabase/migrations` | Schema |
 
-## API
+### Tech stack
 
-### `POST /api/submit`
-
-Submit usage data. Authenticated submissions (with a NextAuth session cookie) are marked `verified: true`; otherwise the request must include an `X-GitHub-User` header.
-
-**Body**: contents of `cc.json` (output of `npx ccusage@latest daily --json`).
-
-**Auth**, in precedence order:
-
-| | Verified | Notes |
-|---|---|---|
-| `Authorization: Bearer vbr_…` | ✅ | API token; works headlessly, which is what `autosubmit` uses |
-| NextAuth session cookie | ✅ | Web upload |
-| `X-GitHub-User: <name>` | ❌ | Unauthenticated; anyone can set it, so the row shows a `cli` pill. Refused with `403` once the username is verified |
-
-**Response**:
-
-```json
-{
-  "success": true,
-  "submissionId": "...",
-  "message": "Successfully submitted data for username",
-  "profileUrl": "https://www.viberank.app/profile/username"
-}
-```
-
-### `POST /api/claim`
-
-Authenticated — merges the caller's submission rows into one verified row without dropping any day's data (see [Merging multiple submissions](#merging-multiple-submissions)). Username is taken from the session, not the request body. Returns 401 without a session.
-
-### `GET|POST /api/tokens`, `DELETE /api/tokens/{id}`
-
-Authenticated (session only — a token cannot mint another token). Lists, creates and revokes API tokens for the signed-in user. Only the SHA-256 of a token is stored; the plaintext is shown once at creation and is unrecoverable afterwards. Revocation is soft, so `last_used_at` stays auditable after a suspected leak. UI at [`/settings/tokens`](https://www.viberank.app/settings/tokens).
-
-### `GET /api/badge/{username}`
-
-Public, unauthenticated. Returns a shields-style SVG for a README:
-
-```markdown
-![viberank](https://www.viberank.app/api/badge/your-github-username)
-![spend](https://www.viberank.app/api/badge/your-github-username?metric=cost)
-![tokens](https://www.viberank.app/api/badge/your-github-username?metric=tokens)
-```
-
-`metric` is `rank` (default), `cost`, or `tokens`. Hand-built SVG rather than a rasterised image so it stays a few hundred bytes and sits crisply next to shields.io badges; cached at the edge with `stale-while-revalidate`.
-
-### `POST /api/admin/flag`
-
-Admin-only (allowlist in `src/lib/admin.ts`) — flags or unflags a submission for review. Runs server-side with the service-role client; returns 403 for non-admins.
-
-### `GET /api/health`
-
-Returns backend status:
-
-```json
-{ "api": "ok", "backend": "supabase", "backendConnection": "ok", "timestamp": "..." }
-```
+Next.js 16, React 19, TypeScript 5, Tailwind CSS 4; Supabase (Postgres) behind Next.js API routes; NextAuth.js v4 with GitHub OAuth; Recharts; Framer Motion; hosted on Vercel.
 
 ## Deployment
 
-Designed to run on Vercel. Push to `main` to trigger an auto-deploy. The required production env vars are the same as `.env.example`; make sure `SUPABASE_SERVICE_ROLE_KEY` and the `NEXT_PUBLIC_*` Supabase vars are also listed in `turbo.json`'s `build.env` allowlist so Turbo passes them through.
+Designed to run on Vercel. Push to `main` to trigger an auto-deploy. The required production env vars are the same as `.env.example`; make sure `SUPABASE_SERVICE_ROLE_KEY` and the `NEXT_PUBLIC_*` Supabase vars are also listed in `turbo.json`'s `build.env` allowlist so Turbo passes them through. `vercel.json` schedules a Monday 12:05 UTC read of the week board, which snapshots the week that just froze.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sculptdotfun/viberank)
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+Issues and PRs are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). If a number on the board looks wrong, open an [issue](https://github.com/sculptdotfun/viberank/issues) with the profile and what doesn't add up. Much of v2 started as reports like that.
 
 ## License
 
@@ -324,13 +262,9 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Acknowledgments
 
+- [ccusage](https://github.com/ryoppippi/ccusage), which produces every number here
 - [Claude Code](https://claude.com/claude-code) by Anthropic
-- [ccusage](https://github.com/ryoppippi/ccusage) — the usage tracker that produces `cc.json`
 
 ## Links
 
-- [Website](https://www.viberank.app)
-- [GitHub](https://github.com/sculptdotfun/viberank)
-- [Report issues](https://github.com/sculptdotfun/viberank/issues)
-- [`viberank-cli` on npm](https://www.npmjs.com/package/viberank-cli)
-- [`viberank-mcp` on npm](https://www.npmjs.com/package/viberank-mcp)
+[Website](https://www.viberank.app) · [Start](https://www.viberank.app/start) · [Records](https://www.viberank.app/records) · [Blog](https://www.viberank.app/blog) · [Issues](https://github.com/sculptdotfun/viberank/issues) · [`viberank-cli`](https://www.npmjs.com/package/viberank-cli) · [`viberank-mcp`](https://www.npmjs.com/package/viberank-mcp)

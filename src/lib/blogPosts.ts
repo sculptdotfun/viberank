@@ -19,6 +19,15 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "viberank-v2-weekly-league",
+    title: "viberank v2: the weekly league for AI coding",
+    excerpt:
+      "A new week every Monday, a Ranked board of verified people at human scale, and weeks that freeze 12 hours after they close. Why we changed it, and how to join in 30 seconds.",
+    datePublished: "2026-11-26",
+    dateModified: "2026-11-26",
+    readTime: "4 min read",
+  },
+  {
     slug: "codex-pricing",
     title: "Codex Pricing (2026): Plans vs Measured Spend Per Developer",
     excerpt:
@@ -33,8 +42,8 @@ export const BLOG_POSTS: BlogPost[] = [
     excerpt:
       "A synthetic $1.8M day briefly topped the leaderboard. What it was, why it got through, the per-day checks that stop it now, and what self-reported usage can and can't prove.",
     datePublished: "2026-10-13",
-    dateModified: "2026-10-13",
-    readTime: "6 min read",
+    dateModified: "2026-11-26",
+    readTime: "7 min read",
   },
   {
     slug: "ai-token-leaderboards-compared",

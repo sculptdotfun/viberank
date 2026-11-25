@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,11 +11,14 @@ import { getToken, getSavedToken, getMachineId, readConfig, writeConfig, clearTo
 import { remoteOwnerKind, resolveTokenOwner, whoami } from './lib/identity.js';
 import * as autosubmit from './lib/autosubmit.js';
 import { collectCorpus, corpusScope } from './lib/corpus.js';
-import { autosubmitPitch, keepLocalHistoryHint } from './lib/pitch.js';
-import { blockedMessage, helpText, parseArgs, submitMode } from './lib/args.js';
+import { autosubmitOneLine, keepLocalHistoryHint } from './lib/pitch.js';
+import { blockedMessage, helpText, linkOffer, parseArgs, skipWithinMs, submitMode, wantsStatusLine } from './lib/args.js';
+import { LINK_HINT, openBrowser, startLink, waitForApproval } from './lib/link.js';
 import { CCUSAGE, generateReport, noUsageHelp, parseReport } from './lib/ccusage.js';
 import { SITE, describeWait, failureMessage, isVerifiedRefusal, networkErrorCode, postReport, submitHeaders } from './lib/submit.js';
 import { appendLog, formatLogLine, isOverdue, lastSuccess, timeAgo } from './lib/runlog.js';
+import { fetchStanding, meUrl, recapUrl, standingLines, toRecord, usernameFromProfileUrl } from './lib/standing.js';
+import { STANDING_FILE, readStandingFile, statusLine, writeStandingFile } from './lib/statusline.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,8 +45,9 @@ const INTERACTIVE = !QUIET && process.stdin.isTTY === true;
 const REPORT_FILE = path.join(CONFIG_DIR, 'cc.json');
 
 // RunAtLoad and logon triggers fire on every boot, so a scheduled run skips
-// itself within this long of a success.
-const SKIP_WITHIN_MS = 20 * 60 * 60 * 1000;
+// itself within this long of a success: 20 hours, or --every <hours> (the
+// Claude Code plugin syncs hourly).
+const SKIP_WITHIN_MS = skipWithinMs(ARGS.flags.every);
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -111,28 +115,99 @@ function help() {
   console.log();
 }
 
+/**
+ * `login`: approve in the browser by default (1.14). No prompt is involved,
+ * so it works from an agent's shell too: it prints the code and link and
+ * waits. `--token` and `--paste` keep the old ways.
+ */
 async function login() {
   const saved = ARGS.flags.token !== null ? await saveVerifiedToken(ARGS.flags.token.trim())
-    : INTERACTIVE ? await acquireToken()
-    : noTerminalForLogin();
+    : ARGS.flags.paste ? (INTERACTIVE ? await pasteToken() : noTerminalForLogin())
+    : (await linkWithGitHub()) !== null;
   if (!saved) process.exit(1);
   console.log(`Next: ${chalk.bold('npx viberank-cli autosubmit')} to keep a running backup.\n`);
 }
 
 function noTerminalForLogin() {
   console.log(chalk.yellow('\nThere is no terminal here to paste a token into.'));
-  console.log(`Pass it instead: ${chalk.bold('npx viberank-cli login --token vbr_…')} (tokens are at ${SITE}/settings/tokens)\n`);
+  console.log(`Run ${chalk.bold('npx viberank-cli login')} without --paste to approve in the browser, or pass ${chalk.bold('--token vbr_…')} (tokens are at ${SITE}/settings/tokens)\n`);
   return false;
 }
 
 /**
- * Walk someone through creating and saving a token.
- *
- * Returns false instead of exiting so it can be offered mid-flow — the
- * autosubmit prompt used to hand out two commands to run later and end there,
- * which is a dead end at the exact moment someone has just said yes.
+ * Get this machine a saved token, the quickest way available: the browser
+ * link, or the paste flow with --paste. Returns false instead of exiting so
+ * it can be offered mid-flow — the autosubmit prompt used to hand out two
+ * commands to run later, a dead end right after someone said yes.
  */
 async function acquireToken() {
+  if (ARGS.flags.paste) return pasteToken();
+  return (await linkWithGitHub()) !== null;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Why a link could not start, in words a person can act on. */
+function linkStartFailure(started) {
+  if (started.reason === 'rate') return started.error ?? 'Too many sign-in attempts from this network. Try again later.';
+  if (started.reason === 'unreachable') return 'Could not reach viberank.app. Check your connection and try again.';
+  if (started.reason === 'unsupported') {
+    return `This server cannot sign in through the browser yet. Use ${chalk.bold('npx viberank-cli login --token <token>')} (from ${SITE}/settings/tokens).`;
+  }
+  return started.error ?? 'Could not start a sign-in. Try again in a minute.';
+}
+
+/**
+ * The one-step sign-in: show a code, open /link?code=…, wait for the approval
+ * and save the token it brings. Resolves the GitHub username ('' if the
+ * server did not say), or null when nothing was saved.
+ */
+async function linkWithGitHub() {
+  const started = await startLink(SITE, { fetch, version: CLI_VERSION });
+  if (!started.ok) {
+    if (started.reason === 'unsupported' && INTERACTIVE) {
+      // A server from before the link routes: the old way still works.
+      return (await pasteToken()) ? (savedTokenOwner(getSavedToken()) ?? '') : null;
+    }
+    console.log(chalk.red(`\n${linkStartFailure(started)}\n`));
+    return null;
+  }
+
+  console.log(chalk.yellow.bold('\nVerify with GitHub\n'));
+  console.log(`  Your code   ${chalk.bold.yellow(started.userCode)}`);
+  console.log(`  Approve at  ${chalk.cyan(started.verifyUrl)}\n`);
+  const opened = !ARGS.flags.noBrowser && openBrowser(started.verifyUrl, { spawn });
+  console.log(chalk.gray(opened
+    ? '  Opened your browser. Check the code matches, sign in, and approve.'
+    : '  Open the link in a browser, check the code matches, sign in, and approve.'));
+
+  const waiting = 'Waiting for approval in the browser… (Ctrl+C to cancel)';
+  const spinner = ora(waiting).start();
+  const result = await waitForApproval(SITE, started, {
+    fetch,
+    sleep,
+    onPoll: (status) => { spinner.text = status === 'offline' ? `${waiting} — connection dropped, still trying` : waiting; },
+  });
+  if (!result.ok) {
+    spinner.fail(result.reason === 'used' ? 'That code was already used.'
+      : result.reason === 'expired' ? 'The code expired before it was approved.'
+      : 'The sign-in failed.');
+    console.log(`Run ${chalk.bold('npx viberank-cli login')} to try again.\n`);
+    return null;
+  }
+
+  writeConfig({ token: result.token });
+  if (result.username) saveTokenOwner(result.token, result.username);
+  spinner.succeed(result.username ? `Verified as @${result.username}` : 'Verified');
+  console.log(chalk.green(`✓ Saved to ${CONFIG_DIR}/config.json (owner-only)\n`));
+  return result.username ?? '';
+}
+
+/**
+ * The pre-1.14 way: create a token on the site and paste it. Kept for
+ * `login --paste` and for servers without the link routes.
+ */
+async function pasteToken() {
   const url = `${SITE}/settings/tokens`;
   console.log(chalk.yellow.bold('\nConnect this machine to viberank\n'));
   console.log(`  1. Open ${chalk.cyan(url)}`);
@@ -270,7 +345,15 @@ function scheduleWarnings(s, token) {
   return notes;
 }
 
+/** One line of weekly standing from ~/.viberank/standing.json. No network:
+ * a status line runs this on every prompt. */
+function printStatusLine() {
+  const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
+  console.log(statusLine(readStandingFile(STANDING_FILE), { format: ARGS.flags.format ?? 'short', color }));
+}
+
 async function showStatus() {
+  if (wantsStatusLine({ format: ARGS.flags.format, stdoutIsTTY: process.stdout.isTTY === true })) return printStatusLine();
   const token = getToken();
   const config = readConfig();
   const s = autosubmit.status();
@@ -282,6 +365,8 @@ async function showStatus() {
 
   const last = lastSuccess(config);
   console.log(`  last submit  ${last ? `${last.toLocaleString()} (${timeAgo(last)})` : chalk.gray('none recorded on this machine')}`);
+  const saved = readStandingFile(STANDING_FILE);
+  console.log(`  this week    ${saved ? `${statusLine(saved, { format: 'long' })} ${chalk.gray(Number.isNaN(Date.parse(saved.updatedAt)) ? '' : `(as of ${timeAgo(new Date(saved.updatedAt))})`)}` : chalk.gray('no standing saved yet; it is written after each submit')}`);
   if (isOverdue({ enabled: s.enabled, last, enabledAt: config.autosubmit?.enabledAt })) {
     console.log(chalk.yellow('  ! No successful submission in over 48 hours. The recent runs below should say why.'));
   }
@@ -306,7 +391,7 @@ async function ensureSavedToken() {
     ? '\nVIBERANK_TOKEN is set in this shell, but a scheduled job will not see it, so it needs a saved token.'
     : '\nA scheduled run cannot sign in through a browser, so it needs a token first.'));
   if (!INTERACTIVE) {
-    console.log(`Save one with ${chalk.bold('npx viberank-cli login --token <token>')} (from ${SITE}/settings/tokens), then run this again.\n`);
+    console.log(`Run ${chalk.bold('npx viberank-cli login')} once (or ${chalk.bold('login --token <token>')}), then run this again.\n`);
     return false;
   }
   return acquireToken();
@@ -449,7 +534,9 @@ async function quietSubmit() {
     writeConfig({ lastAutosubmit: now, lastSubmit: now });
     const as = owner.username ? ` as @${owner.username}` : '';
     const waited = outcome.waitedSeconds ? `, after waiting ${describeWait(outcome.waitedSeconds)} for the rate limit` : '';
-    logRun({ outcome: 'ok', status: outcome.status, detail: `submitted ${data.daily.length} days${as}${waited} ${outcome.body.profileUrl ?? ''}` });
+    const standing = await refreshStanding(owner.username ?? usernameFromProfileUrl(outcome.body.profileUrl));
+    const week = standing ? ` · ${statusLine(toRecord(standing), { format: 'long' })}` : '';
+    logRun({ outcome: 'ok', status: outcome.status, detail: `submitted ${data.daily.length} days${as}${waited} ${outcome.body.profileUrl ?? ''}${week}` });
     return;
   }
 
@@ -657,7 +744,7 @@ function explainFailure(outcome) {
     console.log(chalk.yellow(`- This CLI reads your usage with ${CCUSAGE}; make sure the CLI itself is current: npx viberank-cli@latest`));
     console.log(chalk.yellow(`- The report it sent is at ${REPORT_FILE}`));
   } else if (isVerifiedRefusal(outcome) && !INTERACTIVE) {
-    console.log(chalk.yellow(`\nSave a token with ${chalk.bold('npx viberank-cli login --token <token>')} (from ${SITE}/settings/tokens), then submit again.`));
+    console.log(chalk.yellow(`\nRun ${chalk.bold('npx viberank-cli login')} to verify with GitHub, then submit again.`));
   } else if (status === 413) {
     console.log(chalk.yellow('\nYour usage data is too large. Consider submitting data for a shorter time period.'));
   } else if (status === 429) {
@@ -695,7 +782,39 @@ async function sendReport(payload, githubUser) {
 /** Where you landed, and the badge, right here. This is the one moment
  * someone is actually pleased with the tool, and it used to print a bare URL
  * — which is why almost nobody has ever put the badge up. */
-function showResult(result) {
+/**
+ * This week's standing from the v2 API, saved for status lines. Null when the
+ * server predates v2 or does not answer; the caller then prints what 1.13 did.
+ */
+async function refreshStanding(username) {
+  const standing = await fetchStanding(SITE, username, { fetch, version: CLI_VERSION });
+  if (!standing) return null;
+  try {
+    writeStandingFile(STANDING_FILE, toRecord(standing));
+  } catch {
+    // A read-only home only loses the status line.
+  }
+  return standing;
+}
+
+const PAINT = { bold: chalk.bold, accent: chalk.yellow.bold, gray: chalk.gray, green: chalk.green, red: chalk.red, yellow: chalk.yellow };
+
+/** The week first: rank in class, movement, spend, the gap above; then the links. */
+function showWeek(result, standing) {
+  console.log();
+  for (const line of standingLines(standing, { paint: PAINT })) console.log(`  ${line}`);
+  console.log(`\n  Recap:   ${chalk.green(recapUrl(SITE, standing.week.id, standing.username))}`);
+  const profile = result.profileUrl || `${SITE}/profile/${encodeURIComponent(standing.username)}`;
+  console.log(`  Profile: ${chalk.green(meUrl(profile, standing.username))}`);
+  const badge = result.standing?.badgeMarkdown;
+  if (badge) console.log(`\n  ${chalk.gray('Badge for your README:')}\n  ${chalk.cyan(badge)}`);
+  console.log('');
+  if (result.hint) console.log(chalk.yellow(result.hint) + '\n');
+  if (result.notice) console.log(chalk.gray(result.notice) + '\n');
+}
+
+function showResult(result, weekly = null) {
+  if (weekly) return showWeek(result, weekly);
   const st = result.standing;
   if (st && st.totalDevelopers > 0) {
     console.log(
@@ -720,12 +839,15 @@ function showResult(result) {
 async function main() {
   console.log(chalk.yellow.bold(`\n🚀 Viberank Submission Tool v${CLI_VERSION}\n`));
 
-  const token = getToken();
-  const signedInAs = token ? await signedInOwner(token) : null;
+  let token = getToken();
+  let signedInAs = token ? await signedInOwner(token) : null;
   if (signedInAs && ARGS.flags.user && ARGS.flags.user.toLowerCase() !== signedInAs.toLowerCase()) {
     console.log(chalk.yellow(`The token decides the account, so this is filed under @${signedInAs}, not @${ARGS.flags.user}.`));
   }
-  const githubUser = signedInAs ?? (await chooseUsername());
+  // A first run at a terminal is offered the GitHub link after its usage is
+  // read, so the username question waits until they decline it.
+  const offer = linkOffer({ quiet: QUIET, interactive: INTERACTIVE, hasToken: Boolean(token), yes: ARGS.flags.yes });
+  let githubUser = signedInAs ?? (offer === 'ask' ? null : await chooseUsername());
 
   const data = await readUsage();
   if (data.daily.length === 0) {
@@ -740,7 +862,25 @@ async function main() {
   console.log(`  Total Tokens: ${chalk.green(data.totals.totalTokens.toLocaleString())}`);
   console.log(`  Days Tracked: ${chalk.green(data.daily.length)}\n`);
 
-  if (INTERACTIVE && !ARGS.flags.yes && !(await confirmSubmit(githubUser, signedInAs, token))) {
+  // 'daily' or 'once' once they have linked and answered the one question.
+  let plan = null;
+  if (offer === 'ask') {
+    const linked = await offerVerify(data);
+    if (linked) {
+      if (linked.plan === 'cancel') {
+        console.log(chalk.yellow('Submission cancelled. This machine stays signed in.'));
+        process.exit(0);
+      }
+      token = getToken();
+      signedInAs = linked.username || null;
+      plan = linked.plan;
+    }
+    githubUser = signedInAs ?? (await chooseUsername());
+  } else if (offer === 'hint') {
+    console.log(chalk.gray(LINK_HINT));
+  }
+
+  if (INTERACTIVE && !ARGS.flags.yes && !plan && !(await confirmSubmit(githubUser, signedInAs, token))) {
     console.log(chalk.yellow('Submission cancelled.'));
     process.exit(0);
   }
@@ -752,10 +892,64 @@ async function main() {
   try {
     writeConfig({ lastSubmit: new Date().toISOString(), ...(githubUser ? { username: githubUser } : {}) });
   } catch { /* best effort */ }
-  showResult(result);
+  const standing = await refreshStanding(signedInAs ?? usernameFromProfileUrl(result.profileUrl) ?? githubUser);
+  showResult(result, standing);
 
-  if (INTERACTIVE) await offerAutosubmit(data);
+  if (plan === 'daily') {
+    if (enableAutosubmit(9)) console.log(chalk.gray(`  ${keepLocalHistoryHint()}`));
+    else console.log(chalk.gray('Run `npx viberank-cli autosubmit` to try again.'));
+  } else if (INTERACTIVE && (plan !== 'once' || autosubmit.isEnabled())) {
+    // Also reached with 'once' when a schedule exists, for its repair notice.
+    await offerAutosubmit(data);
+  }
   console.log(chalk.green('\nDone! 🎉'));
+}
+
+/**
+ * The first-run offer (1.14): verify with GitHub, then one question that
+ * covers both the submission and autosubmit, so linking never turns into two
+ * more interruptions. Null when they decline or the link fails; the caller
+ * then goes on unverified as before.
+ */
+async function offerVerify(ccData) {
+  const { verify } = await prompts({
+    type: 'confirm',
+    name: 'verify',
+    message: 'Verify with GitHub to join the Ranked board?',
+    initial: true,
+  });
+  if (!verify) {
+    console.log(chalk.gray('Submitting unverified. Verify any time with `npx viberank-cli login`.'));
+    return null;
+  }
+  const username = await linkWithGitHub();
+  if (username === null) {
+    console.log(chalk.yellow('Continuing unverified.'));
+    return null;
+  }
+  return { username, plan: await choosePlan(ccData, username) };
+}
+
+/** 'daily' | 'once' | 'cancel'. Offers daily only where a schedule can be added. */
+async function choosePlan(ccData, username) {
+  const who = username ? `@${username}` : 'your account';
+  if (!autosubmit.platform() || autosubmit.isEnabled()) {
+    const { go } = await prompts({ type: 'confirm', name: 'go', message: `Submit as ${who}, verified?`, initial: true });
+    return go ? 'once' : 'cancel';
+  }
+  console.log(chalk.gray(autosubmitOneLine(ccData)));
+  const { plan } = await prompts({
+    type: 'select',
+    name: 'plan',
+    message: `Submit as ${who}, verified:`,
+    choices: [
+      { title: 'Submit and keep it current daily (autosubmit)', value: 'daily' },
+      { title: 'Submit once', value: 'once' },
+      { title: 'Cancel', value: 'cancel' },
+    ],
+    initial: 0,
+  });
+  return plan ?? 'cancel';
 }
 
 /**
@@ -783,20 +977,16 @@ async function offerAutosubmit(ccData) {
     return;
   }
 
-  // The pitch used to be about keeping a rank fresh. That is the vanity reason
-  // and it converts badly — 62 of ~1,100 people have ever sent a second report.
-  // The true reason is better: Claude Code deletes session transcripts after
-  // `cleanupPeriodDays`, 30 by default, with no warning and no recovery. Once
-  // it runs, the local history is gone for every tool that reads those files.
-  // What has already been submitted here survives it. That makes autosubmit a
-  // backup rather than a leaderboard chore, and it is the one thing viberank
-  // can offer that a tool reading the same folder cannot.
-  for (const line of autosubmitPitch(ccData)) console.log(chalk.gray(line));
+  // One line, then the question (1.14). The ten-line pitch sat under the
+  // result and pushed the week off the screen. With weekly ranks the live rank
+  // is a real reason now, and the backup (Claude Code deletes transcripts after
+  // `cleanupPeriodDays`, 30 by default) still rides along: see lib/pitch.js.
+  console.log(chalk.gray(autosubmitOneLine(ccData)));
 
   const { enable } = await prompts({
     type: 'confirm',
     name: 'enable',
-    message: 'Keep a running backup of my usage?',
+    message: 'Turn on autosubmit?',
     initial: true,
   });
   if (!enable) {

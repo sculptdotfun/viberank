@@ -5,11 +5,18 @@ import {
   badgeCost,
   badgeTokens,
   badgeLabelFor,
+  badgeRangeWindow,
+  badgeSortFrom,
+  badgeStyleFrom,
+  renderBadgeV2,
   isBadgeMetric,
+  isBadgeRange,
 } from "@/lib/badge";
 
 /**
  * README badge: ![viberank](https://www.viberank.app/api/badge/<username>)
+ * Rolling window (#198): ?range=7d|30d|week&sort=cost|tokens, with any metric.
+ * v2 look: ?style=v2 (combines with range and metric); classic stays the default.
  *
  * Always answers 200 with an SVG, including for unknown users. A README that
  * renders a broken-image icon because someone typo'd their handle is worse
@@ -36,17 +43,45 @@ export async function GET(
   const { username: raw } = await params;
   const username = decodeURIComponent(raw).slice(0, 64);
 
-  const metricParam = request.nextUrl.searchParams.get("metric");
+  const search = request.nextUrl.searchParams;
+  const metricParam = search.get("metric");
   const metric = isBadgeMetric(metricParam) ? metricParam : "rank";
-  const label = badgeLabelFor(metric);
+  const rangeParam = search.get("range");
+  const range = isBadgeRange(rangeParam) ? rangeParam : undefined;
+  const label = badgeLabelFor(metric, range);
+  const style = badgeStyleFrom(search.get("style"));
+  // Classic shields look by default; ?style=v2 is the v2 site's look, with
+  // the rank in heat. Muted states ("not found") never take the accent.
+  const draw = (value: string, muted = false) =>
+    style === "v2"
+      ? renderBadgeV2({ label, value, heat: metric === "rank" && !muted })
+      : renderBadge(muted ? { label, value, color: "#52525b" } : { label, value });
 
   try {
     const dataLayer = await getServerDataLayer();
+
+    // ?range=7d|30d|week&sort=cost|tokens (#198): the user's place on that
+    // window's board, same flagged-row rules as the date-range board.
+    if (range) {
+      const sort = badgeSortFrom(search.get("sort"));
+      const { from, to } = badgeRangeWindow(range, new Date());
+      const standing = await dataLayer.weekly.getWindowRank(username, from, to, sort);
+      if (!standing) {
+        return svg(draw("no usage", true), 900);
+      }
+      const value =
+        metric === "cost"
+          ? badgeCost(standing.cost)
+          : metric === "tokens"
+            ? badgeTokens(standing.tokens)
+            : `#${standing.rank.toLocaleString("en-US")}`;
+      return svg(draw(value), 3600);
+    }
     const profile = await dataLayer.profiles.getProfile(username, 1);
 
     const best = profile?.submissions?.[0];
     if (!profile || !best) {
-      return svg(renderBadge({ label, value: "not found", color: "#52525b" }), 300);
+      return svg(draw("not found", true), 300);
     }
 
     let value: string;
@@ -59,11 +94,11 @@ export async function GET(
       value = rank > 0 ? `#${rank.toLocaleString("en-US")}` : "unranked";
     }
 
-    return svg(renderBadge({ label, value }), 3600);
+    return svg(draw(value), 3600);
   } catch (error) {
     console.error("Badge render failed:", error);
     // Still an image, still 200 — a README must not show a broken image
     // because our database had a bad minute. Short TTL so it self-heals.
-    return svg(renderBadge({ label, value: "unavailable", color: "#52525b" }), 60);
+    return svg(draw("unavailable", true), 60);
   }
 }

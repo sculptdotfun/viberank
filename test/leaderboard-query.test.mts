@@ -124,4 +124,14 @@ function replay(steps: Array<Partial<BoardFilters>>): boolean[] {
   check("tokens, 7d, All, Cost ends on the default board");
 }
 
+{
+  // #200: per-tool boards take the sort from the URL instead of hardcoding cost.
+  const { toolBoardParams, parseSortBy } = await import("../src/lib/leaderboard-query.ts");
+  assert.deepEqual(toolBoardParams("opencode", "efficiency"), { sortBy: "efficiency", page: 0, pageSize: 50, tool: "opencode" });
+  assert.equal(toolBoardParams("codex", "tokens").sortBy, "tokens");
+  assert.equal(toolBoardParams("codex").sortBy, "cost");
+  for (const bad of ["", "COST", "rank", null, undefined]) assert.equal(parseSortBy(bad), "cost", `bad: ${bad}`);
+  check("tool boards accept cost, tokens and efficiency, defaulting to cost");
+}
+
 console.log(`\n${passed} passed, 0 failed`);

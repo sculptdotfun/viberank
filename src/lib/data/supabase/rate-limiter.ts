@@ -33,6 +33,17 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
     rate: 6,
     periodMs: 60 * 60 * 1000, // 6 per hour
   },
+  // Device link (/api/v2/link): starts per IP, so nobody can fill the table
+  // or farm user codes; approvals per GitHub user, so a signed-in account
+  // cannot walk the user-code space looking for someone's pending link.
+  linkStart: {
+    rate: 10,
+    periodMs: 10 * 60 * 1000, // 10 per 10 minutes
+  },
+  linkApprove: {
+    rate: 10,
+    periodMs: 10 * 60 * 1000, // 10 per 10 minutes
+  },
   apiGeneral: {
     rate: 60,
     periodMs: 60 * 1000, // 60 per minute

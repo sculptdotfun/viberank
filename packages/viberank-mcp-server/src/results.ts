@@ -209,3 +209,38 @@ function refusalAdvice(status: number, body: Record<string, unknown>, identity: 
   if (status >= 500) return 'A temporary problem on viberank.app. Nothing needs fixing locally; try again in a few minutes.';
   return `The server refused this report. If the error is about the data, report it at ${ISSUES}.`;
 }
+
+/**
+ * This week's standing (the v2 `Standing` contract) plus the two numbers an
+ * agent is most likely to be asked for and would otherwise compute: the
+ * dollars to pass the row above, and the recap link to share.
+ */
+export function standingResult(response: ApiResult, username: string): ToolResult {
+  if (response.kind === 'rejected' && response.status === 404) {
+    return reply({
+      success: false,
+      found: false,
+      username,
+      error: `No standing for @${username} this week. They have not submitted, or their GitHub username is spelled differently.`,
+      next: 'Running `npx viberank-cli` once submits and creates a standing.',
+    });
+  }
+  if (response.kind !== 'ok') return readFailure(response, 'weekly standings', '/api/v2/standing');
+  const standing = response.body;
+  const week = standing.week as { id?: unknown } | undefined;
+  const above = standing.above as { username?: unknown; cost?: unknown } | null | undefined;
+  const rank = typeof standing.rank === 'number' ? standing.rank : null;
+  const cost = Number(standing.cost) || 0;
+  const gapToAbove = rank !== null && rank > 1 && above && typeof above.cost === 'number'
+    ? Math.max(0, Math.ceil(above.cost - cost))
+    : null;
+  const weekId = typeof week?.id === 'string' ? week.id : null;
+  return reply({
+    success: true,
+    found: true,
+    standing,
+    gapToAbove,
+    recapUrl: weekId ? `${SITE}/recap/${encodeURIComponent(weekId)}/${encodeURIComponent(username)}` : null,
+    boardUrl: `${SITE}/?me=${encodeURIComponent(username)}`,
+  });
+}
