@@ -190,11 +190,19 @@ export function createSupabaseWeeklySource(client: SupabaseClient, canWrite: boo
     },
 
     async frozenWeek(weekStart): Promise<FrozenWeek | null> {
-      const { data: marker, error } = await client
-        .from("v2_weeks")
-        .select("week_start, frozen_at, developers, tokens, cost")
-        .eq("week_start", weekStart)
-        .maybeSingle();
+      // The marker and the first page of rows are read together: a week has
+      // a few hundred rows, so this is one round trip instead of two.
+      const resultsPage = (from: number) =>
+        client
+          .from("v2_week_results")
+          .select("*")
+          .eq("week_start", weekStart)
+          .order("user_key", { ascending: true })
+          .range(from, from + PAGE - 1);
+      const [{ data: marker, error }, firstPage] = await Promise.all([
+        client.from("v2_weeks").select("week_start, frozen_at, developers, tokens, cost").eq("week_start", weekStart).maybeSingle(),
+        resultsPage(0),
+      ]);
       if (error) {
         // Before migration 024 there is nothing frozen; the week is computed live.
         if (MISSING_CODES.has(error.code ?? "")) return null;
@@ -203,13 +211,8 @@ export function createSupabaseWeeklySource(client: SupabaseClient, canWrite: boo
       if (!marker) return null;
 
       const rows: WeekResultRow[] = [];
-      for (let from = 0; ; from += PAGE) {
-        const { data, error: pageError } = await client
-          .from("v2_week_results")
-          .select("*")
-          .eq("week_start", weekStart)
-          .order("user_key", { ascending: true })
-          .range(from, from + PAGE - 1);
+      for (let from = 0, page = firstPage; ; from += PAGE, page = await resultsPage(from)) {
+        const { data, error: pageError } = page;
         if (pageError) throw new Error(`Failed to read week results ${weekStart}: ${pageError.message}`);
         rows.push(...((data ?? []) as WeekResultRow[]));
         if (!data || data.length < PAGE) break;
